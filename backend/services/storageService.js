@@ -43,13 +43,16 @@ export async function uploadFile({ file, userId, entityType, entityId, category,
 
   const key = keyParts.join('/');
 
+  if (!bucket) {
+    throw new Error('S3 bucket not configured. Check HETZNER_S3_BUCKET in your environment.');
+  }
+
   await s3.send(
     new PutObjectCommand({
       Bucket: bucket,
       Key: key,
       Body: file.buffer,
       ContentType: file.mimetype,
-      ACL: 'public-read',
     })
   );
 
