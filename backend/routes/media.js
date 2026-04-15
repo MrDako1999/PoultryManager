@@ -1,4 +1,5 @@
 import express from 'express';
+import multer from 'multer';
 import { protect } from '../middleware/auth.js';
 import { uploadSingle } from '../middleware/upload.js';
 import {
@@ -12,7 +13,20 @@ import {
 const router = express.Router();
 
 // POST /api/media/upload — upload a single file
-router.post('/upload', protect, uploadSingle('file'), async (req, res) => {
+router.post('/upload', protect, (req, res, next) => {
+  uploadSingle('file')(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ message: 'File too large. Maximum size is 10MB.' });
+      }
+      return res.status(400).json({ message: err.message });
+    }
+    if (err) {
+      return res.status(400).json({ message: err.message });
+    }
+    next();
+  });
+}, async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: 'No file provided' });
@@ -32,6 +46,7 @@ router.post('/upload', protect, uploadSingle('file'), async (req, res) => {
 
     res.status(201).json(media);
   } catch (err) {
+    console.error('Upload failed:', err);
     res.status(500).json({ message: err.message });
   }
 });
