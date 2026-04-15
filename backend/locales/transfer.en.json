@@ -1,0 +1,20 @@
+{
+  "transferReceipt": "Transfer Receipt",
+  "receiptNumber": "Receipt No.",
+  "date": "Date",
+  "from": "From",
+  "to": "To",
+  "trn": "TRN",
+  "contact": "Contact",
+  "phone": "Phone",
+  "transferDetails": "Transfer Details",
+  "amount": "Amount",
+  "transferType": "Transfer Type",
+  "bankTransfer": "Bank Transfer",
+  "cash": "Cash",
+  "cheque": "Cheque",
+  "credit": "Credit",
+  "notes": "Notes",
+  "footerGenerated": "This is a computer-generated document and does not require a signature.",
+  "footerCurrency": "All amounts are in {{currency}}."
+}

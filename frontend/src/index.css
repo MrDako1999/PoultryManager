@@ -1,0 +1,73 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 140 20% 97%;
+    --foreground: 150 25% 8%;
+    --card: 0 0% 100%;
+    --card-foreground: 150 25% 8%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 150 25% 8%;
+    --primary: 148 60% 20%;
+    --primary-foreground: 140 20% 97%;
+    --secondary: 148 18% 93%;
+    --secondary-foreground: 150 25% 15%;
+    --muted: 148 14% 92%;
+    --muted-foreground: 150 10% 45%;
+    --accent: 148 18% 91%;
+    --accent-foreground: 150 25% 15%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 148 14% 87%;
+    --input: 148 14% 87%;
+    --ring: 148 60% 20%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 150 25% 6%;
+    --foreground: 140 15% 95%;
+    --card: 150 20% 8%;
+    --card-foreground: 140 15% 95%;
+    --popover: 150 20% 8%;
+    --popover-foreground: 140 15% 95%;
+    --primary: 148 48% 38%;
+    --primary-foreground: 150 25% 6%;
+    --secondary: 150 18% 13%;
+    --secondary-foreground: 140 15% 95%;
+    --muted: 150 14% 13%;
+    --muted-foreground: 148 10% 55%;
+    --accent: 150 18% 15%;
+    --accent-foreground: 140 15% 95%;
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 150 14% 15%;
+    --input: 150 14% 15%;
+    --ring: 148 48% 38%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Poppins', sans-serif;
+  }
+
+  [dir='rtl'] {
+    font-family: 'Poppins', 'Noto Sans Arabic', sans-serif;
+  }
+}
+
+@layer utilities {
+  .font-heading {
+    font-family: 'Poppins', sans-serif;
+  }
+}
