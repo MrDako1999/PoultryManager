@@ -25,29 +25,25 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/components/ui/use-toast';
 import {
   Plus,
-  MoreVertical,
-  Pencil,
-  Trash2,
   Loader2,
   Layers,
   Search,
-  Eye,
-  Calendar,
+  ArrowUpRight,
   Warehouse,
   Home,
+  ChevronRight,
+  CheckCircle2,
+  Clock,
+  AlertTriangle,
+  CircleDashed,
+  CircleDot,
 } from 'lucide-react';
 import SearchableSelect from '@/components/SearchableSelect';
+import CollapsibleSection from '@/components/CollapsibleSection';
 import QuickAddFarmDialog from '@/components/QuickAddFarmDialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import ConfirmDeleteDialog from '@/components/ConfirmDeleteDialog';
@@ -57,12 +53,12 @@ import { formatDateForInput } from '@/lib/format';
 
 const BATCH_STATUSES = ['NEW', 'IN_PROGRESS', 'COMPLETE', 'DELAYED', 'OTHER'];
 
-const STATUS_VARIANTS = {
-  NEW: 'secondary',
-  IN_PROGRESS: 'default',
-  COMPLETE: 'outline',
-  DELAYED: 'destructive',
-  OTHER: 'secondary',
+const STATUS_CONFIG = {
+  NEW: { icon: CircleDashed, color: 'text-muted-foreground', bg: 'bg-muted' },
+  IN_PROGRESS: { icon: Clock, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-100 dark:bg-amber-900/30' },
+  COMPLETE: { icon: CheckCircle2, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-100 dark:bg-emerald-900/30' },
+  DELAYED: { icon: AlertTriangle, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/30' },
+  OTHER: { icon: CircleDot, color: 'text-muted-foreground', bg: 'bg-muted' },
 };
 
 const batchSchema = z.object({
@@ -102,12 +98,24 @@ export default function BatchesPage() {
   const allBatches = useLocalQuery('batches');
   const farms = useLocalQuery('farms');
   const allHouses = useLocalQuery('houses');
+  const allSaleOrders = useLocalQuery('saleOrders');
   const isLoading = false;
 
   const farmsById = useMemo(
     () => Object.fromEntries(farms.map((f) => [f._id, f])),
     [farms]
   );
+
+  const lastSaleDateByBatch = useMemo(() => {
+    const map = {};
+    allSaleOrders.forEach((sale) => {
+      const batchId = sale.batch?._id || sale.batch;
+      if (!batchId || !sale.saleDate) return;
+      const d = new Date(sale.saleDate);
+      if (!map[batchId] || d > map[batchId]) map[batchId] = d;
+    });
+    return map;
+  }, [allSaleOrders]);
 
   const resolveFarm = (batch) => {
     if (batch.farm && typeof batch.farm === 'object') return batch.farm;
@@ -277,6 +285,32 @@ export default function BatchesPage() {
     });
   }, [batchesList, searchQuery]);
 
+  const groupedByFarm = useMemo(() => {
+    const groups = {};
+    filteredBatches.forEach((batch) => {
+      const farm = resolveFarm(batch);
+      const farmId = farm?._id || '_uncategorized';
+      const farmName = farm?.farmName || t('common.uncategorized', 'Uncategorized');
+      if (!groups[farmId]) {
+        groups[farmId] = { farmId, farmName, batches: [] };
+      }
+      groups[farmId].batches.push(batch);
+    });
+
+    return Object.values(groups)
+      .map((group) => {
+        group.batches.sort((a, b) => new Date(b.startDate || 0) - new Date(a.startDate || 0));
+        return group;
+      })
+      .sort((a, b) => {
+        if (a.farmId === '_uncategorized') return 1;
+        if (b.farmId === '_uncategorized') return -1;
+        const aDate = a.batches[0]?.startDate ? new Date(a.batches[0].startDate) : new Date(0);
+        const bDate = b.batches[0]?.startDate ? new Date(b.batches[0].startDate) : new Date(0);
+        return bDate - aDate;
+      });
+  }, [filteredBatches, farmsById, t]);
+
   const deleteWarning = useMemo(() => {
     if (!batchToDelete) return '';
     const parts = [];
@@ -354,83 +388,82 @@ export default function BatchesPage() {
               {t('common.noResults')}
             </p>
           ) : (
-            <div className="space-y-3">
-              {filteredBatches.map((batch) => {
-                const farm = resolveFarm(batch);
-                const displayName = batch.batchName || (farm
-                  ? `${farm.nickname || farm.farmName.substring(0, 8).toUpperCase()}-${batch.startDate ? formatBatchDate(batch.startDate) : '?'}`
-                  : t('batches.addBatch'));
-                return (
-                <div
-                  key={batch._id}
-                  className="flex items-center gap-4 rounded-lg border p-4 transition-colors hover:bg-accent/50 cursor-pointer"
-                  onClick={() => navigate(`/dashboard/batches/${batch._id}`)}
+            <div className="space-y-4">
+              {groupedByFarm.map((group) => (
+                <CollapsibleSection
+                  key={group.farmId}
+                  title={group.farmName}
+                  icon={Warehouse}
+                  count={group.batches.length}
+                  defaultOpen
+                  persistKey={`batches-farm-${group.farmId}`}
+                  headerExtra={
+                    <span className="inline-flex items-center rounded-full border bg-background/80 text-[10px] font-semibold tabular-nums text-muted-foreground">
+                      <span className="px-1.5 py-0">{group.batches.length}</span>
+                      {group.farmId !== '_uncategorized' && (
+                        <>
+                          <span className="w-px self-stretch bg-border" />
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => { e.stopPropagation(); navigate('/dashboard/directory/farms'); }}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); navigate('/dashboard/directory/farms'); } }}
+                            className="px-1 py-0.5 hover:bg-muted/60 rounded-r-full cursor-pointer transition-colors"
+                            title={t('farms.viewFarms', 'View farms')}
+                          >
+                            <ArrowUpRight className="h-2.5 w-2.5" />
+                          </span>
+                        </>
+                      )}
+                    </span>
+                  }
                 >
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                    <Layers className="h-5 w-5 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-medium truncate">{displayName}</p>
-                      <Badge variant={STATUS_VARIANTS[batch.status] || 'secondary'} className="text-[10px] px-1.5 py-0">
-                        {t(`batches.statuses.${batch.status}`)}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                      {farm?.farmName && (
-                        <span className="flex items-center gap-1">
-                          <Warehouse className="h-3 w-3" />
-                          {farm.farmName}
-                        </span>
-                      )}
-                      {batch.startDate && (
-                        <span className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          {new Date(batch.startDate).toLocaleDateString()}
-                        </span>
-                      )}
-                      {(batch._sourcesCount > 0 || batch._expensesCount > 0) && (
-                        <span className="text-xs">
-                          {batch._sourcesCount > 0 && `${batch._sourcesCount} sources`}
-                          {batch._sourcesCount > 0 && batch._expensesCount > 0 && ' · '}
-                          {batch._expensesCount > 0 && `${batch._expensesCount} expenses`}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="shrink-0"
-                        onClick={(e) => e.stopPropagation()}
+                  {group.batches.map((batch) => {
+                    const farm = resolveFarm(batch);
+                    const displayName = batch.batchName || (farm
+                      ? `${farm.nickname || farm.farmName.substring(0, 8).toUpperCase()}-${batch.startDate ? formatBatchDate(batch.startDate) : '?'}`
+                      : t('batches.addBatch'));
+                    const avatarLetter = (farm?.nickname || farm?.farmName || '?')[0].toUpperCase();
+                    const batchNum = batch.sequenceNumber ?? '';
+                    const status = STATUS_CONFIG[batch.status] || STATUS_CONFIG.OTHER;
+                    const StatusIcon = status.icon;
+                    return (
+                      <div
+                        key={batch._id}
+                        className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent/50 cursor-pointer group"
+                        onClick={() => navigate(`/dashboard/batches/${batch._id}`)}
                       >
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/dashboard/batches/${batch._id}`); }}>
-                        <Eye className="mr-2 h-4 w-4" />
-                        {t('common.view')}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openEditSheet(batch); }}>
-                        <Pencil className="mr-2 h-4 w-4" />
-                        {t('common.edit')}
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        className="text-destructive"
-                        onClick={(e) => { e.stopPropagation(); setBatchToDelete(batch); }}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        {t('common.delete')}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-                );
-              })}
+                        <div className="relative shrink-0">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+                            <span className="text-xs font-bold text-primary leading-none">{avatarLetter}{batchNum}</span>
+                          </div>
+                          <div className={`absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full ${status.bg} ring-2 ring-card`}>
+                            <StatusIcon className={`h-2.5 w-2.5 ${status.color}`} />
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{displayName}</p>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                            {batch.startDate && (() => {
+                              const start = new Date(batch.startDate);
+                              const end = batch.status === 'COMPLETE'
+                                ? (lastSaleDateByBatch[batch._id] || start)
+                                : new Date();
+                              const days = Math.max(0, Math.floor((end - start) / 86400000));
+                              return (
+                                <span className="tabular-nums">
+                                  {batch.status === 'COMPLETE' ? `${days} days` : `Day ${days}`}
+                                </span>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                    );
+                  })}
+                </CollapsibleSection>
+              ))}
             </div>
           )}
         </CardContent>
