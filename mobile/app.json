@@ -15,7 +15,11 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.esteratech.poultrymanager"
+      "bundleIdentifier": "com.esteratech.poultrymanager",
+      "appleTeamId": "P85JP93QHY",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -36,6 +40,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "41e0847f-1dbf-4a0b-8230-33d259393096"
+      }
     }
   }
 }
