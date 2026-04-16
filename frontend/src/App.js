@@ -31,6 +31,7 @@ import BusinessSourcesView from '@/pages/dashboard/directory/BusinessSourcesView
 import AccountingSalesPage from '@/pages/dashboard/accounting/AccountingSalesPage';
 import AccountingExpensesPage from '@/pages/dashboard/accounting/AccountingExpensesPage';
 import { Toaster } from '@/components/ui/toaster';
+import { Construction } from 'lucide-react';
 
 function ProtectedRoute({ children }) {
   const { user, isLoading } = useAuthStore();
@@ -70,8 +71,14 @@ function PublicRoute({ children }) {
 
 function PlaceholderPage({ title }) {
   return (
-    <div className="flex items-center justify-center py-20">
-      <p className="text-muted-foreground">{title} — Coming soon</p>
+    <div className="flex flex-col items-center justify-center py-20 text-center px-4">
+      <div className="rounded-full bg-muted p-4 mb-4">
+        <Construction className="h-8 w-8 text-muted-foreground" />
+      </div>
+      <h2 className="text-lg font-semibold mb-1">{title}</h2>
+      <p className="text-sm text-muted-foreground max-w-sm">
+        This feature is currently under development and will be available in a future update.
+      </p>
     </div>
   );
 }
@@ -152,13 +159,14 @@ export default function App() {
           <Route path="/dashboard/accounting" element={<PlaceholderPage title="Accounting" />} />
           <Route path="/dashboard/accounting/sales" element={<AccountingSalesPage />} />
           <Route path="/dashboard/accounting/sales/:saleId" element={<AccountingSalesPage />} />
-          <Route path="/dashboard/accounting/invoices" element={<PlaceholderPage title="Invoices" />} />
+          <Route path="/dashboard/accounting/vat" element={<PlaceholderPage title="VAT" />} />
+          <Route path="/dashboard/accounting/corporate-tax" element={<PlaceholderPage title="Corporate Tax" />} />
           <Route path="/dashboard/accounting/expenses" element={<AccountingExpensesPage />} />
           <Route path="/dashboard/accounting/expenses/:eid" element={<AccountingExpensesPage />} />
 
           {/* Legacy redirects */}
           <Route path="/dashboard/sales" element={<Navigate to="/dashboard/accounting/sales" replace />} />
-          <Route path="/dashboard/invoices" element={<Navigate to="/dashboard/accounting/invoices" replace />} />
+          <Route path="/dashboard/invoices" element={<Navigate to="/dashboard/accounting/sales" replace />} />
 
           <Route path="/dashboard/settings" element={<SettingsPage />} />
         </Route>

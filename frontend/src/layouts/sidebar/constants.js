@@ -3,7 +3,6 @@ import {
   Layers,
   HeartPulse,
   ShoppingCart,
-  FileText,
   Receipt,
   Warehouse,
   Building2,
@@ -12,6 +11,8 @@ import {
   Wheat,
   BookOpen,
   Calculator,
+  Landmark,
+  BadgePercent,
 } from 'lucide-react';
 
 export const SIDEBAR_WIDTH = 'w-64';
@@ -45,8 +46,9 @@ export const navGroups = [
     icon: Calculator,
     children: [
       { key: 'sales', path: '/dashboard/accounting/sales', icon: ShoppingCart },
-      { key: 'invoices', path: '/dashboard/accounting/invoices', icon: FileText },
       { key: 'expenses', path: '/dashboard/accounting/expenses', icon: Receipt },
+      { key: 'vat', path: '/dashboard/accounting/vat', icon: BadgePercent },
+      { key: 'corporateTax', path: '/dashboard/accounting/corporate-tax', icon: Landmark },
     ],
   },
 ];
