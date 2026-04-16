@@ -1,11 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import useLocalQuery from '@/hooks/useLocalQuery';
 import useOfflineMutation from '@/hooks/useOfflineMutation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Card,
   CardContent,
@@ -86,7 +86,9 @@ export default function BatchesPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [didAutoOpen, setDidAutoOpen] = useState(false);
   const [editingBatch, setEditingBatch] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [farmFilter, setFarmFilter] = useState('');
@@ -220,6 +222,14 @@ export default function BatchesPage() {
     setSheetOpen(true);
     armGuard();
   };
+
+  useEffect(() => {
+    if (location.state?.openNew && !didAutoOpen) {
+      setDidAutoOpen(true);
+      openCreateSheet();
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }); // eslint-disable-line react-hooks/exhaustive-deps
 
   const openEditSheet = (batch) => {
     resetGuard();
