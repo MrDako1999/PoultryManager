@@ -5,9 +5,9 @@ import { router } from 'expo-router';
 import {
   ChevronLeft, Bird, Egg, Feather, Factory, ShoppingBag, Wrench, Check, Lock,
 } from 'lucide-react-native';
-import useAuthStore from '../../stores/authStore';
-import useThemeStore from '../../stores/themeStore';
-import { Badge } from '../../components/ui/Badge';
+import useAuthStore from '@/stores/authStore';
+import useThemeStore from '@/stores/themeStore';
+import { Badge } from '@/components/ui/Badge';
 
 const MODULE_META = {
   broiler: { icon: Bird, color: '#059669', darkColor: '#34d399' },

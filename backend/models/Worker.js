@@ -40,8 +40,18 @@ const workerSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['manager', 'supervisor', 'labourer', 'driver', 'other'],
+      enum: ['manager', 'supervisor', 'labourer', 'driver', 'veterinarian', 'other'],
       default: 'labourer',
+    },
+    linkedUser: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+      index: true,
+    },
+    houseAssignments: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'House' }],
+      default: [],
     },
     firstName: {
       type: String,

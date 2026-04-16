@@ -2,27 +2,74 @@ import db, { ENTITY_TABLES, ENTITY_API_MAP, SYNC_ORDER, SOFT_DELETE_TABLES } fro
 import api from './api';
 import { uploadPendingBlob } from './mediaQueue';
 import useSyncStore from '@/stores/syncStore';
+import useAuthStore from '@/stores/authStore';
+import { MODULES, MODULE_ORDER } from '@/modules/registry';
+import {
+  REF_FIELDS,
+  ARRAY_REF_FIELDS,
+  SINGLE_MEDIA_FIELDS,
+  ARRAY_MEDIA_FIELDS,
+  ITEM_ARRAYS,
+  NESTED_REF_OBJECTS,
+  OTHER_DOC_ARRAY_MEDIA_KEY,
+} from '@poultrymanager/shared';
 
 const SYNC_INTERVAL_MS = 60_000;
 let intervalId = null;
 let _queueProcessing = false;
 let _rerunRequested = false;
 
+const SHARED_TABLES = new Set([
+  'businesses', 'contacts', 'workers', 'farms', 'media',
+]);
+
+function getVisibleModules() {
+  const user = useAuthStore.getState().user;
+  if (!user) return MODULE_ORDER;
+  const userModules = Array.isArray(user.modules) ? user.modules : [];
+  return MODULE_ORDER.filter((m) => userModules.includes(m));
+}
+
+function resolveAllowedTables() {
+  const visible = getVisibleModules();
+  const allowed = new Set(SHARED_TABLES);
+  for (const id of visible) {
+    const mod = MODULES[id];
+    if (!mod?.sync) continue;
+    for (const t of mod.sync.tables || []) allowed.add(t);
+    for (const t of mod.sync.dependsOn || []) allowed.add(t);
+  }
+  return allowed;
+}
+
+function resolveBatchScoped() {
+  const visible = getVisibleModules();
+  const batched = new Set();
+  for (const id of visible) {
+    const mod = MODULES[id];
+    for (const t of mod?.sync?.batchScoped || []) batched.add(t);
+  }
+  return batched;
+}
+
+function filteredSyncOrder() {
+  const allowed = resolveAllowedTables();
+  return SYNC_ORDER.filter((e) => ENTITY_API_MAP[e] && allowed.has(e));
+}
+
 async function getServerTime() {
   const { data } = await api.get('/sync/status');
   return data.serverTime;
 }
 
-const BATCH_SCOPED = ['sources', 'expenses', 'feedOrders', 'saleOrders', 'dailyLogs'];
-
-async function fetchAllForEntity(entityType, updatedSince) {
+async function fetchAllForEntity(entityType, updatedSince, batchScoped) {
   const apiPath = ENTITY_API_MAP[entityType];
   if (!apiPath) return [];
 
   const params = {};
   if (updatedSince) {
     params.updatedSince = updatedSince;
-  } else if (BATCH_SCOPED.includes(entityType)) {
+  } else if (batchScoped && batchScoped.has(entityType)) {
     params.syncAll = true;
   }
 
@@ -53,13 +100,23 @@ async function handleSoftDeletes(tableName, records) {
   }
 }
 
+const ENTITY_TO_TABLE = {
+  feedOrder: 'feedOrders',
+  feedOrderItem: 'feedOrderItems',
+  saleOrder: 'saleOrders',
+  dailyLog: 'dailyLogs',
+  feedItem: 'feedItems',
+  media: 'media',
+};
+
+function tableForEntityType(entityType) {
+  if (ENTITY_TO_TABLE[entityType]) return ENTITY_TO_TABLE[entityType];
+  return entityType + 's';
+}
+
 async function applyDeletions(deletionMap) {
   for (const [entityType, ids] of Object.entries(deletionMap)) {
-    const tableName = entityType === 'feedOrder' ? 'feedOrders'
-      : entityType === 'feedOrderItem' ? 'feedOrderItems'
-      : entityType === 'saleOrder' ? 'saleOrders'
-      : entityType + 's';
-
+    const tableName = tableForEntityType(entityType);
     if (db[tableName]) {
       await db[tableName].bulkDelete(ids);
     }
@@ -88,7 +145,8 @@ export async function fullSync({ reportProgress = false } = {}) {
   const store = useSyncStore.getState();
   store.setSyncing(true);
 
-  const syncableEntities = SYNC_ORDER.filter(e => ENTITY_API_MAP[e]);
+  const syncableEntities = filteredSyncOrder();
+  const batchScoped = resolveBatchScoped();
   const totalSteps = syncableEntities.length + 1;
   let currentStep = 0;
 
@@ -103,7 +161,7 @@ export async function fullSync({ reportProgress = false } = {}) {
 
     for (const entityType of syncableEntities) {
       report(ENTITY_LABELS[entityType] || entityType);
-      const records = await fetchAllForEntity(entityType);
+      const records = await fetchAllForEntity(entityType, undefined, batchScoped);
       await upsertEntities(entityType, records);
     }
 
@@ -163,9 +221,10 @@ export async function deltaSync() {
     const serverTime = await getServerTime();
 
     let oldestSyncAt = null;
+    const syncableEntities = filteredSyncOrder();
+    const batchScoped = resolveBatchScoped();
 
-    for (const entityType of SYNC_ORDER) {
-      if (!ENTITY_API_MAP[entityType]) continue;
+    for (const entityType of syncableEntities) {
       const meta = await db.syncMeta.get(entityType);
       const lastSyncAt = meta?.lastSyncAt;
 
@@ -173,7 +232,7 @@ export async function deltaSync() {
         oldestSyncAt = lastSyncAt;
       }
 
-      const records = await fetchAllForEntity(entityType, lastSyncAt);
+      const records = await fetchAllForEntity(entityType, lastSyncAt, batchScoped);
       await upsertEntities(entityType, records);
       await handleSoftDeletes(entityType, records);
     }
@@ -203,9 +262,8 @@ export async function deltaSync() {
       }
     }
 
-    const metaEntries = SYNC_ORDER
-      .filter(e => ENTITY_API_MAP[e])
-      .map(entityType => ({ entityType, lastSyncAt: serverTime }));
+    const metaEntries = syncableEntities
+      .map((entityType) => ({ entityType, lastSyncAt: serverTime }));
     metaEntries.push({ entityType: 'settings', lastSyncAt: serverTime });
     await db.syncMeta.bulkPut(metaEntries);
 
@@ -348,28 +406,14 @@ async function resolveIds(payload) {
   if (!payload || typeof payload !== 'object') return payload;
   const resolved = { ...payload };
 
-  const refFields = {
-    batch: 'batches', source: 'sources', feedOrder: 'feedOrders',
-    saleOrder: 'saleOrders', tradingCompany: 'businesses',
-    sourceFrom: 'businesses', farm: 'farms', house: 'houses', business: 'businesses',
-    contact: 'contacts', feedCompany: 'businesses', feedItem: 'feedItems',
-    buyer: 'businesses', customer: 'businesses',
-    existingBusinessId: 'businesses', existingContactId: 'contacts',
-  };
-
-  for (const [field, entityType] of Object.entries(refFields)) {
+  for (const [field, entityType] of Object.entries(REF_FIELDS)) {
     if (resolved[field]) {
       const mapping = await db.idMap.get({ tempId: resolved[field], entityType });
       if (mapping) resolved[field] = mapping.realId;
     }
   }
 
-  const arrayRefFields = {
-    contacts: 'contacts',
-    businesses: 'businesses',
-  };
-
-  for (const [field, entityType] of Object.entries(arrayRefFields)) {
+  for (const [field, entityType] of Object.entries(ARRAY_REF_FIELDS)) {
     if (Array.isArray(resolved[field])) {
       resolved[field] = await Promise.all(
         resolved[field].map((id) => resolveRefId(id, entityType)),
@@ -377,58 +421,50 @@ async function resolveIds(payload) {
     }
   }
 
-  if (Array.isArray(resolved.items)) {
-    resolved.items = await Promise.all(
-      resolved.items.map(async (item) => {
+  for (const [arrayField, refMap] of Object.entries(ITEM_ARRAYS)) {
+    if (!Array.isArray(resolved[arrayField])) continue;
+    resolved[arrayField] = await Promise.all(
+      resolved[arrayField].map(async (item) => {
         if (!item || typeof item !== 'object') return item;
         const copy = { ...item };
-        if (copy.feedItem) {
-          copy.feedItem = await resolveRefId(copy.feedItem, 'feedItems');
+        for (const [itemField, entityType] of Object.entries(refMap)) {
+          if (copy[itemField]) copy[itemField] = await resolveRefId(copy[itemField], entityType);
         }
         return copy;
-      }),
+      })
     );
   }
 
-  if (Array.isArray(resolved.houses)) {
-    resolved.houses = await Promise.all(
-      resolved.houses.map(async (entry) => {
-        if (!entry || typeof entry !== 'object') return entry;
-        const copy = { ...entry };
-        if (copy.house) {
-          copy.house = await resolveRefId(copy.house, 'houses');
-        }
-        return copy;
-      }),
-    );
-  }
-
-  const singleMediaFields = [
-    'logo', 'photo', 'trnCertificate', 'tradeLicense',
-    'eidFront', 'eidBack', 'visa', 'passportPage',
-  ];
-  for (const field of singleMediaFields) {
+  for (const field of SINGLE_MEDIA_FIELDS) {
     if (resolved[field]) {
       resolved[field] = await resolveMediaId(resolved[field]);
     }
   }
 
-  if (resolved.slaughter && typeof resolved.slaughter === 'object') {
-    resolved.slaughter = { ...resolved.slaughter };
-    resolved.slaughter.slaughterhouse = await resolveRefId(resolved.slaughter.slaughterhouse, 'businesses');
-    resolved.slaughter.relatedExpense = await resolveRefId(resolved.slaughter.relatedExpense, 'expenses');
-    resolved.slaughter.reportDocs = await resolveMediaArray(resolved.slaughter.reportDocs);
+  for (const [objField, config] of Object.entries(NESTED_REF_OBJECTS)) {
+    if (resolved[objField] && typeof resolved[objField] === 'object') {
+      const nested = { ...resolved[objField] };
+      for (const [field, entityType] of Object.entries(config.refFields || {})) {
+        if (nested[field]) nested[field] = await resolveRefId(nested[field], entityType);
+      }
+      for (const field of config.mediaArrayFields || []) {
+        nested[field] = await resolveMediaArray(nested[field]);
+      }
+      resolved[objField] = nested;
+    }
   }
 
-  for (const field of ['invoiceDocs', 'transferProofs', 'taxInvoiceDocs', 'deliveryNoteDocs', 'receipts', 'reportDocs', 'photos']) {
-    resolved[field] = await resolveMediaArray(resolved[field]);
+  for (const field of ARRAY_MEDIA_FIELDS) {
+    if (Array.isArray(resolved[field])) {
+      resolved[field] = await resolveMediaArray(resolved[field]);
+    }
   }
 
   if (Array.isArray(resolved.otherDocs)) {
     resolved.otherDocs = await Promise.all(
       resolved.otherDocs.map(async (doc) => {
-        if (!doc || !doc.media_id) return doc;
-        return { ...doc, media_id: await resolveMediaId(doc.media_id) };
+        if (!doc || !doc[OTHER_DOC_ARRAY_MEDIA_KEY]) return doc;
+        return { ...doc, [OTHER_DOC_ARRAY_MEDIA_KEY]: await resolveMediaId(doc[OTHER_DOC_ARRAY_MEDIA_KEY]) };
       }),
     );
   }
@@ -438,22 +474,22 @@ async function resolveIds(payload) {
 
 async function updateReferences(entityType, tempId, realId) {
   const pending = await db.mutationQueue.where('status').equals('pending').toArray();
+
+  const refFieldNames = Object.keys(REF_FIELDS);
+  const arrRefFieldNames = Object.keys(ARRAY_REF_FIELDS);
+
   for (const entry of pending) {
     let changed = false;
     const payload = entry.payload ? { ...entry.payload } : {};
 
-    const refFields = ['batch', 'source', 'feedOrder', 'saleOrder', 'tradingCompany',
-      'sourceFrom', 'farm', 'house', 'business', 'contact', 'feedCompany', 'feedItem', 'buyer', 'customer',
-      'existingBusinessId', 'existingContactId'];
-
-    for (const field of refFields) {
+    for (const field of refFieldNames) {
       if (payload[field] === tempId) {
         payload[field] = realId;
         changed = true;
       }
     }
 
-    for (const arrField of ['contacts', 'businesses']) {
+    for (const arrField of arrRefFieldNames) {
       if (Array.isArray(payload[arrField])) {
         const idx = payload[arrField].indexOf(tempId);
         if (idx !== -1) {
@@ -464,14 +500,20 @@ async function updateReferences(entityType, tempId, realId) {
       }
     }
 
-    if (Array.isArray(payload.items)) {
-      payload.items = payload.items.map((item) => {
-        if (item?.feedItem === tempId) {
-          changed = true;
-          return { ...item, feedItem: realId };
-        }
-        return item;
-      });
+    for (const arrayField of Object.keys(ITEM_ARRAYS)) {
+      if (Array.isArray(payload[arrayField])) {
+        payload[arrayField] = payload[arrayField].map((item) => {
+          if (!item || typeof item !== 'object') return item;
+          let local = item;
+          for (const [k] of Object.entries(ITEM_ARRAYS[arrayField])) {
+            if (item[k] === tempId) {
+              local = { ...local, [k]: realId };
+              changed = true;
+            }
+          }
+          return local;
+        });
+      }
     }
 
     if (entry.entityId === tempId && entry.entityType === entityType) {

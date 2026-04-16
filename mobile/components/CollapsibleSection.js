@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { View, Text, Pressable, LayoutAnimation, UIManager, Platform } from 'react-native';
 import { ChevronDown, ChevronRight, Plus, ArrowRight } from 'lucide-react-native';
-import useThemeStore from '../stores/themeStore';
+import useThemeStore from '@/stores/themeStore';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);

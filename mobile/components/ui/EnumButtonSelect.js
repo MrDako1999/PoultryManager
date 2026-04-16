@@ -1,6 +1,6 @@
 import { View, Text, Pressable } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import useThemeStore from '../../stores/themeStore';
+import useThemeStore from '@/stores/themeStore';
 
 export default function EnumButtonSelect({
   options = [],

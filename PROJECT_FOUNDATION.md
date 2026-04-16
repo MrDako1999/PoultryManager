@@ -4,6 +4,29 @@
 
 ---
 
+## Module Architecture (PoultryManager)
+
+Both mobile (`mobile/`) and web (`frontend/`) clients follow a plugin-style
+module architecture:
+
+- Shared contracts live in the repo-root [shared/](shared) package: `MODULE_IDS`,
+  `ACCOUNT_ROLES`, `DEFAULT_ROLE_ACTIONS` (capability grammar), and `syncRefs.js`
+  (single source of truth for ID resolution).
+- Each client has a module registry (`mobile/modules/registry.js` and
+  `frontend/src/modules/registry.js`). Registered modules declare their own
+  tabs/sidebar groups, routes, sync tables, capabilities, dashboard widgets,
+  accounting tabs, and role-specific overrides.
+- Role-aware UI is driven by a single `useCapabilities()` hook on each client —
+  `can(action)` decides what buttons, tabs, and routes surface for a given user.
+- Adding a new module means copying `modules/_template/` on both clients and
+  filling in the contract. See [MODULES.md](MODULES.md).
+
+Backend routes for a module's entities use `router.use(protect, requireModule('<id>'))`;
+cross-module routes (users, media, settings, sync, businesses, contacts, etc.)
+stay module-free. See [PERMISSIONS.md](PERMISSIONS.md) and [DATA_OWNERSHIP.md](DATA_OWNERSHIP.md).
+
+---
+
 ## What AutoShipper Is
 
 A multi-tenant CRM for auto-shipping brokers. Brokers get their own subdomain (or custom domain), manage vehicles through a 4-stage pipeline, track finances (charges + payments), import data from BidManager.io, and serve a customer portal. Features dark/light theming, RTL language support, Cloudinary & Hetzner S3 storage, and Vercel deployment with cron jobs.

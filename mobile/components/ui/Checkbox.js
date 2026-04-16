@@ -1,7 +1,7 @@
 import { Pressable, View } from 'react-native';
 import { Check } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { cn } from '../../lib/utils';
+import { cn } from '@/lib/utils';
 
 export function Checkbox({ checked, onCheckedChange, disabled, className }) {
   const handlePress = () => {

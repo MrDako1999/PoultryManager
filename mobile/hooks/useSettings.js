@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getSettings, dbEvents } from '../lib/db';
+import { getSettings, dbEvents } from '@/lib/db';
 
 export default function useSettings(key) {
   const [value, setValue] = useState(null);

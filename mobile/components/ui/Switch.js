@@ -1,5 +1,5 @@
 import { Switch as RNSwitch } from 'react-native';
-import useThemeStore from '../../stores/themeStore';
+import useThemeStore from '@/stores/themeStore';
 
 export default function Switch({ value, onValueChange, disabled }) {
   const { resolvedTheme } = useThemeStore();

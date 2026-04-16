@@ -1,9 +1,9 @@
 import { View, ActivityIndicator } from 'react-native';
 import { Redirect, Stack } from 'expo-router';
-import useAuthStore from '../../stores/authStore';
-import useThemeStore from '../../stores/themeStore';
-import SyncStatusBar from '../../components/SyncStatusBar';
-import FullResyncOverlay from '../../components/FullResyncOverlay';
+import useAuthStore from '@/stores/authStore';
+import useThemeStore from '@/stores/themeStore';
+import SyncStatusBar from '@/components/SyncStatusBar';
+import FullResyncOverlay from '@/components/FullResyncOverlay';
 
 export default function AppLayout() {
   const { user, isLoading } = useAuthStore();
@@ -20,6 +20,10 @@ export default function AppLayout() {
 
   if (!user) {
     return <Redirect href="/(auth)/login" />;
+  }
+
+  if (user.mustChangePassword) {
+    return <Redirect href="/(auth)/first-login" />;
   }
 
   return (

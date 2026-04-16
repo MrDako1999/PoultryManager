@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { User, Shield, Users, Boxes, CreditCard, Calculator, ShoppingCart } from 'lucide-react';
-import useAuthStore from '@/stores/authStore';
+import useCapabilities from '@/hooks/useCapabilities';
 import ProfileSettings from './ProfileSettings';
 import SecuritySettings from './SecuritySettings';
 import TeamSettings from './TeamSettings';
@@ -11,8 +11,10 @@ import SaleDefaultsSettings from './SaleDefaultsSettings';
 
 export default function SettingsPage() {
   const { t } = useTranslation();
-  const { user } = useAuthStore();
-  const isOwner = user?.accountRole === 'owner' || !user?.createdBy;
+  const { workspace, can } = useCapabilities();
+  const isOwner = !!workspace?.isOwner;
+  const canEditAccounting = isOwner || can('settings:accounting:read');
+  const canEditSaleDefaults = isOwner || can('settings:saleDefaults:read');
 
   return (
     <div className="space-y-6">
@@ -48,27 +50,33 @@ export default function SettingsPage() {
               <span className="hidden sm:inline">{t('settings.team')}</span>
             </TabsTrigger>
           )}
-          <TabsTrigger
-            value="modules"
-            className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-2"
-          >
-            <Boxes className="h-4 w-4" />
-            <span className="hidden sm:inline">{t('settings.modules')}</span>
-          </TabsTrigger>
-          <TabsTrigger
-            value="accounting"
-            className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-2"
-          >
-            <Calculator className="h-4 w-4" />
-            <span className="hidden sm:inline">{t('settings.accounting')}</span>
-          </TabsTrigger>
-          <TabsTrigger
-            value="saleDefaults"
-            className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-2"
-          >
-            <ShoppingCart className="h-4 w-4" />
-            <span className="hidden sm:inline">{t('settings.saleDefaults')}</span>
-          </TabsTrigger>
+          {isOwner && (
+            <TabsTrigger
+              value="modules"
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-2"
+            >
+              <Boxes className="h-4 w-4" />
+              <span className="hidden sm:inline">{t('settings.modules')}</span>
+            </TabsTrigger>
+          )}
+          {canEditAccounting && (
+            <TabsTrigger
+              value="accounting"
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-2"
+            >
+              <Calculator className="h-4 w-4" />
+              <span className="hidden sm:inline">{t('settings.accounting')}</span>
+            </TabsTrigger>
+          )}
+          {canEditSaleDefaults && (
+            <TabsTrigger
+              value="saleDefaults"
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-2"
+            >
+              <ShoppingCart className="h-4 w-4" />
+              <span className="hidden sm:inline">{t('settings.saleDefaults')}</span>
+            </TabsTrigger>
+          )}
           <TabsTrigger
             value="billing"
             disabled
@@ -93,17 +101,23 @@ export default function SettingsPage() {
           </TabsContent>
         )}
 
-        <TabsContent value="modules">
-          <ModulesSettings />
-        </TabsContent>
+        {isOwner && (
+          <TabsContent value="modules">
+            <ModulesSettings />
+          </TabsContent>
+        )}
 
-        <TabsContent value="accounting">
-          <AccountingSettings />
-        </TabsContent>
+        {canEditAccounting && (
+          <TabsContent value="accounting">
+            <AccountingSettings />
+          </TabsContent>
+        )}
 
-        <TabsContent value="saleDefaults">
-          <SaleDefaultsSettings />
-        </TabsContent>
+        {canEditSaleDefaults && (
+          <TabsContent value="saleDefaults">
+            <SaleDefaultsSettings />
+          </TabsContent>
+        )}
 
         <TabsContent value="billing">
           <div className="flex items-center justify-center py-20">

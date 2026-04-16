@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getEntityById, dbEvents } from '../lib/db';
+import { getEntityById, dbEvents } from '@/lib/db';
 
 export default function useLocalRecord(tableName, id) {
   const [record, setRecord] = useState(null);

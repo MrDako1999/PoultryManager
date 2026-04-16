@@ -3,8 +3,59 @@ import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import Business from '../models/Business.js';
 import { protect } from '../middleware/auth.js';
+import { resolveModules } from '../middleware/modules.js';
+import { actionsForRole } from '@poultrymanager/shared';
 
 const router = express.Router();
+
+async function buildAuthPayload(user) {
+  const ownerId = user.createdBy || user._id;
+  const isOwner = String(user._id) === String(ownerId);
+
+  let owner = user;
+  if (!isOwner) {
+    owner = await User.findById(ownerId).select('firstName lastName accountBusiness modules country vatRate currency invoiceLanguage moduleSettings companyName');
+  }
+
+  const modules = await resolveModules(user);
+
+  const explicitAllow = Array.isArray(user.permissions?.allow) ? user.permissions.allow : [];
+  const explicitDeny = Array.isArray(user.permissions?.deny) ? user.permissions.deny : [];
+  const roleDefaults = actionsForRole(user.accountRole);
+
+  return {
+    _id: user._id,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    email: user.email,
+    phone: user.phone,
+    companyName: user.companyName,
+    accountRole: user.accountRole,
+    modules,
+    permissions: {
+      allow: explicitAllow,
+      deny: explicitDeny,
+      defaults: roleDefaults,
+    },
+    workspace: {
+      ownerId,
+      ownerName: owner ? `${owner.firstName || ''} ${owner.lastName || ''}`.trim() : '',
+      ownerBusiness: owner?.accountBusiness || null,
+      isOwner,
+    },
+    accountBusiness: user.accountBusiness,
+    country: owner?.country ?? user.country ?? null,
+    vatRate: owner?.vatRate ?? user.vatRate ?? null,
+    currency: owner?.currency ?? user.currency ?? null,
+    invoiceLanguage: owner?.invoiceLanguage ?? user.invoiceLanguage ?? 'en',
+    moduleSettings: owner?.moduleSettings ?? user.moduleSettings ?? {},
+    mustChangePassword: !!user.mustChangePassword,
+    isActive: user.isActive,
+    createdBy: user.createdBy,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+  };
+}
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -12,7 +63,7 @@ const generateToken = (id) => {
   });
 };
 
-const sendTokenResponse = (user, statusCode, res) => {
+const sendTokenResponse = async (user, statusCode, res) => {
   const token = generateToken(user._id);
 
   res.cookie('token', token, {
@@ -22,7 +73,8 @@ const sendTokenResponse = (user, statusCode, res) => {
     maxAge: 30 * 24 * 60 * 60 * 1000,
   });
 
-  res.status(statusCode).json({ user, token });
+  const payload = await buildAuthPayload(user);
+  res.status(statusCode).json({ user: payload, token });
 };
 
 router.post('/register', async (req, res) => {
@@ -54,7 +106,7 @@ router.post('/register', async (req, res) => {
     user.accountBusiness = business._id;
     await user.save();
 
-    sendTokenResponse(user, 201, res);
+    await sendTokenResponse(user, 201, res);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -82,7 +134,7 @@ router.post('/login', async (req, res) => {
       return res.status(403).json({ message: 'Account is deactivated' });
     }
 
-    sendTokenResponse(user, 200, res);
+    await sendTokenResponse(user, 200, res);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -110,7 +162,10 @@ router.get('/me', protect, async (req, res) => {
     await user.save();
   }
 
-  res.json(user);
+  const payload = await buildAuthPayload(user);
+  res.json(payload);
 });
+
+export { sendTokenResponse, buildAuthPayload };
 
 export default router;

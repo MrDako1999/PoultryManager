@@ -7,18 +7,19 @@ import {
   User, Shield, Puzzle, Calculator, ShoppingCart,
   ChevronRight, LogOut, Moon, Sun, Monitor,
 } from 'lucide-react-native';
-import useAuthStore from '../../../stores/authStore';
-import useThemeStore from '../../../stores/themeStore';
-import useSettings from '../../../hooks/useSettings';
-import { Input } from '../../../components/ui/Input';
-import { Label } from '../../../components/ui/Label';
-import { Button } from '../../../components/ui/Button';
-import Separator from '../../../components/ui/Separator';
-import api from '../../../lib/api';
-import { useToast } from '../../../components/ui/Toast';
+import useAuthStore from '@/stores/authStore';
+import useThemeStore from '@/stores/themeStore';
+import useSettings from '@/hooks/useSettings';
+import useCapabilities from '@/hooks/useCapabilities';
+import { Input } from '@/components/ui/Input';
+import { Label } from '@/components/ui/Label';
+import { Button } from '@/components/ui/Button';
+import Separator from '@/components/ui/Separator';
+import api from '@/lib/api';
+import { useToast } from '@/components/ui/Toast';
 
-const logoLight = require('../../../assets/images/logo.png');
-const logoDark = require('../../../assets/images/logo-white.png');
+const logoLight = require('@/assets/images/logo.png');
+const logoDark = require('@/assets/images/logo-white.png');
 
 function SettingsRow({ icon: Icon, label, value, onPress, destructive }) {
   const { resolvedTheme } = useThemeStore();
@@ -50,6 +51,8 @@ export default function SettingsScreen() {
   const { theme, setTheme } = useThemeStore();
   const { toast } = useToast();
   const accountingSettings = useSettings('accounting');
+  const { workspace, can } = useCapabilities();
+  const isOwner = !!workspace?.isOwner;
 
   const [section, setSection] = useState('main');
   const [oldPassword, setOldPassword] = useState('');
@@ -198,28 +201,38 @@ export default function SettingsScreen() {
             {t('settings.account', 'Account')}
           </Text>
           <SettingsRow icon={Shield} label={t('settings.security', 'Security')} onPress={() => setSection('security')} />
-          <SettingsRow icon={Puzzle} label={t('settings.modules', 'Modules')} onPress={() => router.push('/(app)/settings-modules')} />
+          {isOwner && (
+            <SettingsRow icon={Puzzle} label={t('settings.modules', 'Modules')} onPress={() => router.push('/(app)/settings-modules')} />
+          )}
         </View>
 
-        <Separator className="my-1" />
+        {(can('settings:accounting:read') || can('settings:saleDefaults:read') || isOwner) && (
+          <>
+            <Separator className="my-1" />
 
-        {/* Preferences */}
-        <View>
-          <Text className="text-xs font-semibold text-muted-foreground uppercase px-4 py-2">
-            {t('settings.preferences', 'Preferences')}
-          </Text>
-          <SettingsRow
-            icon={Calculator}
-            label={t('settings.accounting', 'Accounting')}
-            value={accountingSettings?.currency || '—'}
-            onPress={() => router.push('/(app)/settings-accounting')}
-          />
-          <SettingsRow
-            icon={ShoppingCart}
-            label={t('settings.saleDefaults', 'Sale Defaults')}
-            onPress={() => router.push('/(app)/settings-sale-defaults')}
-          />
-        </View>
+            {/* Preferences */}
+            <View>
+              <Text className="text-xs font-semibold text-muted-foreground uppercase px-4 py-2">
+                {t('settings.preferences', 'Preferences')}
+              </Text>
+              {(isOwner || can('settings:accounting:read')) && (
+                <SettingsRow
+                  icon={Calculator}
+                  label={t('settings.accounting', 'Accounting')}
+                  value={accountingSettings?.currency || '—'}
+                  onPress={() => router.push('/(app)/settings-accounting')}
+                />
+              )}
+              {(isOwner || can('settings:saleDefaults:read')) && (
+                <SettingsRow
+                  icon={ShoppingCart}
+                  label={t('settings.saleDefaults', 'Sale Defaults')}
+                  onPress={() => router.push('/(app)/settings-sale-defaults')}
+                />
+              )}
+            </View>
+          </>
+        )}
 
         <Separator className="my-1" />
 

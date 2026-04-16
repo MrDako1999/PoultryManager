@@ -2,6 +2,7 @@ import express from 'express';
 import Farm from '../models/Farm.js';
 import Business from '../models/Business.js';
 import { protect } from '../middleware/auth.js';
+import { logDeletion } from '../middleware/deletionTracker.js';
 
 const router = express.Router();
 
@@ -215,6 +216,7 @@ router.delete('/:id', protect, async (req, res) => {
 
     farm.deletedAt = new Date();
     await farm.save();
+    await logDeletion(ownerId, 'farm', farm._id);
 
     res.json({ message: 'Farm deleted' });
   } catch (err) {

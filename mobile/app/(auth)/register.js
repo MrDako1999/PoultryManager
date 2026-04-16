@@ -7,18 +7,18 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import * as Haptics from 'expo-haptics';
 import { ArrowLeft, ArrowRight, Check, Building2 } from 'lucide-react-native';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../../components/ui/Card';
-import { Button } from '../../components/ui/Button';
-import { Input } from '../../components/ui/Input';
-import { Label } from '../../components/ui/Label';
-import { Checkbox } from '../../components/ui/Checkbox';
-import { Badge } from '../../components/ui/Badge';
-import PasswordInput from '../../components/ui/PasswordInput';
-import PasswordStrength from '../../components/PasswordStrength';
-import PhoneInput from '../../components/PhoneInput';
-import { useToast } from '../../components/ui/Toast';
-import useAuthStore from '../../stores/authStore';
-import useThemeStore from '../../stores/themeStore';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Label } from '@/components/ui/Label';
+import { Checkbox } from '@/components/ui/Checkbox';
+import { Badge } from '@/components/ui/Badge';
+import PasswordInput from '@/components/ui/PasswordInput';
+import PasswordStrength from '@/components/PasswordStrength';
+import PhoneInput from '@/components/PhoneInput';
+import { useToast } from '@/components/ui/Toast';
+import useAuthStore from '@/stores/authStore';
+import useThemeStore from '@/stores/themeStore';
 
 const AVAILABLE_MODULES = [
   { slug: 'broiler', labelKey: 'modules.broiler', descKey: 'modules.broilerDesc', available: true },

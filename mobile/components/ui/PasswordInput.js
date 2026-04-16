@@ -1,7 +1,7 @@
 import { forwardRef, useState } from 'react';
 import { View, TextInput, Pressable } from 'react-native';
 import { Eye, EyeOff } from 'lucide-react-native';
-import { cn } from '../../lib/utils';
+import { cn } from '@/lib/utils';
 
 const PasswordInput = forwardRef(({ className, ...props }, ref) => {
   const [visible, setVisible] = useState(false);

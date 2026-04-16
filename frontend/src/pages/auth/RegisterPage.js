@@ -15,14 +15,17 @@ import { useToast } from '@/components/ui/use-toast';
 import PhoneInput from '@/components/PhoneInput';
 import PasswordStrength from '@/components/PasswordStrength';
 import useAuthStore from '@/stores/authStore';
+import { MODULE_IDS, MODULE_CATALOG } from '@poultrymanager/shared';
 
-const AVAILABLE_MODULES = [
-  { slug: 'broiler', labelKey: 'modules.broiler', descKey: 'modules.broilerDesc', available: true },
-  { slug: 'hatchery', labelKey: 'modules.hatchery', descKey: 'modules.hatcheryDesc', available: false },
-  { slug: 'free-range', labelKey: 'modules.freeRange', descKey: 'modules.freeRangeDesc', available: false },
-  { slug: 'egg-production', labelKey: 'modules.eggProduction', descKey: 'modules.eggProductionDesc', available: false },
-  { slug: 'slaughterhouse', labelKey: 'modules.slaughterhouse', descKey: 'modules.slaughterhouseDesc', available: false },
-];
+const AVAILABLE_MODULES = MODULE_IDS.map((id) => {
+  const catalog = MODULE_CATALOG[id] || {};
+  return {
+    slug: id,
+    labelKey: catalog.labelKey || `modules.${id}`,
+    descKey: catalog.descKey || `modules.${id}Desc`,
+    available: !!catalog.available,
+  };
+});
 
 const registerSchema = z
   .object({

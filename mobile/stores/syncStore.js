@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { getPendingCount, getFailedCount as _getFailedCount } from '../lib/mutationQueue';
+import { getPendingCount, getFailedCount as _getFailedCount } from '@/lib/mutationQueue';
 
 const useSyncStore = create((set) => ({
   isOnline: true,

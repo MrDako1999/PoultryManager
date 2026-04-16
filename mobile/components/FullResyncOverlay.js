@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { View, Text, Modal, Animated } from 'react-native';
 import { DatabaseZap } from 'lucide-react-native';
-import useSyncStore from '../stores/syncStore';
-import useThemeStore from '../stores/themeStore';
+import useSyncStore from '@/stores/syncStore';
+import useThemeStore from '@/stores/themeStore';
 
 export default function FullResyncOverlay() {
   const { isFullResyncing, syncProgress } = useSyncStore();

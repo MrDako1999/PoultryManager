@@ -4,8 +4,8 @@ import {
   Dimensions, PanResponder, Animated, Keyboard,
 } from 'react-native';
 import { ChevronDown, Check, X, Search, Plus } from 'lucide-react-native';
-import { cn } from '../../lib/utils';
-import useThemeStore from '../../stores/themeStore';
+import { cn } from '@/lib/utils';
+import useThemeStore from '@/stores/themeStore';
 import * as Haptics from 'expo-haptics';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;

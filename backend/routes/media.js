@@ -12,6 +12,8 @@ import {
 
 const router = express.Router();
 
+const getOwnerId = (user) => user.createdBy || user._id;
+
 // POST /api/media/upload — upload a single file
 router.post('/upload', protect, (req, res, next) => {
   uploadSingle('file')(req, res, (err) => {
@@ -34,14 +36,16 @@ router.post('/upload', protect, (req, res, next) => {
 
     const { entityType, entityId, category, mediaType, customPrefix } = req.body;
 
+    const ownerId = getOwnerId(req.user);
     const media = await uploadFile({
       file: req.file,
-      userId: req.user._id.toString(),
+      userId: ownerId.toString(),
       entityType,
       entityId,
       category,
       mediaType,
       customPrefix,
+      createdBy: req.user._id,
     });
 
     res.status(201).json(media);
@@ -54,14 +58,15 @@ router.post('/upload', protect, (req, res, next) => {
 // GET /api/media — list user's media with optional filters
 router.get('/', protect, async (req, res) => {
   try {
+    const ownerId = getOwnerId(req.user);
     const { entityType, entityId, category } = req.query;
 
     if (entityType && entityId) {
-      const files = await getFilesByEntity(entityType, entityId, req.user._id);
+      const files = await getFilesByEntity(entityType, entityId, ownerId);
       return res.json(files);
     }
 
-    const query = { user_id: req.user._id };
+    const query = { user_id: ownerId };
     if (entityType) query.entity_type = entityType;
     if (category) query.category = category;
 
@@ -77,6 +82,7 @@ router.get('/', protect, async (req, res) => {
 // GET /api/media/:id — get a single media document
 router.get('/:id', protect, async (req, res) => {
   try {
+    const ownerId = getOwnerId(req.user);
     const { default: Media } = await import('../models/Media.js');
     const media = await Media.findById(req.params.id);
 
@@ -84,7 +90,7 @@ router.get('/:id', protect, async (req, res) => {
       return res.status(404).json({ message: 'File not found' });
     }
 
-    if (media.user_id.toString() !== req.user._id.toString()) {
+    if (media.user_id.toString() !== ownerId.toString()) {
       return res.status(403).json({ message: 'Not authorized to access this file' });
     }
 
@@ -97,7 +103,8 @@ router.get('/:id', protect, async (req, res) => {
 // DELETE /api/media/:id — delete a single file
 router.delete('/:id', protect, async (req, res) => {
   try {
-    const result = await deleteFile(req.params.id, req.user._id);
+    const ownerId = getOwnerId(req.user);
+    const result = await deleteFile(req.params.id, ownerId);
     res.json(result);
   } catch (err) {
     const status = err.message === 'File not found' ? 404
@@ -110,10 +117,11 @@ router.delete('/:id', protect, async (req, res) => {
 // DELETE /api/media/entity/:entityType/:entityId — bulk delete for an entity
 router.delete('/entity/:entityType/:entityId', protect, async (req, res) => {
   try {
+    const ownerId = getOwnerId(req.user);
     const result = await deleteAllByEntity(
       req.params.entityType,
       req.params.entityId,
-      req.user._id
+      ownerId
     );
     res.json(result);
   } catch (err) {

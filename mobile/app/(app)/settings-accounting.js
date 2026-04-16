@@ -4,16 +4,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { router } from 'expo-router';
 import { ChevronLeft } from 'lucide-react-native';
-import { Input } from '../../components/ui/Input';
-import { Label } from '../../components/ui/Label';
-import { Button } from '../../components/ui/Button';
-import Select from '../../components/ui/Select';
-import { useToast } from '../../components/ui/Toast';
-import useThemeStore from '../../stores/themeStore';
-import useSettings from '../../hooks/useSettings';
-import api from '../../lib/api';
-import { upsertSettings } from '../../lib/db';
-import { COUNTRY_VAT_MAP } from '../../lib/constants';
+import { Input } from '@/components/ui/Input';
+import { Label } from '@/components/ui/Label';
+import { Button } from '@/components/ui/Button';
+import Select from '@/components/ui/Select';
+import { useToast } from '@/components/ui/Toast';
+import useThemeStore from '@/stores/themeStore';
+import useSettings from '@/hooks/useSettings';
+import api from '@/lib/api';
+import { upsertSettings } from '@/lib/db';
+import { COUNTRY_VAT_MAP } from '@/lib/constants';
 
 const countryOptions = Object.entries(COUNTRY_VAT_MAP).map(([code, info]) => ({
   value: code,

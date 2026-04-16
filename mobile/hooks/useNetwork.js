@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import NetInfo from '@react-native-community/netinfo';
-import useSyncStore from '../stores/syncStore';
-import { deltaSync, processQueue } from '../lib/syncEngine';
+import useSyncStore from '@/stores/syncStore';
+import { deltaSync, processQueue } from '@/lib/syncEngine';
 
 export default function useNetwork() {
   useEffect(() => {

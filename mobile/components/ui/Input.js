@@ -1,6 +1,6 @@
 import { forwardRef } from 'react';
 import { TextInput } from 'react-native';
-import { cn } from '../../lib/utils';
+import { cn } from '@/lib/utils';
 
 const Input = forwardRef(({ className, ...props }, ref) => {
   return (

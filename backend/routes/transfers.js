@@ -2,6 +2,7 @@ import express from 'express';
 import Transfer from '../models/Transfer.js';
 import { protect } from '../middleware/auth.js';
 import { generateTransferReceipt } from '../services/transferService.js';
+import { logDeletion } from '../middleware/deletionTracker.js';
 
 const router = express.Router();
 
@@ -152,6 +153,7 @@ router.delete('/:id', protect, async (req, res) => {
     }
 
     transfer.deletedAt = new Date();
+    await logDeletion(ownerId, 'transfer', transfer._id);
     await transfer.save();
 
     res.json({ message: 'Transfer deleted' });

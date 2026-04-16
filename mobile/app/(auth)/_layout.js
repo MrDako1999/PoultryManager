@@ -2,8 +2,8 @@ import { View, Text, Image, KeyboardAvoidingView, Platform, ScrollView } from 'r
 import { Slot } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import useThemeStore from '../../stores/themeStore';
-import ThemeToggle from '../../components/ThemeToggle';
+import useThemeStore from '@/stores/themeStore';
+import ThemeToggle from '@/components/ThemeToggle';
 
 export default function AuthLayout() {
   const insets = useSafeAreaInsets();
@@ -11,8 +11,8 @@ export default function AuthLayout() {
   const { resolvedTheme } = useThemeStore();
 
   const logo = resolvedTheme === 'dark'
-    ? require('../../assets/images/logo-white.png')
-    : require('../../assets/images/logo.png');
+    ? require('@/assets/images/logo-white.png')
+    : require('@/assets/images/logo.png');
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>

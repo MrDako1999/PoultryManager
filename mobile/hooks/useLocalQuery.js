@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getAllEntities, dbEvents, SOFT_DELETE_TABLES } from '../lib/db';
+import { getAllEntities, dbEvents, SOFT_DELETE_TABLES } from '@/lib/db';
 
 export default function useLocalQuery(tableName, filters) {
   const [data, setData] = useState([]);

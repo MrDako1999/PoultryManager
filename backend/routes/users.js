@@ -2,7 +2,10 @@ import express from 'express';
 import User from '../models/User.js';
 import Contact from '../models/Contact.js';
 import Business from '../models/Business.js';
+import Worker from '../models/Worker.js';
 import { protect, requireOwner } from '../middleware/auth.js';
+import { sendCredentials } from '../services/emailService.js';
+import { invalidateOwnerModulesCache } from '../middleware/modules.js';
 
 const router = express.Router();
 
@@ -29,7 +32,7 @@ router.get('/:id', protect, requireOwner, async (req, res) => {
 
 router.post('/', protect, requireOwner, async (req, res) => {
   try {
-    const { firstName, lastName, email, phone, accountRole, permissions } = req.body;
+    const { firstName, lastName, email, phone, accountRole, permissions, houseAssignments } = req.body;
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -53,10 +56,11 @@ router.post('/', protect, requireOwner, async (req, res) => {
       accountRole: accountRole || 'viewer',
       permissions: permissions || {},
       createdBy: req.user._id,
+      mustChangePassword: true,
     });
 
     const ownerId = req.user.createdBy || req.user._id;
-    const owner = ownerId === req.user._id.toString()
+    const owner = String(ownerId) === String(req.user._id)
       ? req.user
       : await User.findById(ownerId);
 
@@ -79,6 +83,29 @@ router.post('/', protect, requireOwner, async (req, res) => {
       });
     }
 
+    const shouldCreateWorker = accountRole === 'ground_staff' || Array.isArray(houseAssignments);
+    if (shouldCreateWorker) {
+      await Worker.create({
+        user_id: ownerId,
+        createdBy: req.user._id,
+        firstName,
+        lastName,
+        phone: phone || '',
+        role: accountRole === 'ground_staff' ? 'labourer' : 'other',
+        linkedUser: user._id,
+        houseAssignments: Array.isArray(houseAssignments) ? houseAssignments : [],
+        contact: contact._id,
+      });
+    }
+
+    try {
+      await sendCredentials(user, tempPassword, {
+        ownerName: [req.user.firstName, req.user.lastName].filter(Boolean).join(' ') || req.user.email,
+      });
+    } catch (err) {
+      console.warn('[users] sendCredentials failed:', err?.message);
+    }
+
     res.status(201).json({ user, tempPassword });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -92,7 +119,7 @@ router.put('/:id', protect, requireOwner, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const { firstName, lastName, phone, accountRole, permissions, isActive } = req.body;
+    const { firstName, lastName, phone, accountRole, permissions, isActive, houseAssignments } = req.body;
 
     if (accountRole === 'owner') {
       return res.status(400).json({ message: 'Cannot promote to owner' });
@@ -106,6 +133,13 @@ router.put('/:id', protect, requireOwner, async (req, res) => {
     if (isActive !== undefined) user.isActive = isActive;
 
     await user.save();
+
+    if (Array.isArray(houseAssignments)) {
+      await Worker.findOneAndUpdate(
+        { linkedUser: user._id, user_id: req.user._id, deletedAt: null },
+        { houseAssignments }
+      );
+    }
 
     const contactUpdate = {};
     if (firstName !== undefined) contactUpdate.firstName = firstName;
@@ -131,7 +165,16 @@ router.post('/:id/reset-password', protect, requireOwner, async (req, res) => {
 
     const tempPassword = Math.random().toString(36).slice(-10) + 'A1!';
     user.password = tempPassword;
+    user.mustChangePassword = true;
     await user.save();
+
+    try {
+      await sendCredentials(user, tempPassword, {
+        ownerName: [req.user.firstName, req.user.lastName].filter(Boolean).join(' ') || req.user.email,
+      });
+    } catch (err) {
+      console.warn('[users] sendCredentials failed on reset:', err?.message);
+    }
 
     res.json({ message: 'Password reset successfully', tempPassword });
   } catch (err) {

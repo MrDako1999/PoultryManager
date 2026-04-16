@@ -1,6 +1,6 @@
 import { TextInput } from 'react-native';
-import { cn } from '../../lib/utils';
-import useThemeStore from '../../stores/themeStore';
+import { cn } from '@/lib/utils';
+import useThemeStore from '@/stores/themeStore';
 
 export default function Textarea({ className, ...props }) {
   const { resolvedTheme } = useThemeStore();

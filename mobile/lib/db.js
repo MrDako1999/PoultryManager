@@ -9,66 +9,115 @@ export async function getDb() {
   if (_db) return _db;
   _db = await SQLite.openDatabaseAsync('PoultryManagerDB');
   await _db.execAsync(`PRAGMA journal_mode = WAL;`);
-  await initSchema(_db);
+  await runMigrations(_db, BASE_MIGRATIONS);
   return _db;
 }
 
-async function initSchema(db) {
+const BASE_MIGRATIONS = [
+  {
+    id: 'v1_initial_schema',
+    up: async (db) => {
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS batches (_id TEXT PRIMARY KEY, data TEXT, updatedAt TEXT);
+        CREATE TABLE IF NOT EXISTS sources (_id TEXT PRIMARY KEY, data TEXT, batch TEXT, updatedAt TEXT);
+        CREATE TABLE IF NOT EXISTS expenses (_id TEXT PRIMARY KEY, data TEXT, batch TEXT, updatedAt TEXT);
+        CREATE TABLE IF NOT EXISTS feedOrders (_id TEXT PRIMARY KEY, data TEXT, batch TEXT, updatedAt TEXT);
+        CREATE TABLE IF NOT EXISTS feedOrderItems (_id TEXT PRIMARY KEY, data TEXT, feedOrder TEXT, updatedAt TEXT);
+        CREATE TABLE IF NOT EXISTS saleOrders (_id TEXT PRIMARY KEY, data TEXT, batch TEXT, updatedAt TEXT);
+        CREATE TABLE IF NOT EXISTS businesses (_id TEXT PRIMARY KEY, data TEXT, updatedAt TEXT, deletedAt TEXT);
+        CREATE TABLE IF NOT EXISTS contacts (_id TEXT PRIMARY KEY, data TEXT, updatedAt TEXT, deletedAt TEXT);
+        CREATE TABLE IF NOT EXISTS workers (_id TEXT PRIMARY KEY, data TEXT, updatedAt TEXT, deletedAt TEXT);
+        CREATE TABLE IF NOT EXISTS farms (_id TEXT PRIMARY KEY, data TEXT, updatedAt TEXT, deletedAt TEXT);
+        CREATE TABLE IF NOT EXISTS houses (_id TEXT PRIMARY KEY, data TEXT, farm TEXT, updatedAt TEXT, deletedAt TEXT);
+        CREATE TABLE IF NOT EXISTS feedItems (_id TEXT PRIMARY KEY, data TEXT, feedCompany TEXT, updatedAt TEXT, deletedAt TEXT);
+        CREATE TABLE IF NOT EXISTS transfers (_id TEXT PRIMARY KEY, data TEXT, business TEXT, updatedAt TEXT, deletedAt TEXT);
+        CREATE TABLE IF NOT EXISTS dailyLogs (_id TEXT PRIMARY KEY, data TEXT, batch TEXT, house TEXT, updatedAt TEXT, deletedAt TEXT);
+        CREATE TABLE IF NOT EXISTS media (_id TEXT PRIMARY KEY, data TEXT, updatedAt TEXT);
+
+        CREATE TABLE IF NOT EXISTS mutation_queue (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          entityType TEXT NOT NULL,
+          action TEXT NOT NULL,
+          entityId TEXT,
+          payload TEXT,
+          mediaFields TEXT,
+          status TEXT DEFAULT 'pending',
+          createdAt TEXT NOT NULL,
+          error TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_mq_status ON mutation_queue(status);
+
+        CREATE TABLE IF NOT EXISTS sync_meta (
+          entityType TEXT PRIMARY KEY,
+          lastSyncAt TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS id_map (
+          tempId TEXT NOT NULL,
+          entityType TEXT NOT NULL,
+          realId TEXT NOT NULL,
+          PRIMARY KEY (tempId, entityType)
+        );
+
+        CREATE TABLE IF NOT EXISTS settings (
+          key TEXT PRIMARY KEY,
+          value TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS media_blobs (
+          _id TEXT PRIMARY KEY,
+          blob BLOB,
+          filename TEXT,
+          mimeType TEXT,
+          metadata TEXT
+        );
+      `);
+    },
+  },
+];
+
+const _moduleMigrations = [];
+
+export function registerModuleMigrations(migrations) {
+  if (!Array.isArray(migrations)) return;
+  for (const m of migrations) {
+    if (!m || !m.id || typeof m.up !== 'function') continue;
+    if (_moduleMigrations.some((x) => x.id === m.id)) continue;
+    _moduleMigrations.push(m);
+  }
+}
+
+async function runMigrations(db, migrations) {
   await db.execAsync(`
-    CREATE TABLE IF NOT EXISTS batches (_id TEXT PRIMARY KEY, data TEXT, updatedAt TEXT);
-    CREATE TABLE IF NOT EXISTS sources (_id TEXT PRIMARY KEY, data TEXT, batch TEXT, updatedAt TEXT);
-    CREATE TABLE IF NOT EXISTS expenses (_id TEXT PRIMARY KEY, data TEXT, batch TEXT, updatedAt TEXT);
-    CREATE TABLE IF NOT EXISTS feedOrders (_id TEXT PRIMARY KEY, data TEXT, batch TEXT, updatedAt TEXT);
-    CREATE TABLE IF NOT EXISTS feedOrderItems (_id TEXT PRIMARY KEY, data TEXT, feedOrder TEXT, updatedAt TEXT);
-    CREATE TABLE IF NOT EXISTS saleOrders (_id TEXT PRIMARY KEY, data TEXT, batch TEXT, updatedAt TEXT);
-    CREATE TABLE IF NOT EXISTS businesses (_id TEXT PRIMARY KEY, data TEXT, updatedAt TEXT, deletedAt TEXT);
-    CREATE TABLE IF NOT EXISTS contacts (_id TEXT PRIMARY KEY, data TEXT, updatedAt TEXT, deletedAt TEXT);
-    CREATE TABLE IF NOT EXISTS workers (_id TEXT PRIMARY KEY, data TEXT, updatedAt TEXT, deletedAt TEXT);
-    CREATE TABLE IF NOT EXISTS farms (_id TEXT PRIMARY KEY, data TEXT, updatedAt TEXT, deletedAt TEXT);
-    CREATE TABLE IF NOT EXISTS houses (_id TEXT PRIMARY KEY, data TEXT, farm TEXT, updatedAt TEXT, deletedAt TEXT);
-    CREATE TABLE IF NOT EXISTS feedItems (_id TEXT PRIMARY KEY, data TEXT, feedCompany TEXT, updatedAt TEXT, deletedAt TEXT);
-    CREATE TABLE IF NOT EXISTS transfers (_id TEXT PRIMARY KEY, data TEXT, business TEXT, updatedAt TEXT, deletedAt TEXT);
-    CREATE TABLE IF NOT EXISTS dailyLogs (_id TEXT PRIMARY KEY, data TEXT, batch TEXT, house TEXT, updatedAt TEXT, deletedAt TEXT);
-    CREATE TABLE IF NOT EXISTS media (_id TEXT PRIMARY KEY, data TEXT, updatedAt TEXT);
-
-    CREATE TABLE IF NOT EXISTS mutation_queue (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      entityType TEXT NOT NULL,
-      action TEXT NOT NULL,
-      entityId TEXT,
-      payload TEXT,
-      mediaFields TEXT,
-      status TEXT DEFAULT 'pending',
-      createdAt TEXT NOT NULL,
-      error TEXT
-    );
-    CREATE INDEX IF NOT EXISTS idx_mq_status ON mutation_queue(status);
-
-    CREATE TABLE IF NOT EXISTS sync_meta (
-      entityType TEXT PRIMARY KEY,
-      lastSyncAt TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS id_map (
-      tempId TEXT NOT NULL,
-      entityType TEXT NOT NULL,
-      realId TEXT NOT NULL,
-      PRIMARY KEY (tempId, entityType)
-    );
-
-    CREATE TABLE IF NOT EXISTS settings (
-      key TEXT PRIMARY KEY,
-      value TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS media_blobs (
-      _id TEXT PRIMARY KEY,
-      blob BLOB,
-      filename TEXT,
-      mimeType TEXT,
-      metadata TEXT
+    CREATE TABLE IF NOT EXISTS schema_version (
+      id TEXT PRIMARY KEY,
+      appliedAt TEXT NOT NULL
     );
   `);
+
+  const all = [...migrations, ..._moduleMigrations];
+  for (const m of all) {
+    const already = await db.getFirstAsync(
+      `SELECT id FROM schema_version WHERE id = ?`,
+      [m.id]
+    );
+    if (already) continue;
+    try {
+      await m.up(db);
+      await db.runAsync(
+        `INSERT OR REPLACE INTO schema_version (id, appliedAt) VALUES (?, ?)`,
+        [m.id, new Date().toISOString()]
+      );
+    } catch (err) {
+      console.error(`Migration ${m.id} failed:`, err);
+      throw err;
+    }
+  }
+}
+
+export async function rerunMigrations() {
+  const db = await getDb();
+  await runMigrations(db, BASE_MIGRATIONS);
 }
 
 export const ENTITY_TABLES = [

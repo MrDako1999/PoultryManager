@@ -1,7 +1,7 @@
 import { Pressable } from 'react-native';
 import { Sun, Moon } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import useThemeStore from '../stores/themeStore';
+import useThemeStore from '@/stores/themeStore';
 
 export default function ThemeToggle() {
   const { resolvedTheme, setTheme } = useThemeStore();

@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useCallback, useRef, useEffect } f
 import { View, Text, Pressable, Animated } from 'react-native';
 import { X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { cn } from '../../lib/utils';
+import { cn } from '@/lib/utils';
 
 const ToastContext = createContext(null);
 

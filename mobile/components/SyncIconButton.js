@@ -7,11 +7,11 @@ import {
   Trash2, RotateCcw, DatabaseZap,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import useSyncStore from '../stores/syncStore';
-import useThemeStore from '../stores/themeStore';
+import useSyncStore from '@/stores/syncStore';
+import useThemeStore from '@/stores/themeStore';
 import { Button } from './ui/Button';
-import { deltaSync, processQueue, fullResync } from '../lib/syncEngine';
-import { getFailedEntries, retryFailed, discardFailed } from '../lib/mutationQueue';
+import { deltaSync, processQueue, fullResync } from '@/lib/syncEngine';
+import { getFailedEntries, retryFailed, discardFailed } from '@/lib/mutationQueue';
 
 function formatTimeAgo(dateStr) {
   if (!dateStr) return 'Never';

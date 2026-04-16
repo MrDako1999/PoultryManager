@@ -3,9 +3,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { router } from 'expo-router';
 import { Warehouse, Building2, ContactRound, Users, Wheat } from 'lucide-react-native';
-import useLocalQuery from '../../../hooks/useLocalQuery';
-import useThemeStore from '../../../stores/themeStore';
-import { deltaSync } from '../../../lib/syncEngine';
+import useLocalQuery from '@/hooks/useLocalQuery';
+import useThemeStore from '@/stores/themeStore';
+import { deltaSync } from '@/lib/syncEngine';
 import { useState } from 'react';
 
 const GAP = 12;

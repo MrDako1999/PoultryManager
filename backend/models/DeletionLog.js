@@ -10,7 +10,7 @@ const deletionLogSchema = new mongoose.Schema({
   entityType: {
     type: String,
     required: true,
-    enum: ['batch', 'source', 'expense', 'feedOrder', 'feedOrderItem', 'saleOrder', 'media'],
+    index: true,
   },
   entityId: {
     type: mongoose.Schema.Types.ObjectId,

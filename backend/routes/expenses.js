@@ -6,13 +6,16 @@ import FeedOrderItem from '../models/FeedOrderItem.js';
 import SaleOrder from '../models/SaleOrder.js';
 import Batch from '../models/Batch.js';
 import { protect } from '../middleware/auth.js';
+import { requireModule } from '../middleware/modules.js';
 import { logDeletion, logDeletions } from '../middleware/deletionTracker.js';
 
 const router = express.Router();
 
+router.use(protect, requireModule('broiler'));
+
 const getOwnerId = (user) => user.createdBy || user._id;
 
-router.get('/', protect, async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const ownerId = getOwnerId(req.user);
     const { batch, updatedSince, syncAll } = req.query;
@@ -40,7 +43,7 @@ router.get('/', protect, async (req, res) => {
   }
 });
 
-router.get('/:id', protect, async (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
     const ownerId = getOwnerId(req.user);
     const expense = await Expense.findOne({ _id: req.params.id, user_id: ownerId })
@@ -61,7 +64,7 @@ router.get('/:id', protect, async (req, res) => {
   }
 });
 
-router.post('/', protect, async (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const ownerId = getOwnerId(req.user);
     const {
@@ -119,7 +122,7 @@ router.post('/', protect, async (req, res) => {
   }
 });
 
-router.put('/:id', protect, async (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
     const ownerId = getOwnerId(req.user);
     const expense = await Expense.findOne({ _id: req.params.id, user_id: ownerId });
@@ -184,7 +187,7 @@ router.put('/:id', protect, async (req, res) => {
   }
 });
 
-router.delete('/:id', protect, async (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
     const ownerId = getOwnerId(req.user);
     const expense = await Expense.findOne({ _id: req.params.id, user_id: ownerId });

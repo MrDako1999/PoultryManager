@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"],
+      "@poultrymanager/shared": ["../shared/index.js"],
+      "@poultrymanager/shared/*": ["../shared/*"]
+    },
+    "jsx": "react-jsx",
+    "allowJs": true,
+    "module": "esnext",
+    "moduleResolution": "node",
+    "target": "esnext"
+  },
+  "include": ["**/*.js", "../shared/**/*.js"],
+  "exclude": ["node_modules", ".expo", "ios", "android", "dist"]
+}

@@ -3,6 +3,7 @@ import express from 'express';
 import FeedItem from '../models/FeedItem.js';
 import Business from '../models/Business.js';
 import { protect } from '../middleware/auth.js';
+import { logDeletion } from '../middleware/deletionTracker.js';
 
 const router = express.Router();
 
@@ -193,6 +194,7 @@ router.delete('/:id', protect, async (req, res) => {
     }
 
     feedItem.deletedAt = new Date();
+    await logDeletion(ownerId, 'feedItem', feedItem._id);
     await feedItem.save();
 
     res.json({ message: 'Feed item deleted' });

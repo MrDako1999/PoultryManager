@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { View, Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Check, X } from 'lucide-react-native';
-import { cn } from '../lib/utils';
+import { cn } from '@/lib/utils';
 
 const RULES = [
   { key: 'length', test: (pw) => pw.length >= 8, labelKey: 'auth.pwRuleLength' },

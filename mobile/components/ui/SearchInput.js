@@ -1,7 +1,7 @@
 import { View, TextInput, Pressable } from 'react-native';
 import { Search, X } from 'lucide-react-native';
 import { useState, useCallback, useRef, useEffect } from 'react';
-import useThemeStore from '../../stores/themeStore';
+import useThemeStore from '@/stores/themeStore';
 
 export default function SearchInput({ value, onChangeText, placeholder = 'Search...', debounceMs = 300 }) {
   const { resolvedTheme } = useThemeStore();

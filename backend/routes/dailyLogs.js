@@ -1,11 +1,27 @@
 import express from 'express';
 import DailyLog from '../models/DailyLog.js';
 import Batch from '../models/Batch.js';
+import Worker from '../models/Worker.js';
 import { protect } from '../middleware/auth.js';
+import { requireModule } from '../middleware/modules.js';
+import { logDeletion } from '../middleware/deletionTracker.js';
+import { userCan } from '@poultrymanager/shared';
 
 const router = express.Router();
 
+router.use(protect, requireModule('broiler'));
+
 const getOwnerId = (user) => user.createdBy || user._id;
+
+async function resolveGroundStaffHouses(user) {
+  if (user.accountRole !== 'ground_staff') return null;
+  const worker = await Worker.findOne({ linkedUser: user._id, deletedAt: null }).select('houseAssignments');
+  return Array.isArray(worker?.houseAssignments) ? worker.houseAssignments : [];
+}
+
+function userCanReadAll(user) {
+  return userCan(user, 'dailyLog:read');
+}
 
 function toUTCMidnight(d) {
   const dt = new Date(d);
@@ -19,7 +35,7 @@ function computeCycleDay(batchStartDate, entryDate) {
   return Math.floor((entry - start) / (1000 * 60 * 60 * 24)) + 1;
 }
 
-router.get('/', protect, async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const ownerId = getOwnerId(req.user);
     const { batch, house, logType, updatedSince, syncAll } = req.query;
@@ -36,6 +52,20 @@ router.get('/', protect, async (req, res) => {
       query.deletedAt = null;
     }
 
+    const scopedHouses = await resolveGroundStaffHouses(req.user);
+    if (scopedHouses !== null) {
+      if (scopedHouses.length === 0) {
+        return res.json([]);
+      }
+      if (userCan(req.user, 'dailyLog:read:own') && !userCanReadAll(req.user)) {
+        query.createdBy = req.user._id;
+      }
+      if (house && !scopedHouses.map(String).includes(String(house))) {
+        return res.json([]);
+      }
+      query.house = { $in: scopedHouses };
+    }
+
     const logs = await DailyLog.find(query)
       .populate('house', 'name capacity')
       .populate('createdBy', 'firstName lastName')
@@ -48,7 +78,7 @@ router.get('/', protect, async (req, res) => {
   }
 });
 
-router.get('/:id', protect, async (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
     const ownerId = getOwnerId(req.user);
     const log = await DailyLog.findOne({ _id: req.params.id, user_id: ownerId })
@@ -66,7 +96,7 @@ router.get('/:id', protect, async (req, res) => {
   }
 });
 
-router.post('/', protect, async (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const ownerId = getOwnerId(req.user);
     const { batch: batchId, house, date, logType, ...fields } = req.body;
@@ -148,7 +178,7 @@ router.post('/', protect, async (req, res) => {
   }
 });
 
-router.put('/:id', protect, async (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
     const ownerId = getOwnerId(req.user);
     const log = await DailyLog.findOne({ _id: req.params.id, user_id: ownerId, deletedAt: null });
@@ -197,7 +227,7 @@ router.put('/:id', protect, async (req, res) => {
   }
 });
 
-router.delete('/:id', protect, async (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
     const ownerId = getOwnerId(req.user);
     const log = await DailyLog.findOne({ _id: req.params.id, user_id: ownerId, deletedAt: null });
@@ -207,6 +237,7 @@ router.delete('/:id', protect, async (req, res) => {
     }
 
     log.deletedAt = new Date();
+    await logDeletion(ownerId, 'dailyLog', log._id);
     await log.save();
 
     res.json({ message: 'Daily log deleted' });

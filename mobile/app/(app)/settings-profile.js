@@ -7,20 +7,21 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ChevronLeft } from 'lucide-react-native';
-import { Input } from '../../components/ui/Input';
-import { Label } from '../../components/ui/Label';
-import { Button } from '../../components/ui/Button';
-import { Badge } from '../../components/ui/Badge';
-import Separator from '../../components/ui/Separator';
-import PhoneInput from '../../components/PhoneInput';
-import MobileLogoUpload from '../../components/MobileLogoUpload';
-import MobileFileUpload from '../../components/MobileFileUpload';
-import { useToast } from '../../components/ui/Toast';
-import useAuthStore from '../../stores/authStore';
-import useThemeStore from '../../stores/themeStore';
-import useSettings from '../../hooks/useSettings';
-import api from '../../lib/api';
-import { upsertSettings } from '../../lib/db';
+import { Input } from '@/components/ui/Input';
+import { Label } from '@/components/ui/Label';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
+import Separator from '@/components/ui/Separator';
+import PhoneInput from '@/components/PhoneInput';
+import LogoUpload from '@/components/LogoUpload';
+import FileUpload from '@/components/FileUpload';
+import { useToast } from '@/components/ui/Toast';
+import useAuthStore from '@/stores/authStore';
+import useThemeStore from '@/stores/themeStore';
+import useSettings from '@/hooks/useSettings';
+import useCapabilities from '@/hooks/useCapabilities';
+import api from '@/lib/api';
+import { upsertSettings } from '@/lib/db';
 
 const profileSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
@@ -42,7 +43,8 @@ export default function SettingsProfileScreen() {
   const insets = useSafeAreaInsets();
   const { user, checkAuth } = useAuthStore();
   const { toast } = useToast();
-  const isOwner = user?.accountRole === 'owner' || !user?.createdBy;
+  const { workspace } = useCapabilities();
+  const isOwner = workspace?.isOwner ?? (user?.accountRole === 'owner' || !user?.createdBy);
   const accountBusiness = useSettings('business');
 
   const primaryColor = resolvedTheme === 'dark' ? 'hsl(148, 48%, 38%)' : 'hsl(148, 60%, 20%)';
@@ -257,7 +259,7 @@ export default function SettingsProfileScreen() {
               {/* Brand / Logo */}
               <View className="gap-2 mb-4">
                 <Label>{t('businesses.logo', 'Brand / Logo')}</Label>
-                <MobileLogoUpload
+                <LogoUpload
                   value={logoMedia}
                   onUpload={(media) => { setLogoMedia(media); setBizExtraDirty(true); }}
                   onRemove={() => { setLogoMedia(null); setBizExtraDirty(true); }}
@@ -349,7 +351,7 @@ export default function SettingsProfileScreen() {
 
               {/* TRN Certificate Upload */}
               <View className="mt-2 mb-4">
-                <MobileFileUpload
+                <FileUpload
                   label={t('businesses.trnCertificate', 'TRN Certificate')}
                   value={trnCertMedia}
                   onUpload={(media) => { setTrnCertMedia(media); setBizExtraDirty(true); }}
@@ -363,7 +365,7 @@ export default function SettingsProfileScreen() {
 
               {/* Trade License Upload */}
               <View className="mb-4">
-                <MobileFileUpload
+                <FileUpload
                   label={t('businesses.tradeLicense', 'Trade License')}
                   value={tradeLicenseMedia}
                   onUpload={(media) => { setTradeLicenseMedia(media); setBizExtraDirty(true); }}

@@ -6,13 +6,13 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import * as Haptics from 'expo-haptics';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../../components/ui/Card';
-import { Button } from '../../components/ui/Button';
-import { Input } from '../../components/ui/Input';
-import { Label } from '../../components/ui/Label';
-import PasswordInput from '../../components/ui/PasswordInput';
-import { useToast } from '../../components/ui/Toast';
-import useAuthStore from '../../stores/authStore';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Label } from '@/components/ui/Label';
+import PasswordInput from '@/components/ui/PasswordInput';
+import { useToast } from '@/components/ui/Toast';
+import useAuthStore from '@/stores/authStore';
 
 const loginSchema = z.object({
   email: z.string().email('auth.emailInvalid').min(1, 'auth.emailRequired'),

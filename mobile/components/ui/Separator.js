@@ -1,5 +1,5 @@
 import { View } from 'react-native';
-import { cn } from '../../lib/utils';
+import { cn } from '@/lib/utils';
 
 export default function Separator({ className, orientation = 'horizontal' }) {
   return (

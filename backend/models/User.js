@@ -89,20 +89,13 @@ const userSchema = new mongoose.Schema(
       enum: ['en'],
       default: 'en',
     },
-    saleDefaults: {
-      portionRates: {
-        type: Map,
-        of: Number,
-        default: () => new Map([
-          ['LIVER', 0], ['GIZZARD', 0], ['HEART', 0], ['BREAST', 0],
-          ['LEG', 0], ['WING', 0], ['BONE', 0], ['THIGH', 0],
-          ['DRUMSTICK', 0], ['BONELESS_THIGH', 0], ['NECK', 0], ['MINCE', 0],
-        ]),
-      },
-      transportRatePerTruck: {
-        type: Number,
-        default: 0,
-      },
+    moduleSettings: {
+      type: mongoose.Schema.Types.Mixed,
+      default: () => ({}),
+    },
+    mustChangePassword: {
+      type: Boolean,
+      default: false,
     },
   },
   { timestamps: true }

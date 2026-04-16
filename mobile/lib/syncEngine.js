@@ -17,27 +17,87 @@ import {
 } from './db';
 import api from './api';
 import { uploadPendingBlob } from './mediaQueue';
-import useSyncStore from '../stores/syncStore';
+import useSyncStore from '@/stores/syncStore';
+import {
+  REF_FIELDS,
+  ARRAY_REF_FIELDS,
+  SINGLE_MEDIA_FIELDS,
+  ARRAY_MEDIA_FIELDS,
+  ITEM_ARRAYS,
+  NESTED_REF_OBJECTS,
+  OTHER_DOC_ARRAY_MEDIA_KEY,
+} from '@poultrymanager/shared';
 
 const SYNC_INTERVAL_MS = 60_000;
 let intervalId = null;
 let _queueProcessing = false;
 let _rerunRequested = false;
 
+const SHARED_TABLES = new Set([
+  'businesses', 'contacts', 'workers', 'farms', 'media',
+]);
+
+// Lazy-load the registry and authStore to break the require cycle:
+// syncEngine -> registry -> broiler/index -> widgets -> authStore -> syncEngine.
+// Top-level imports would crash because the registry hasn't finished evaluating
+// when syncEngine first loads.
+function getRegistry() {
+  return require('@/modules/registry');
+}
+
+function getAuthStore() {
+  return require('@/stores/authStore').default;
+}
+
+function getVisibleModules() {
+  const { MODULE_ORDER } = getRegistry();
+  const user = getAuthStore().getState().user;
+  if (!user) return MODULE_ORDER;
+  const userModules = Array.isArray(user.modules) ? user.modules : [];
+  return MODULE_ORDER.filter((m) => userModules.includes(m));
+}
+
+function resolveAllowedTables() {
+  const { MODULES } = getRegistry();
+  const visible = getVisibleModules();
+  const allowed = new Set(SHARED_TABLES);
+  for (const id of visible) {
+    const mod = MODULES[id];
+    if (!mod?.sync) continue;
+    for (const t of mod.sync.tables || []) allowed.add(t);
+    for (const t of mod.sync.dependsOn || []) allowed.add(t);
+  }
+  return allowed;
+}
+
+function resolveBatchScoped() {
+  const { MODULES } = getRegistry();
+  const visible = getVisibleModules();
+  const batched = new Set();
+  for (const id of visible) {
+    const mod = MODULES[id];
+    for (const t of mod?.sync?.batchScoped || []) batched.add(t);
+  }
+  return batched;
+}
+
+function filteredSyncOrder() {
+  const allowed = resolveAllowedTables();
+  return SYNC_ORDER.filter((e) => ENTITY_API_MAP[e] && allowed.has(e));
+}
+
 async function getServerTime() {
   const { data } = await api.get('/sync/status');
   return data.serverTime;
 }
 
-const BATCH_SCOPED = ['sources', 'expenses', 'feedOrders', 'saleOrders', 'dailyLogs'];
-
-async function fetchAllForEntity(entityType, updatedSince) {
+async function fetchAllForEntity(entityType, updatedSince, batchScoped) {
   const apiPath = ENTITY_API_MAP[entityType];
   if (!apiPath) return [];
   const params = {};
   if (updatedSince) {
     params.updatedSince = updatedSince;
-  } else if (BATCH_SCOPED.includes(entityType)) {
+  } else if (batchScoped && batchScoped.has(entityType)) {
     params.syncAll = true;
   }
   const { data } = await api.get(apiPath, { params });
@@ -61,21 +121,34 @@ async function handleSoftDeletes(tableName, records) {
   }
 }
 
+const ENTITY_TO_TABLE = {
+  feedOrder: 'feedOrders',
+  feedOrderItem: 'feedOrderItems',
+  saleOrder: 'saleOrders',
+  dailyLog: 'dailyLogs',
+  feedItem: 'feedItems',
+  media: 'media',
+};
+
+function tableForEntityType(entityType) {
+  if (ENTITY_TO_TABLE[entityType]) return ENTITY_TO_TABLE[entityType];
+  return entityType + 's';
+}
+
 async function applyDeletions(deletionMap) {
   for (const [entityType, ids] of Object.entries(deletionMap)) {
-    const tableName =
-      entityType === 'feedOrder' ? 'feedOrders'
-        : entityType === 'feedOrderItem' ? 'feedOrderItems'
-          : entityType === 'saleOrder' ? 'saleOrders'
-            : entityType + 's';
-    await deleteEntities(tableName, ids);
+    const tableName = tableForEntityType(entityType);
+    if (ENTITY_TABLES.includes(tableName)) {
+      await deleteEntities(tableName, ids);
+    }
   }
 }
 
 export async function fullSync({ reportProgress = false } = {}) {
   const store = useSyncStore.getState();
   store.setSyncing(true);
-  const syncableEntities = SYNC_ORDER.filter((e) => ENTITY_API_MAP[e]);
+  const syncableEntities = filteredSyncOrder();
+  const batchScoped = resolveBatchScoped();
   const totalSteps = syncableEntities.length + 1;
   let currentStep = 0;
   const report = (label) => {
@@ -88,7 +161,7 @@ export async function fullSync({ reportProgress = false } = {}) {
     const serverTime = await getServerTime();
     for (const entityType of syncableEntities) {
       report(entityType);
-      const records = await fetchAllForEntity(entityType);
+      const records = await fetchAllForEntity(entityType, undefined, batchScoped);
       await upsertEntities(entityType, records);
     }
     report('Settings');
@@ -147,9 +220,10 @@ export async function deltaSync() {
 
     const serverTime = await getServerTime();
     let oldestSyncAt = null;
+    const syncableEntities = filteredSyncOrder();
+    const batchScoped = resolveBatchScoped();
 
-    for (const entityType of SYNC_ORDER) {
-      if (!ENTITY_API_MAP[entityType]) continue;
+    for (const entityType of syncableEntities) {
       const meta = await getSyncMeta(entityType);
       const lastSyncAt = meta?.lastSyncAt;
 
@@ -157,7 +231,7 @@ export async function deltaSync() {
         oldestSyncAt = lastSyncAt;
       }
 
-      const records = await fetchAllForEntity(entityType, lastSyncAt);
+      const records = await fetchAllForEntity(entityType, lastSyncAt, batchScoped);
       await upsertEntities(entityType, records);
       await handleSoftDeletes(entityType, records);
     }
@@ -181,8 +255,7 @@ export async function deltaSync() {
       }
     }
 
-    const metaEntries = SYNC_ORDER
-      .filter((e) => ENTITY_API_MAP[e])
+    const metaEntries = syncableEntities
       .map((entityType) => ({ entityType, lastSyncAt: serverTime }));
     metaEntries.push({ entityType: 'settings', lastSyncAt: serverTime });
     await upsertSyncMeta(metaEntries);
@@ -255,6 +328,7 @@ export async function processQueue() {
             await putIdMapping(entityId, entry.entityType, serverRecord._id);
             await db.runAsync(`DELETE FROM ${entry.entityType} WHERE _id = ?`, [entityId]);
             await upsertEntities(entry.entityType, [serverRecord]);
+            await updateReferences(entry.entityType, entityId, serverRecord._id);
           }
         } else if (entry.action === 'update') {
           response = await api.put(`${apiPath}/${entityId}`, payload);
@@ -305,27 +379,161 @@ async function resolveId(entityType, id) {
   return mapping ? mapping.realId : id;
 }
 
+async function resolveRefId(tempId, entityType) {
+  if (!tempId) return tempId;
+  const mapping = await getIdMapping(tempId, entityType);
+  return mapping ? mapping.realId : tempId;
+}
+
+async function resolveMediaId(tempId) {
+  if (!tempId) return tempId;
+  const mapping = await getIdMapping(tempId, 'media');
+  if (mapping) return mapping.realId;
+
+  const db = await getDb();
+  const blob = await db.getFirstAsync(`SELECT _id FROM media_blobs WHERE _id = ?`, [tempId]);
+  if (blob) {
+    const uploaded = await uploadPendingBlob(tempId);
+    return uploaded?._id || tempId;
+  }
+
+  return tempId;
+}
+
+async function resolveMediaArray(arr) {
+  if (!Array.isArray(arr) || arr.length === 0) return arr;
+  return Promise.all(arr.map(resolveMediaId));
+}
+
 async function resolveIds(payload) {
   if (!payload || typeof payload !== 'object') return payload;
   const resolved = { ...payload };
 
-  const refFields = {
-    batch: 'batches', source: 'sources', feedOrder: 'feedOrders',
-    saleOrder: 'saleOrders', tradingCompany: 'businesses',
-    sourceFrom: 'businesses', farm: 'farms', house: 'houses', business: 'businesses',
-    contact: 'contacts', feedCompany: 'businesses', feedItem: 'feedItems',
-    buyer: 'businesses', customer: 'businesses',
-    existingBusinessId: 'businesses', existingContactId: 'contacts',
-  };
-
-  for (const [field, entityType] of Object.entries(refFields)) {
+  for (const [field, entityType] of Object.entries(REF_FIELDS)) {
     if (resolved[field]) {
       const mapping = await getIdMapping(resolved[field], entityType);
       if (mapping) resolved[field] = mapping.realId;
     }
   }
 
+  for (const [field, entityType] of Object.entries(ARRAY_REF_FIELDS)) {
+    if (Array.isArray(resolved[field])) {
+      resolved[field] = await Promise.all(
+        resolved[field].map((id) => resolveRefId(id, entityType))
+      );
+    }
+  }
+
+  for (const [arrayField, refMap] of Object.entries(ITEM_ARRAYS)) {
+    if (!Array.isArray(resolved[arrayField])) continue;
+    resolved[arrayField] = await Promise.all(
+      resolved[arrayField].map(async (item) => {
+        if (!item || typeof item !== 'object') return item;
+        const copy = { ...item };
+        for (const [itemField, entityType] of Object.entries(refMap)) {
+          if (copy[itemField]) copy[itemField] = await resolveRefId(copy[itemField], entityType);
+        }
+        return copy;
+      })
+    );
+  }
+
+  for (const field of SINGLE_MEDIA_FIELDS) {
+    if (resolved[field]) resolved[field] = await resolveMediaId(resolved[field]);
+  }
+
+  for (const [objField, config] of Object.entries(NESTED_REF_OBJECTS)) {
+    if (resolved[objField] && typeof resolved[objField] === 'object') {
+      const nested = { ...resolved[objField] };
+      for (const [field, entityType] of Object.entries(config.refFields || {})) {
+        if (nested[field]) nested[field] = await resolveRefId(nested[field], entityType);
+      }
+      for (const field of config.mediaArrayFields || []) {
+        nested[field] = await resolveMediaArray(nested[field]);
+      }
+      resolved[objField] = nested;
+    }
+  }
+
+  for (const field of ARRAY_MEDIA_FIELDS) {
+    if (Array.isArray(resolved[field])) {
+      resolved[field] = await resolveMediaArray(resolved[field]);
+    }
+  }
+
+  if (Array.isArray(resolved.otherDocs)) {
+    resolved.otherDocs = await Promise.all(
+      resolved.otherDocs.map(async (doc) => {
+        if (!doc || !doc[OTHER_DOC_ARRAY_MEDIA_KEY]) return doc;
+        return { ...doc, [OTHER_DOC_ARRAY_MEDIA_KEY]: await resolveMediaId(doc[OTHER_DOC_ARRAY_MEDIA_KEY]) };
+      })
+    );
+  }
+
   return resolved;
+}
+
+async function updateReferences(entityType, tempId, realId) {
+  const db = await getDb();
+  const pending = await db.getAllAsync(
+    `SELECT id, entityType, entityId, payload FROM mutation_queue WHERE status = 'pending'`
+  );
+
+  const refFieldNames = Object.keys(REF_FIELDS);
+  const arrRefFieldNames = Object.keys(ARRAY_REF_FIELDS);
+
+  for (const row of pending) {
+    const parsedPayload = row.payload ? JSON.parse(row.payload) : null;
+    let payload = parsedPayload ? { ...parsedPayload } : null;
+    let changed = false;
+
+    if (payload) {
+      for (const field of refFieldNames) {
+        if (payload[field] === tempId) {
+          payload[field] = realId;
+          changed = true;
+        }
+      }
+      for (const field of arrRefFieldNames) {
+        if (Array.isArray(payload[field])) {
+          const idx = payload[field].indexOf(tempId);
+          if (idx !== -1) {
+            payload[field] = [...payload[field]];
+            payload[field][idx] = realId;
+            changed = true;
+          }
+        }
+      }
+      for (const arrayField of Object.keys(ITEM_ARRAYS)) {
+        if (Array.isArray(payload[arrayField])) {
+          payload[arrayField] = payload[arrayField].map((item) => {
+            if (!item || typeof item !== 'object') return item;
+            let local = item;
+            for (const [k] of Object.entries(ITEM_ARRAYS[arrayField])) {
+              if (item[k] === tempId) {
+                local = { ...local, [k]: realId };
+                changed = true;
+              }
+            }
+            return local;
+          });
+        }
+      }
+    }
+
+    const isSelfEntity = row.entityId === tempId && row.entityType === entityType;
+    if (isSelfEntity) {
+      await db.runAsync(
+        `UPDATE mutation_queue SET entityId = ?, payload = ? WHERE id = ?`,
+        [realId, changed ? JSON.stringify(payload) : row.payload, row.id]
+      );
+    } else if (changed) {
+      await db.runAsync(
+        `UPDATE mutation_queue SET payload = ? WHERE id = ?`,
+        [JSON.stringify(payload), row.id]
+      );
+    }
+  }
 }
 
 async function uploadPendingMedia(payload, mediaFields) {

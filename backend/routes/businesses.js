@@ -5,6 +5,7 @@ import Contact from '../models/Contact.js';
 import User from '../models/User.js';
 import { protect } from '../middleware/auth.js';
 import { generateStatement } from '../services/statementService.js';
+import { logDeletion } from '../middleware/deletionTracker.js';
 
 const router = express.Router();
 
@@ -204,6 +205,7 @@ router.delete('/:id', protect, async (req, res) => {
 
     business.deletedAt = new Date();
     await business.save();
+    await logDeletion(ownerId, 'business', business._id);
 
     await Farm.updateMany(
       { business: business._id, deletedAt: null },

@@ -2,6 +2,7 @@ import express from 'express';
 import Worker from '../models/Worker.js';
 import Contact from '../models/Contact.js';
 import { protect } from '../middleware/auth.js';
+import { logDeletion } from '../middleware/deletionTracker.js';
 
 const router = express.Router();
 
@@ -218,9 +219,11 @@ router.delete('/:id', protect, async (req, res) => {
     const now = new Date();
     worker.deletedAt = now;
     await worker.save();
+    await logDeletion(ownerId, 'worker', worker._id);
 
     if (worker.contact) {
       await Contact.findByIdAndUpdate(worker.contact, { deletedAt: now });
+      await logDeletion(ownerId, 'contact', worker.contact);
     }
 
     res.json({ message: 'Worker deleted' });

@@ -1,5 +1,5 @@
 import { Text } from 'react-native';
-import { cn } from '../../lib/utils';
+import { cn } from '@/lib/utils';
 
 export function Label({ className, children, ...props }) {
   return (

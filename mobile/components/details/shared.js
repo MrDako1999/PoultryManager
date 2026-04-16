@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { ChevronRight, FileText, File, Image as ImageIcon, Receipt } from 'lucide-react-native';
-import { cn } from '../../lib/utils';
-import { SkeletonDetailPage } from '../skeletons';
-import FileViewer, { detectFileType } from '../FileViewer';
+import { cn } from '@/lib/utils';
+import { SkeletonDetailPage } from '@/components/skeletons';
+import FileViewer, { detectFileType } from '@/components/FileViewer';
 
 export const fmt = (val) =>
   Number(val || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });

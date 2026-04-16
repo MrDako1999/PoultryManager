@@ -10,6 +10,12 @@ const mediaSchema = new mongoose.Schema(
       required: [true, 'User ID is required'],
       index: true,
     },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+      index: true,
+    },
     url: {
       type: String,
       required: [true, 'URL is required'],

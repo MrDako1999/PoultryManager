@@ -64,8 +64,11 @@ import PhoneInput from '@/components/PhoneInput';
 import ConfirmDiscardDialog from '@/components/ConfirmDiscardDialog';
 import useFormGuard from '@/hooks/useFormGuard';
 import api from '@/lib/api';
+import { ACCOUNT_ROLES as ALL_ROLES } from '@poultrymanager/shared';
 
-const ACCOUNT_ROLES = ['manager', 'veterinarian', 'accountant', 'ground_staff', 'viewer'];
+// Exclude 'owner' from the assignable-role list — owners are created via
+// registration, not the team settings flow.
+const ACCOUNT_ROLES = ALL_ROLES.filter((r) => r !== 'owner');
 
 const userSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),

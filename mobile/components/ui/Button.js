@@ -2,7 +2,7 @@ import { forwardRef } from 'react';
 import { Pressable, Text, ActivityIndicator } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { cva } from 'class-variance-authority';
-import { cn } from '../../lib/utils';
+import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
   'flex-row items-center justify-center rounded-md',

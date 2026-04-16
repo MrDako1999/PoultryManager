@@ -3,6 +3,7 @@ import Contact from '../models/Contact.js';
 import Business from '../models/Business.js';
 import Worker from '../models/Worker.js';
 import { protect } from '../middleware/auth.js';
+import { logDeletion, logDeletions } from '../middleware/deletionTracker.js';
 
 const router = express.Router();
 
@@ -165,11 +166,22 @@ router.delete('/:id', protect, async (req, res) => {
     const now = new Date();
     contact.deletedAt = now;
     await contact.save();
+    await logDeletion(ownerId, 'contact', contact._id);
 
-    await Worker.updateMany(
-      { contact: contact._id, user_id: ownerId, deletedAt: null },
-      { deletedAt: now }
-    );
+    const cascadedWorkers = await Worker.find({
+      contact: contact._id,
+      user_id: ownerId,
+      deletedAt: null,
+    }).select('_id');
+
+    if (cascadedWorkers.length > 0) {
+      const ids = cascadedWorkers.map((w) => w._id);
+      await Worker.updateMany(
+        { _id: { $in: ids } },
+        { deletedAt: now }
+      );
+      await logDeletions(ownerId, 'worker', ids);
+    }
 
     res.json({ message: 'Contact deleted' });
   } catch (err) {

@@ -9,7 +9,7 @@ import { WebView } from 'react-native-webview';
 import { File as ExpoFile, Directory, Paths } from 'expo-file-system/next';
 import * as Sharing from 'expo-sharing';
 import * as Haptics from 'expo-haptics';
-import useThemeStore from '../stores/themeStore';
+import useThemeStore from '@/stores/themeStore';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const SCREEN_WIDTH = Dimensions.get('window').width;

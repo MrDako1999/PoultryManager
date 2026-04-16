@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from 'react';
 import { View, Text, Pressable, Animated, StyleSheet, Easing } from 'react-native';
 import { Plus } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import useThemeStore from '../stores/themeStore';
+import useThemeStore from '@/stores/themeStore';
 
 const FAB_SIZE = 56;
 const MENU_GAP = 10;

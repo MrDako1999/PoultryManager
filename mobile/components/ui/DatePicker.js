@@ -5,8 +5,8 @@ import {
 } from 'react-native';
 import { Calendar, ChevronLeft, ChevronRight, X } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { cn } from '../../lib/utils';
-import useThemeStore from '../../stores/themeStore';
+import { cn } from '@/lib/utils';
+import useThemeStore from '@/stores/themeStore';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const SHEET_HEIGHT = 460;

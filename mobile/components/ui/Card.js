@@ -1,5 +1,5 @@
 import { View, Text } from 'react-native';
-import { cn } from '../../lib/utils';
+import { cn } from '@/lib/utils';
 
 export function Card({ className, children, ...props }) {
   return (

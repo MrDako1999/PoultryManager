@@ -1,9 +1,9 @@
 import { useCallback } from 'react';
 import * as Haptics from 'expo-haptics';
-import { upsertEntities, getDb, dbEvents } from '../lib/db';
-import { enqueue } from '../lib/mutationQueue';
-import { processQueue } from '../lib/syncEngine';
-import useSyncStore from '../stores/syncStore';
+import { upsertEntities, getDb, dbEvents } from '@/lib/db';
+import { enqueue } from '@/lib/mutationQueue';
+import { processQueue } from '@/lib/syncEngine';
+import useSyncStore from '@/stores/syncStore';
 
 export default function useOfflineMutation(entityType) {
   const create = useCallback(

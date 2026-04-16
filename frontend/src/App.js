@@ -1,37 +1,27 @@
-import { useEffect } from 'react';
+import { useEffect, createElement } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import useAuthStore from '@/stores/authStore';
 import useThemeStore from '@/stores/themeStore';
+import useCapabilities from '@/hooks/useCapabilities';
 import AuthLayout from '@/layouts/AuthLayout';
 import DashboardLayout from '@/layouts/DashboardLayout';
 import LoginPage from '@/pages/auth/LoginPage';
 import RegisterPage from '@/pages/auth/RegisterPage';
+import FirstLoginPage from '@/pages/auth/FirstLoginPage';
 import DashboardPage from '@/pages/dashboard/DashboardPage';
+import AccountingShell from '@/pages/dashboard/AccountingShell';
 import SettingsPage from '@/pages/dashboard/settings/SettingsPage';
-import ContactsPage from '@/pages/dashboard/directory/ContactsPage';
-import BusinessesPage from '@/pages/dashboard/directory/BusinessesPage';
-import WorkersPage from '@/pages/dashboard/directory/WorkersPage';
-import FarmsPage from '@/pages/dashboard/directory/FarmsPage';
-import FeedCataloguePage from '@/pages/dashboard/directory/FeedCataloguePage';
-import BatchesPage from '@/pages/dashboard/BatchesPage';
-import BatchDetailLayout from '@/pages/dashboard/batch/BatchDetailLayout';
-import BatchOverview from '@/pages/dashboard/batch/BatchOverview';
-import BatchExpensesView from '@/pages/dashboard/batch/BatchExpensesView';
-import BatchSourcesView from '@/pages/dashboard/batch/BatchSourcesView';
-import BatchFeedOrdersView from '@/pages/dashboard/batch/BatchFeedOrdersView';
-import BatchSalesView from '@/pages/dashboard/batch/BatchSalesView';
-import BatchOperationsView from '@/pages/dashboard/batch/BatchOperationsView';
-import BatchHouseOpsView from '@/pages/dashboard/batch/BatchHouseOpsView';
-import BusinessDetailLayout from '@/pages/dashboard/directory/BusinessDetailLayout';
-import BusinessOverview from '@/pages/dashboard/directory/BusinessOverview';
-import BusinessExpensesView from '@/pages/dashboard/directory/BusinessExpensesView';
-import BusinessSalesView from '@/pages/dashboard/directory/BusinessSalesView';
-import BusinessFeedOrdersView from '@/pages/dashboard/directory/BusinessFeedOrdersView';
-import BusinessSourcesView from '@/pages/dashboard/directory/BusinessSourcesView';
-import FarmDetailLayout from '@/pages/dashboard/directory/FarmDetailLayout';
-import FarmOverview from '@/pages/dashboard/directory/FarmOverview';
-import AccountingSalesPage from '@/pages/dashboard/accounting/AccountingSalesPage';
-import AccountingExpensesPage from '@/pages/dashboard/accounting/AccountingExpensesPage';
+import ContactsPage from '@/shared/pages/directory/ContactsPage';
+import BusinessesPage from '@/shared/pages/directory/BusinessesPage';
+import WorkersPage from '@/shared/pages/directory/WorkersPage';
+import FarmsPage from '@/shared/pages/directory/FarmsPage';
+import FeedCataloguePage from '@/shared/pages/directory/FeedCataloguePage';
+import BusinessDetailLayout from '@/shared/pages/directory/BusinessDetailLayout';
+import BusinessOverview from '@/shared/pages/directory/BusinessOverview';
+import FarmDetailLayout from '@/shared/pages/directory/FarmDetailLayout';
+import FarmOverview from '@/shared/pages/directory/FarmOverview';
+import RequireCapability from '@/components/RequireCapability';
+import { MODULES } from '@/modules/registry';
 import { Toaster } from '@/components/ui/toaster';
 import { Construction } from 'lucide-react';
 
@@ -50,6 +40,10 @@ function ProtectedRoute({ children }) {
     return <Navigate to="/login" replace />;
   }
 
+  if (user.mustChangePassword) {
+    return <Navigate to="/first-login" replace />;
+  }
+
   return children;
 }
 
@@ -64,7 +58,7 @@ function PublicRoute({ children }) {
     );
   }
 
-  if (user) {
+  if (user && !user.mustChangePassword) {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -85,9 +79,61 @@ function PlaceholderPage({ title }) {
   );
 }
 
+// Recursively render a module's route tree into <Route> elements. Each route
+// is wrapped in <RequireCapability> using its `capability` field.
+function renderModuleRoutes(routes) {
+  return routes.flatMap((r, idx) => {
+    const children = Array.isArray(r.children) ? r.children : [];
+    const ElementComponent = r.element;
+    const guardedElement = ElementComponent
+      ? (
+        <RequireCapability action={r.capability}>
+          {createElement(ElementComponent)}
+        </RequireCapability>
+      )
+      : null;
+
+    if (r.index) {
+      return <Route key={`idx-${idx}`} index element={guardedElement} />;
+    }
+
+    return (
+      <Route key={r.path} path={r.path} element={guardedElement}>
+        {children.length > 0 ? renderModuleRoutes(children) : null}
+      </Route>
+    );
+  });
+}
+
+// Partition module routes: top-level vs business-scoped (which need to be
+// nested under the shared BusinessDetailLayout so <Outlet> works).
+function partitionModuleRoutes(routes) {
+  const topLevel = [];
+  const businessScoped = [];
+  for (const r of routes) {
+    if (r.businessScoped) {
+      // Convert the absolute path to a relative child under :id/
+      const match = r.path.match(/^\/dashboard\/directory\/businesses\/:id\/(.+)$/);
+      if (match) {
+        businessScoped.push({ ...r, path: match[1] });
+        continue;
+      }
+    }
+    topLevel.push(r);
+  }
+  return { topLevel, businessScoped };
+}
+
+function useModuleRouteTree() {
+  const { visibleModules } = useCapabilities();
+  const routes = visibleModules.flatMap((id) => MODULES[id]?.routes || []);
+  return partitionModuleRoutes(routes);
+}
+
 export default function App() {
   const { checkAuth } = useAuthStore();
   const { initTheme } = useThemeStore();
+  const { topLevel: moduleTopLevelRoutes, businessScoped: moduleBusinessScopedRoutes } = useModuleRouteTree();
 
   useEffect(() => {
     initTheme();
@@ -109,6 +155,12 @@ export default function App() {
           <Route path="/register" element={<RegisterPage />} />
         </Route>
 
+        {/* First-login password change — public layout but only reachable when
+            ProtectedRoute redirects an authenticated user with mustChangePassword */}
+        <Route element={<AuthLayout />}>
+          <Route path="/first-login" element={<FirstLoginPage />} />
+        </Route>
+
         {/* Protected dashboard routes */}
         <Route
           element={
@@ -117,63 +169,59 @@ export default function App() {
             </ProtectedRoute>
           }
         >
+          {/* Shell */}
           <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/dashboard/batches" element={<BatchesPage />} />
-          <Route path="/dashboard/batches/:id" element={<BatchDetailLayout />}>
-            <Route index element={<BatchOverview />} />
-            <Route path="expenses" element={<BatchExpensesView />} />
-            <Route path="expenses/:eid" element={<BatchExpensesView />} />
-            <Route path="sources" element={<BatchSourcesView />} />
-            <Route path="sources/:sid" element={<BatchSourcesView />} />
-            <Route path="feed-orders" element={<BatchFeedOrdersView />} />
-            <Route path="feed-orders/:fid" element={<BatchFeedOrdersView />} />
-            <Route path="sales" element={<BatchSalesView />} />
-            <Route path="sales/:saleId" element={<BatchSalesView />} />
-            <Route path="performance" element={<BatchOperationsView />} />
-            <Route path="performance/:houseId" element={<BatchHouseOpsView />} />
-            <Route path="performance/:houseId/:logId" element={<BatchHouseOpsView />} />
-          </Route>
+          <Route path="/dashboard/settings" element={<SettingsPage />} />
 
+          {/* Top-level module-contributed routes */}
+          {renderModuleRoutes(moduleTopLevelRoutes)}
+
+          {/* Legacy redirects */}
           <Route path="/dashboard/farms" element={<Navigate to="/dashboard/directory/farms" replace />} />
           <Route path="/dashboard/workers" element={<Navigate to="/dashboard/directory/workers" replace />} />
           <Route path="/dashboard/health" element={<PlaceholderPage title="Health & Medicine" />} />
 
-          {/* Directory */}
+          {/* Always-on directory routes (shared) — each child-entity gated by capability */}
           <Route path="/dashboard/directory" element={<PlaceholderPage title="Directory" />} />
-          <Route path="/dashboard/directory/contacts" element={<ContactsPage />} />
-          <Route path="/dashboard/directory/businesses" element={<BusinessesPage />} />
-          <Route path="/dashboard/directory/businesses/:id" element={<BusinessDetailLayout />}>
+          <Route path="/dashboard/directory/contacts" element={
+            <RequireCapability action="contact:read"><ContactsPage /></RequireCapability>
+          } />
+          <Route path="/dashboard/directory/businesses" element={
+            <RequireCapability action="business:read"><BusinessesPage /></RequireCapability>
+          } />
+          <Route path="/dashboard/directory/businesses/:id" element={
+            <RequireCapability action="business:read"><BusinessDetailLayout /></RequireCapability>
+          }>
             <Route index element={<BusinessOverview />} />
-            <Route path="expenses" element={<BusinessExpensesView />} />
-            <Route path="expenses/:eid" element={<BusinessExpensesView />} />
-            <Route path="sales" element={<BusinessSalesView />} />
-            <Route path="sales/:saleId" element={<BusinessSalesView />} />
-            <Route path="feed-orders" element={<BusinessFeedOrdersView />} />
-            <Route path="feed-orders/:fid" element={<BusinessFeedOrdersView />} />
-            <Route path="sources" element={<BusinessSourcesView />} />
-            <Route path="sources/:sid" element={<BusinessSourcesView />} />
+            {renderModuleRoutes(moduleBusinessScopedRoutes)}
           </Route>
-          <Route path="/dashboard/directory/workers" element={<WorkersPage />} />
-          <Route path="/dashboard/directory/farms" element={<FarmsPage />} />
-          <Route path="/dashboard/directory/farms/:farmId" element={<FarmDetailLayout />}>
+          <Route path="/dashboard/directory/workers" element={
+            <RequireCapability action="worker:read"><WorkersPage /></RequireCapability>
+          } />
+          <Route path="/dashboard/directory/farms" element={
+            <RequireCapability action="farm:read"><FarmsPage /></RequireCapability>
+          } />
+          <Route path="/dashboard/directory/farms/:farmId" element={
+            <RequireCapability action="farm:read"><FarmDetailLayout /></RequireCapability>
+          }>
             <Route index element={<FarmOverview />} />
           </Route>
-          <Route path="/dashboard/directory/feed" element={<FeedCataloguePage />} />
+          <Route path="/dashboard/directory/feed" element={
+            <RequireCapability action="feedItem:read"><FeedCataloguePage /></RequireCapability>
+          } />
 
-          {/* Accounting */}
-          <Route path="/dashboard/accounting" element={<PlaceholderPage title="Accounting" />} />
-          <Route path="/dashboard/accounting/sales" element={<AccountingSalesPage />} />
-          <Route path="/dashboard/accounting/sales/:saleId" element={<AccountingSalesPage />} />
+          {/* Accounting shell — tabs contributed by each module's accountingTabs */}
+          <Route path="/dashboard/accounting" element={<AccountingShell />} />
+          <Route path="/dashboard/accounting/:tabId" element={<AccountingShell />} />
+          <Route path="/dashboard/accounting/:tabId/:recordId" element={<AccountingShell />} />
+
+          {/* Unimplemented accounting subsections */}
           <Route path="/dashboard/accounting/vat" element={<PlaceholderPage title="VAT" />} />
           <Route path="/dashboard/accounting/corporate-tax" element={<PlaceholderPage title="Corporate Tax" />} />
-          <Route path="/dashboard/accounting/expenses" element={<AccountingExpensesPage />} />
-          <Route path="/dashboard/accounting/expenses/:eid" element={<AccountingExpensesPage />} />
 
           {/* Legacy redirects */}
           <Route path="/dashboard/sales" element={<Navigate to="/dashboard/accounting/sales" replace />} />
           <Route path="/dashboard/invoices" element={<Navigate to="/dashboard/accounting/sales" replace />} />
-
-          <Route path="/dashboard/settings" element={<SettingsPage />} />
         </Route>
 
         {/* Catch-all */}

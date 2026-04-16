@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
+    "@poultrymanager/shared": "file:../shared",
     "@react-native-async-storage/async-storage": "^3.0.2",
     "@react-native-community/netinfo": "11.4.1",
     "axios": "^1.15.0",
@@ -53,5 +54,8 @@
     "zod": "^3.24.1",
     "zustand": "^5.0.12"
   },
-  "private": true
+  "private": true,
+  "devDependencies": {
+    "babel-plugin-module-resolver": "^5.0.3"
+  }
 }

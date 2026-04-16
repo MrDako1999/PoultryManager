@@ -1,0 +1,15 @@
+{
+  "name": "@poultrymanager/shared",
+  "version": "1.0.0",
+  "description": "Cross-platform shared constants and helpers for PoultryManager",
+  "type": "module",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./modules": "./modules.js",
+    "./roles": "./roles.js",
+    "./permissions": "./permissions.js",
+    "./syncRefs": "./syncRefs.js"
+  },
+  "private": true
+}

@@ -3,9 +3,9 @@ import { Pressable, Text, View, Animated, Easing } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WifiOff, RefreshCw, AlertCircle, Loader2 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import useSyncStore from '../stores/syncStore';
-import useThemeStore from '../stores/themeStore';
-import { deltaSync, processQueue } from '../lib/syncEngine';
+import useSyncStore from '@/stores/syncStore';
+import useThemeStore from '@/stores/themeStore';
+import { deltaSync, processQueue } from '@/lib/syncEngine';
 
 export default function SyncStatusBar() {
   const { isOnline, isSyncing, pendingCount, failedCount } = useSyncStore();

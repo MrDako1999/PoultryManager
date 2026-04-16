@@ -4,9 +4,12 @@ import Farm from '../models/Farm.js';
 import Source from '../models/Source.js';
 import Expense from '../models/Expense.js';
 import { protect } from '../middleware/auth.js';
+import { requireModule } from '../middleware/modules.js';
 import { logDeletion, logDeletions } from '../middleware/deletionTracker.js';
 
 const router = express.Router();
+
+router.use(protect, requireModule('broiler'));
 
 const getOwnerId = (user) => user.createdBy || user._id;
 
@@ -19,7 +22,7 @@ function formatBatchDate(date) {
   return `${day}${month}${year}`;
 }
 
-router.get('/', protect, async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const ownerId = getOwnerId(req.user);
     const { search, farm, updatedSince } = req.query;
@@ -71,7 +74,7 @@ router.get('/', protect, async (req, res) => {
   }
 });
 
-router.get('/:id', protect, async (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
     const ownerId = getOwnerId(req.user);
     const batch = await Batch.findOne({ _id: req.params.id, user_id: ownerId })
@@ -98,7 +101,7 @@ router.get('/:id', protect, async (req, res) => {
   }
 });
 
-router.post('/', protect, async (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const ownerId = getOwnerId(req.user);
     const { farm: farmId, startDate, status, houses } = req.body;
@@ -140,7 +143,7 @@ router.post('/', protect, async (req, res) => {
   }
 });
 
-router.put('/:id', protect, async (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
     const ownerId = getOwnerId(req.user);
     const batch = await Batch.findOne({ _id: req.params.id, user_id: ownerId });
@@ -183,7 +186,7 @@ router.put('/:id', protect, async (req, res) => {
   }
 });
 
-router.delete('/:id', protect, async (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
     const ownerId = getOwnerId(req.user);
     const batch = await Batch.findOne({ _id: req.params.id, user_id: ownerId });

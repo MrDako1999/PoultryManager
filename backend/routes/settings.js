@@ -136,6 +136,20 @@ router.put('/accounting', protect, async (req, res) => {
   }
 });
 
+const DEFAULT_BROILER_SALE_DEFAULTS = () => ({
+  portionRates: {
+    LIVER: 0, GIZZARD: 0, HEART: 0, BREAST: 0,
+    LEG: 0, WING: 0, BONE: 0, THIGH: 0,
+    DRUMSTICK: 0, BONELESS_THIGH: 0, NECK: 0, MINCE: 0,
+  },
+  transportRatePerTruck: 0,
+});
+
+function getModuleSettings(user, moduleId) {
+  const block = user?.moduleSettings?.[moduleId] || {};
+  return block;
+}
+
 router.get('/sale-defaults', protect, async (req, res) => {
   try {
     const ownerId = req.user.createdBy || req.user._id;
@@ -143,10 +157,11 @@ router.get('/sale-defaults', protect, async (req, res) => {
       ? req.user
       : await User.findById(ownerId);
 
-    const defaults = owner?.saleDefaults || {};
-    const portionRates = defaults.portionRates instanceof Map
-      ? Object.fromEntries(defaults.portionRates)
-      : defaults.portionRates || {};
+    const moduleId = (req.query.module || 'broiler').toString();
+    const moduleBlock = getModuleSettings(owner, moduleId);
+    const defaults = moduleBlock.saleDefaults || DEFAULT_BROILER_SALE_DEFAULTS();
+    const portionRates = defaults.portionRates || {};
+
     res.json({
       portionRates,
       transportRatePerTruck: defaults.transportRatePerTruck ?? 0,
@@ -163,6 +178,7 @@ router.put('/sale-defaults', protect, async (req, res) => {
       return res.status(403).json({ message: 'Only the account owner can edit sale defaults' });
     }
 
+    const moduleId = (req.query.module || 'broiler').toString();
     const { portionRates, transportRatePerTruck } = req.body;
     const user = await User.findById(req.user._id);
 
@@ -170,27 +186,22 @@ router.put('/sale-defaults', protect, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    if (!user.saleDefaults) {
-      user.saleDefaults = {};
+    if (!user.moduleSettings) user.moduleSettings = {};
+    if (!user.moduleSettings[moduleId]) user.moduleSettings[moduleId] = {};
+    if (!user.moduleSettings[moduleId].saleDefaults) {
+      user.moduleSettings[moduleId].saleDefaults = DEFAULT_BROILER_SALE_DEFAULTS();
     }
 
-    if (portionRates !== undefined) {
-      user.saleDefaults.portionRates = new Map(Object.entries(portionRates));
-    }
-    if (transportRatePerTruck !== undefined) {
-      user.saleDefaults.transportRatePerTruck = transportRatePerTruck;
-    }
+    const block = user.moduleSettings[moduleId].saleDefaults;
+    if (portionRates !== undefined) block.portionRates = portionRates;
+    if (transportRatePerTruck !== undefined) block.transportRatePerTruck = transportRatePerTruck;
 
-    user.markModified('saleDefaults');
+    user.markModified('moduleSettings');
     await user.save();
 
-    const saved = user.saleDefaults;
-    const rates = saved.portionRates instanceof Map
-      ? Object.fromEntries(saved.portionRates)
-      : saved.portionRates || {};
     res.json({
-      portionRates: rates,
-      transportRatePerTruck: saved.transportRatePerTruck ?? 0,
+      portionRates: block.portionRates || {},
+      transportRatePerTruck: block.transportRatePerTruck ?? 0,
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -220,6 +231,7 @@ router.put('/password', protect, async (req, res) => {
     }
 
     user.password = newPassword;
+    user.mustChangePassword = false;
     await user.save();
 
     res.json({ message: 'Password updated successfully' });

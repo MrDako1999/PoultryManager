@@ -1,7 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import useMediaQuery from '@/hooks/useMediaQuery';
-import { navGroups, STORAGE_KEY } from '@/layouts/sidebar/constants';
+import { STORAGE_KEY } from '@/layouts/sidebar/constants';
+
+// Static list of sidebar group keys the hook knows about for auto-open behavior.
+// Individual groups are dynamically built in Sidebar.js via `buildSidebar`; this
+// list only needs to reflect the top-level group keys we want to auto-expand
+// when the user is on one of their child routes.
+const AUTO_OPEN_GROUPS = [
+  { key: 'directory', path: '/dashboard/directory' },
+  { key: 'accounting', path: '/dashboard/accounting' },
+];
 
 export default function useSidebar() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -10,7 +19,7 @@ export default function useSidebar() {
   });
   const [openGroups, setOpenGroups] = useState(() => {
     const initial = {};
-    navGroups.forEach(g => { initial[g.key] = false; });
+    AUTO_OPEN_GROUPS.forEach((g) => { initial[g.key] = false; });
     return initial;
   });
 
@@ -19,7 +28,7 @@ export default function useSidebar() {
   const isExpanded = !isDesktop || !collapsed;
 
   const toggleGroup = useCallback((key) => {
-    setOpenGroups(prev => ({ ...prev, [key]: !prev[key] }));
+    setOpenGroups((prev) => ({ ...prev, [key]: !prev[key] }));
   }, []);
 
   const closeMobileDrawer = useCallback(() => {
@@ -31,9 +40,9 @@ export default function useSidebar() {
   }, [collapsed]);
 
   useEffect(() => {
-    navGroups.forEach(g => {
+    AUTO_OPEN_GROUPS.forEach((g) => {
       if (location.pathname.startsWith(g.path)) {
-        setOpenGroups(prev => prev[g.key] ? prev : { ...prev, [g.key]: true });
+        setOpenGroups((prev) => (prev[g.key] ? prev : { ...prev, [g.key]: true }));
       }
     });
   }, [location.pathname]);

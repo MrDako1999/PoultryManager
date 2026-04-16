@@ -1,13 +1,24 @@
 import express from 'express';
 import House from '../models/House.js';
 import Farm from '../models/Farm.js';
+import Worker from '../models/Worker.js';
 import { protect } from '../middleware/auth.js';
+import { requireModule } from '../middleware/modules.js';
+import { logDeletion } from '../middleware/deletionTracker.js';
 
 const router = express.Router();
 
+router.use(protect, requireModule('broiler'));
+
 const getOwnerId = (user) => user.createdBy || user._id;
 
-router.get('/', protect, async (req, res) => {
+async function resolveGroundStaffHouses(user) {
+  if (user.accountRole !== 'ground_staff') return null;
+  const worker = await Worker.findOne({ linkedUser: user._id, deletedAt: null }).select('houseAssignments');
+  return Array.isArray(worker?.houseAssignments) ? worker.houseAssignments : [];
+}
+
+router.get('/', async (req, res) => {
   try {
     const ownerId = getOwnerId(req.user);
     const { farm, updatedSince } = req.query;
@@ -24,6 +35,12 @@ router.get('/', protect, async (req, res) => {
       query.deletedAt = null;
     }
 
+    const scoped = await resolveGroundStaffHouses(req.user);
+    if (scoped !== null) {
+      if (scoped.length === 0) return res.json([]);
+      query._id = { $in: scoped };
+    }
+
     const houses = await House.find(query).sort({ sortOrder: 1, createdAt: 1 });
     res.json(houses);
   } catch (err) {
@@ -31,7 +48,7 @@ router.get('/', protect, async (req, res) => {
   }
 });
 
-router.get('/:id', protect, async (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
     const ownerId = getOwnerId(req.user);
     const house = await House.findOne({
@@ -50,7 +67,7 @@ router.get('/:id', protect, async (req, res) => {
   }
 });
 
-router.post('/', protect, async (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const ownerId = getOwnerId(req.user);
     const { farm: farmId, name, capacity, sortOrder } = req.body;
@@ -79,7 +96,7 @@ router.post('/', protect, async (req, res) => {
   }
 });
 
-router.post('/bulk', protect, async (req, res) => {
+router.post('/bulk', async (req, res) => {
   try {
     const ownerId = getOwnerId(req.user);
     const { farm: farmId, houses } = req.body;
@@ -109,7 +126,7 @@ router.post('/bulk', protect, async (req, res) => {
   }
 });
 
-router.put('/:id', protect, async (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
     const ownerId = getOwnerId(req.user);
     const house = await House.findOne({
@@ -136,7 +153,7 @@ router.put('/:id', protect, async (req, res) => {
   }
 });
 
-router.delete('/:id', protect, async (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
     const ownerId = getOwnerId(req.user);
     const house = await House.findOne({
@@ -151,6 +168,7 @@ router.delete('/:id', protect, async (req, res) => {
 
     house.deletedAt = new Date();
     await house.save();
+    await logDeletion(ownerId, 'house', house._id);
 
     res.json({ message: 'House deleted' });
   } catch (err) {

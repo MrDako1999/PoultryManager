@@ -28,7 +28,7 @@ function getExtension(filename) {
  * @param {string} [params.customPrefix] - optional prefix for the filename (e.g. SALES_INV_)
  * @returns {Promise<Object>} saved Media document
  */
-export async function uploadFile({ file, userId, entityType, entityId, category, mediaType, customPrefix }) {
+export async function uploadFile({ file, userId, entityType, entityId, category, mediaType, customPrefix, createdBy }) {
   const s3 = getS3Client();
   const bucket = getBucket();
 
@@ -60,6 +60,7 @@ export async function uploadFile({ file, userId, entityType, entityId, category,
 
   const media = await Media.create({
     user_id: userId,
+    createdBy: createdBy || userId,
     url,
     key,
     filename,

@@ -17,6 +17,7 @@ import LogoUpload from '@/components/LogoUpload';
 import AddressAutocomplete from '@/components/AddressAutocomplete';
 import InfoTip from '@/components/InfoTip';
 import useAuthStore from '@/stores/authStore';
+import useCapabilities from '@/hooks/useCapabilities';
 import api from '@/lib/api';
 import db from '@/lib/db';
 import useSettings from '@/hooks/useSettings';
@@ -36,8 +37,9 @@ const businessSchema = z.object({
 export default function ProfileSettings() {
   const { t } = useTranslation();
   const { user, checkAuth } = useAuthStore();
+  const { workspace } = useCapabilities();
   const { toast } = useToast();
-  const isOwner = user?.accountRole === 'owner' || !user?.createdBy;
+  const isOwner = !!workspace?.isOwner;
 
   const {
     register: registerProfile,

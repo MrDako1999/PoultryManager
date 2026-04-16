@@ -1,5 +1,5 @@
 import { View, TextInput, Text } from 'react-native';
-import { cn } from '../lib/utils';
+import { cn } from '@/lib/utils';
 
 export default function PhoneInput({ value, onChange, className }) {
   return (

@@ -19,26 +19,22 @@ import {
   Lock,
 } from 'lucide-react';
 import useAuthStore from '@/stores/authStore';
+import { MODULE_IDS, MODULE_CATALOG } from '@poultrymanager/shared';
 
-const MODULE_META = {
-  broiler: { icon: Bird, color: 'text-emerald-600 dark:text-emerald-400' },
-  hatchery: { icon: Egg, color: 'text-amber-600 dark:text-amber-400' },
-  freeRange: { icon: Feather, color: 'text-sky-600 dark:text-sky-400' },
-  eggProduction: { icon: Egg, color: 'text-orange-600 dark:text-orange-400' },
-  slaughterhouse: { icon: Factory, color: 'text-red-600 dark:text-red-400' },
-  marketing: { icon: ShoppingBag, color: 'text-purple-600 dark:text-purple-400' },
-  equipment: { icon: Wrench, color: 'text-slate-600 dark:text-slate-400' },
+// Map the shared catalog's icon names to actual lucide icons.
+const ICON_MAP = {
+  Bird, Egg, Feather, Factory, ShoppingBag, Wrench, Warehouse,
 };
 
-const ALL_MODULES = [
-  'broiler',
-  'hatchery',
-  'freeRange',
-  'eggProduction',
-  'slaughterhouse',
-  'marketing',
-  'equipment',
-];
+const COLOR_MAP = {
+  broiler: 'text-emerald-600 dark:text-emerald-400',
+  hatchery: 'text-amber-600 dark:text-amber-400',
+  freeRange: 'text-sky-600 dark:text-sky-400',
+  eggProduction: 'text-orange-600 dark:text-orange-400',
+  slaughterhouse: 'text-red-600 dark:text-red-400',
+  marketing: 'text-purple-600 dark:text-purple-400',
+  equipment: 'text-slate-600 dark:text-slate-400',
+};
 
 export default function ModulesSettings() {
   const { t } = useTranslation();
@@ -53,10 +49,11 @@ export default function ModulesSettings() {
       </CardHeader>
       <CardContent>
         <div className="grid gap-3 sm:grid-cols-2">
-          {ALL_MODULES.map((moduleKey) => {
+          {MODULE_IDS.map((moduleKey) => {
+            const catalog = MODULE_CATALOG[moduleKey] || {};
             const isActive = activeModules.includes(moduleKey);
-            const meta = MODULE_META[moduleKey] || { icon: Warehouse, color: 'text-muted-foreground' };
-            const Icon = meta.icon;
+            const Icon = ICON_MAP[catalog.icon] || Warehouse;
+            const colorClass = COLOR_MAP[moduleKey] || 'text-muted-foreground';
 
             return (
               <div
@@ -70,12 +67,12 @@ export default function ModulesSettings() {
                     isActive ? 'bg-primary/10' : 'bg-muted'
                   }`}
                 >
-                  <Icon className={`h-5 w-5 ${isActive ? meta.color : 'text-muted-foreground'}`} />
+                  <Icon className={`h-5 w-5 ${isActive ? colorClass : 'text-muted-foreground'}`} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm">{t(`modules.${moduleKey}`)}</p>
+                  <p className="font-medium text-sm">{t(`modules.${moduleKey}`, moduleKey)}</p>
                   <p className="text-xs text-muted-foreground truncate">
-                    {t(`modules.${moduleKey}Desc`)}
+                    {t(`modules.${moduleKey}Desc`, '')}
                   </p>
                 </div>
                 {isActive ? (

@@ -1,12 +1,16 @@
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { navItems, navGroups, SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from './constants';
+import { buildSidebar, SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from './constants';
 import NavItem from './NavItem';
 import NavGroup from './NavGroup';
 import SidebarFooter from './SidebarFooter';
 import useThemeStore from '@/stores/themeStore';
+import useCapabilities from '@/hooks/useCapabilities';
+import { MODULES } from '@/modules/registry';
+import ModuleSwitcher from '@/shared/components/ModuleSwitcher';
 
 export default function Sidebar({
   sidebarOpen, setSidebarOpen,
@@ -18,10 +22,16 @@ export default function Sidebar({
 }) {
   const { t } = useTranslation();
   const { resolvedTheme } = useThemeStore();
+  const { visibleModules, can } = useCapabilities();
   const isDark = resolvedTheme === 'dark';
   const bannerSrc = isDark ? '/media/logo/PM_banner_white.png' : '/media/logo/PM_Banner.png';
   const iconSrc = isDark ? '/media/logo/pm_logo_notext_square_white_max.png' : '/media/logo/PM logo_notext_square_max.png';
   const sidebarWidth = isExpanded ? SIDEBAR_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
+
+  const { navItems, navGroups } = useMemo(
+    () => buildSidebar({ visibleModules, modules: MODULES, can }),
+    [visibleModules, can],
+  );
 
   return (
     <aside
@@ -81,13 +91,13 @@ export default function Sidebar({
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
-        {navItems.map(({ key, path, icon }) => (
+        {navItems.map(({ key, path, icon, end }) => (
           <NavItem
             key={key}
             to={path}
-            end={key === 'dashboard'}
+            end={end === true || key === 'dashboard'}
             icon={icon}
-            label={t(`nav.${key}`)}
+            label={t(`nav.${key}`, key)}
             isExpanded={isExpanded}
             rtl={rtl}
             onNavigate={closeMobileDrawer}
@@ -107,6 +117,13 @@ export default function Sidebar({
           />
         ))}
       </nav>
+
+      {/* Module switcher — hidden when only one module */}
+      {visibleModules.length > 1 && (
+        <div className={cn('px-3 pb-2', !isExpanded && 'flex justify-center')}>
+          <ModuleSwitcher compact={!isExpanded} />
+        </div>
+      )}
 
       {/* Footer */}
       <SidebarFooter
