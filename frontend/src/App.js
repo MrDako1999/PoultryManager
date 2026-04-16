@@ -28,6 +28,8 @@ import BusinessExpensesView from '@/pages/dashboard/directory/BusinessExpensesVi
 import BusinessSalesView from '@/pages/dashboard/directory/BusinessSalesView';
 import BusinessFeedOrdersView from '@/pages/dashboard/directory/BusinessFeedOrdersView';
 import BusinessSourcesView from '@/pages/dashboard/directory/BusinessSourcesView';
+import FarmDetailLayout from '@/pages/dashboard/directory/FarmDetailLayout';
+import FarmOverview from '@/pages/dashboard/directory/FarmOverview';
 import AccountingSalesPage from '@/pages/dashboard/accounting/AccountingSalesPage';
 import AccountingExpensesPage from '@/pages/dashboard/accounting/AccountingExpensesPage';
 import { Toaster } from '@/components/ui/toaster';
@@ -153,6 +155,9 @@ export default function App() {
           </Route>
           <Route path="/dashboard/directory/workers" element={<WorkersPage />} />
           <Route path="/dashboard/directory/farms" element={<FarmsPage />} />
+          <Route path="/dashboard/directory/farms/:farmId" element={<FarmDetailLayout />}>
+            <Route index element={<FarmOverview />} />
+          </Route>
           <Route path="/dashboard/directory/feed" element={<FeedCataloguePage />} />
 
           {/* Accounting */}

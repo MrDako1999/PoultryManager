@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams, useOutletContext, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Card, CardContent } from '@/components/ui/card';
@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import {
   ArrowLeftRight, ShoppingCart, DollarSign, Wheat, Egg, FileText, Loader2,
+  Building2, MapPin, ExternalLink, ContactRound, Warehouse, Scale,
 } from 'lucide-react';
 import CollapsibleSection from '@/components/CollapsibleSection';
 import TransferRow from '@/components/rows/TransferRow';
@@ -15,6 +16,7 @@ import SaleRow from '@/components/rows/SaleRow';
 import ExpenseRow from '@/components/rows/ExpenseRow';
 import TransferSheet from '@/components/TransferSheet';
 import TransferDetailSheet from '@/components/TransferDetailSheet';
+import { DocRow, OtherDocsList } from '@/components/details/shared';
 import useLocalQuery from '@/hooks/useLocalQuery';
 import useSettings from '@/hooks/useSettings';
 import useOfflineMutation from '@/hooks/useOfflineMutation';
@@ -37,6 +39,7 @@ export default function BusinessOverview() {
   const [transferSheetOpen, setTransferSheetOpen] = useState(false);
   const [editingTransfer, setEditingTransfer] = useState(null);
   const [viewingTransferId, setViewingTransferId] = useState(null);
+  const [bizDocs, setBizDocs] = useState(null);
 
   const [stmtFrom, setStmtFrom] = useState('');
   const [stmtTo, setStmtTo] = useState(formatDateForInput(new Date()));
@@ -49,13 +52,30 @@ export default function BusinessOverview() {
   const allSaleOrders = useLocalQuery('saleOrders');
   const allFeedOrders = useLocalQuery('feedOrders');
   const allSources = useLocalQuery('sources');
+  const allFarms = useLocalQuery('farms');
+
+  useEffect(() => {
+    let cancelled = false;
+    api.get(`/businesses/${id}`).then(({ data }) => {
+      if (!cancelled) setBizDocs(data);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [id]);
+
+  const linkedFarms = useMemo(
+    () => allFarms.filter((f) => {
+      const bId = typeof f.business === 'object' ? f.business?._id : f.business;
+      return bId === id;
+    }),
+    [allFarms, id],
+  );
 
   const relatedExpenses = useMemo(
     () => allExpenses.filter((e) => {
       const tc = typeof e.tradingCompany === 'object' ? e.tradingCompany?._id : e.tradingCompany;
       return tc === id;
     }),
-    [allExpenses, id]
+    [allExpenses, id],
   );
 
   const relatedSales = useMemo(
@@ -63,7 +83,7 @@ export default function BusinessOverview() {
       const c = typeof s.customer === 'object' ? s.customer?._id : s.customer;
       return c === id;
     }),
-    [allSaleOrders, id]
+    [allSaleOrders, id],
   );
 
   const relatedFeedOrders = useMemo(
@@ -71,7 +91,7 @@ export default function BusinessOverview() {
       const fc = typeof f.feedCompany === 'object' ? f.feedCompany?._id : f.feedCompany;
       return fc === id;
     }),
-    [allFeedOrders, id]
+    [allFeedOrders, id],
   );
 
   const relatedSources = useMemo(
@@ -79,7 +99,7 @@ export default function BusinessOverview() {
       const sf = typeof s.sourceFrom === 'object' ? s.sourceFrom?._id : s.sourceFrom;
       return sf === id;
     }),
-    [allSources, id]
+    [allSources, id],
   );
 
   const totalTransfers = useMemo(() => transfers.reduce((s, x) => s + (x.amount || 0), 0), [transfers]);
@@ -94,12 +114,6 @@ export default function BusinessOverview() {
     : totalPurchases - totalTransfers;
 
   const { mutate: deleteTransfer } = useOfflineMutation('transfers');
-
-  const handleDeleteTransfer = (transfer) => {
-    deleteTransfer({ action: 'delete', id: transfer._id }, {
-      onSuccess: () => toast({ title: t('transfers.transferDeleted') }),
-    });
-  };
 
   const handleGenerateStatement = async () => {
     setStmtLoading(true);
@@ -119,69 +133,181 @@ export default function BusinessOverview() {
     }
   };
 
+  const contacts = business.contacts || [];
+  const hasDocuments = bizDocs && (
+    bizDocs.logo ||
+    bizDocs.trnCertificate ||
+    bizDocs.tradeLicense ||
+    (bizDocs.otherDocs && bizDocs.otherDocs.length > 0)
+  );
+
+  const traderKpis = [
+    { label: t('businesses.detail.totalSales'), value: `${currency} ${fmt(totalSales)}`, icon: ShoppingCart, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-100 dark:bg-emerald-900/30' },
+    { label: t('businesses.detail.totalExpenses'), value: `${currency} ${fmt(totalExpenses)}`, icon: DollarSign, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/30' },
+    { label: t('businesses.detail.totalTransfers'), value: `${currency} ${fmt(totalTransfers)}`, icon: ArrowLeftRight, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/30' },
+    {
+      label: `${t('businesses.detail.balance')}${balance > 0 ? ` · ${t('businesses.detail.theyOweYou')}` : balance < 0 ? ` · ${t('businesses.detail.settled')}` : ''}`,
+      value: `${currency} ${fmt(Math.abs(balance))}`,
+      icon: Scale,
+      color: balance > 0 ? 'text-red-600 dark:text-red-400' : balance < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground',
+      bg: balance > 0 ? 'bg-red-100 dark:bg-red-900/30' : balance < 0 ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-muted',
+    },
+  ];
+
+  const supplierKpis = [
+    { label: t('businesses.detail.totalPurchases'), value: `${currency} ${fmt(totalPurchases)}`, icon: DollarSign, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/30' },
+    { label: t('businesses.detail.totalTransfers'), value: `${currency} ${fmt(totalTransfers)}`, icon: ArrowLeftRight, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/30' },
+    {
+      label: `${t('businesses.detail.balance')}${balance > 0 ? ` · ${t('businesses.detail.youOweThem')}` : balance < 0 ? ` · ${t('businesses.detail.settled')}` : ''}`,
+      value: `${currency} ${fmt(Math.abs(balance))}`,
+      icon: Scale,
+      color: balance > 0 ? 'text-red-600 dark:text-red-400' : balance < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground',
+      bg: balance > 0 ? 'bg-red-100 dark:bg-red-900/30' : balance < 0 ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-muted',
+    },
+  ];
+
+  const kpis = isTrader ? traderKpis : supplierKpis;
+
   return (
     <>
       {/* KPI Cards */}
-      {isTrader ? (
-        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-2xl font-bold">{fmt(totalSales)}</div>
-              <p className="text-xs text-muted-foreground">{t('businesses.detail.totalSales')}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-2xl font-bold">{fmt(totalExpenses)}</div>
-              <p className="text-xs text-muted-foreground">{t('businesses.detail.totalExpenses')}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-2xl font-bold">{fmt(totalTransfers)}</div>
-              <p className="text-xs text-muted-foreground">{t('businesses.detail.totalTransfers')}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className={`text-2xl font-bold ${balance > 0 ? 'text-red-600 dark:text-red-400' : balance < 0 ? 'text-green-600 dark:text-green-400' : ''}`}>
-                {fmt(Math.abs(balance))}
+      <div className={`grid gap-3 grid-cols-2 ${isTrader ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}>
+        {kpis.map((kpi) => (
+          <Card key={kpi.label}>
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${kpi.bg} shrink-0`}>
+                  <kpi.icon className={`h-4 w-4 ${kpi.color}`} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground truncate">{kpi.label}</p>
+                  <p className="text-lg font-bold tabular-nums truncate">{kpi.value}</p>
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground">
-                {t('businesses.detail.balance')}
-                {balance > 0 && ` · ${t('businesses.detail.theyOweYou')}`}
-                {balance < 0 && ` · ${t('businesses.detail.settled')}`}
-              </p>
             </CardContent>
           </Card>
-        </div>
-      ) : (
-        <div className="grid gap-4 grid-cols-2 lg:grid-cols-3">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-2xl font-bold">{fmt(totalPurchases)}</div>
-              <p className="text-xs text-muted-foreground">{t('businesses.detail.totalPurchases')}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-2xl font-bold">{fmt(totalTransfers)}</div>
-              <p className="text-xs text-muted-foreground">{t('businesses.detail.totalTransfers')}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className={`text-2xl font-bold ${balance > 0 ? 'text-red-600 dark:text-red-400' : balance < 0 ? 'text-green-600 dark:text-green-400' : ''}`}>
-                {fmt(Math.abs(balance))}
+        ))}
+      </div>
+
+      {/* Business Info */}
+      <Card className="mt-4">
+        <CardContent className="pt-5 pb-4">
+          <h3 className="text-sm font-semibold mb-3">{t('businesses.detail.businessInfo', 'Business Info')}</h3>
+          <div className="grid gap-6 sm:grid-cols-2">
+            <div className="space-y-3">
+              <div className="space-y-0.5">
+                <p className="text-xs text-muted-foreground">{t('businesses.businessType')}</p>
+                <p className="text-sm font-medium">{isTrader ? t('businesses.trader') : t('businesses.supplier')}</p>
               </div>
-              <p className="text-xs text-muted-foreground">
-                {t('businesses.detail.balance')}
-                {balance > 0 && ` · ${t('businesses.detail.youOweThem')}`}
-                {balance < 0 && ` · ${t('businesses.detail.settled')}`}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+
+              {business.trnNumber && (
+                <div className="space-y-0.5">
+                  <p className="text-xs text-muted-foreground">{t('businesses.trnNumber')}</p>
+                  <p className="text-sm font-medium">{business.trnNumber}</p>
+                </div>
+              )}
+
+              {business.tradeLicenseNumber && (
+                <div className="space-y-0.5">
+                  <p className="text-xs text-muted-foreground">{t('businesses.tradeLicenseNumber')}</p>
+                  <p className="text-sm font-medium">{business.tradeLicenseNumber}</p>
+                </div>
+              )}
+
+              {business.address?.formattedAddress && (
+                <div className="space-y-0.5">
+                  <p className="text-xs text-muted-foreground">{t('businesses.addressSection')}</p>
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <p className="text-sm truncate">{business.address.formattedAddress}</p>
+                  </div>
+                  {business.address?.lat != null && business.address?.lng != null && (
+                    <a
+                      href={`https://www.google.com/maps?q=${business.address.lat},${business.address.lng}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline mt-1"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      {t('businesses.detail.openInMaps', 'Open in Maps')}
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              {/* Associated contacts */}
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">{t('businesses.detail.associatedContacts', 'Associated Contacts')}</p>
+                {contacts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">{t('businesses.detail.noContacts', 'No contacts linked')}</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {contacts.map((c) => {
+                      const contact = typeof c === 'object' ? c : null;
+                      if (!contact) return null;
+                      return (
+                        <div key={contact._id} className="flex items-center gap-2 rounded-md border px-3 py-2">
+                          <ContactRound className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                          <div className="min-w-0">
+                            <span className="text-sm font-medium truncate block">
+                              {contact.firstName} {contact.lastName}
+                            </span>
+                            {contact.email && (
+                              <span className="text-xs text-muted-foreground truncate block">{contact.email}</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Linked farms */}
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">{t('businesses.detail.linkedFarms', 'Linked Farms')}</p>
+                {linkedFarms.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">{t('businesses.detail.noFarms', 'No farms linked')}</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {linkedFarms.map((farm) => (
+                      <button
+                        key={farm._id}
+                        onClick={() => navigate(`/dashboard/directory/farms/${farm._id}`)}
+                        className="flex items-center gap-2 rounded-md border px-3 py-2 w-full text-left hover:bg-muted/30 transition-colors"
+                      >
+                        <Warehouse className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <div className="min-w-0">
+                          <span className="text-sm font-medium truncate block">{farm.farmName}</span>
+                          <span className="text-xs text-muted-foreground capitalize">
+                            {t(`farms.farmTypes.${farm.farmType || 'broiler'}`)}
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Documents */}
+      {hasDocuments && (
+        <Card className="mt-4">
+          <CardContent className="pt-5 pb-2">
+            <h3 className="text-sm font-semibold mb-2">{t('documents.otherDocs', 'Documents')}</h3>
+            <div className="divide-y">
+              {bizDocs.logo && <DocRow label={t('businesses.logo')} doc={bizDocs.logo} />}
+              {bizDocs.trnCertificate && <DocRow label={t('businesses.trnCertificate')} doc={bizDocs.trnCertificate} />}
+              {bizDocs.tradeLicense && <DocRow label={t('businesses.tradeLicense')} doc={bizDocs.tradeLicense} />}
+              <OtherDocsList docs={bizDocs.otherDocs} />
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Statement generation */}

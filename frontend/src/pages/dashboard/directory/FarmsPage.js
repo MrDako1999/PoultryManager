@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import useLocalQuery from '@/hooks/useLocalQuery';
 import useOfflineMutation from '@/hooks/useOfflineMutation';
 import { useForm } from 'react-hook-form';
@@ -41,6 +42,8 @@ import {
   MapPin,
   Building2,
   Home,
+  Eye,
+  Layers,
 } from 'lucide-react';
 import { LuEgg, LuEggFried, LuFactory, LuTrees } from 'react-icons/lu';
 import { PiBird } from 'react-icons/pi';
@@ -91,6 +94,8 @@ const defaultValues = {
 export default function FarmsPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const routerLocation = useLocation();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingFarm, setEditingFarm] = useState(null);
   const [linkedBusinessId, setLinkedBusinessId] = useState(null);
@@ -109,6 +114,7 @@ export default function FarmsPage() {
   const farmsList = useLocalQuery('farms');
   const allHouses = useLocalQuery('houses');
   const businesses = useLocalQuery('businesses');
+  const allBatches = useLocalQuery('batches');
 
   const [search, setSearch] = usePersistedState('dir-farms-search', '');
   const [typeFilter, setTypeFilter] = usePersistedState('dir-farms-type', []);
@@ -159,6 +165,26 @@ export default function FarmsPage() {
     });
     return map;
   }, [allHouses]);
+
+  const batchCountByFarm = useMemo(() => {
+    const map = {};
+    allBatches.forEach((b) => {
+      const fId = typeof b.farm === 'object' ? b.farm?._id : b.farm;
+      if (fId) map[fId] = (map[fId] || 0) + 1;
+    });
+    return map;
+  }, [allBatches]);
+
+  useEffect(() => {
+    if (routerLocation.state?.editFarmId) {
+      const farm = farmsList.find((f) => f._id === routerLocation.state.editFarmId);
+      if (farm) {
+        openEditSheet(farm);
+        navigate(routerLocation.pathname, { replace: true, state: {} });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routerLocation.state?.editFarmId, farmsList]);
 
   const { mutate: saveFarm, isPending: isSaving } = useOfflineMutation('farms');
   const { mutate: deleteFarm } = useOfflineMutation('farms');
@@ -516,8 +542,16 @@ export default function FarmsPage() {
           ) : (
             filtered.map((farm) => {
               const TypeIcon = FARM_TYPE_ICONS[farm.farmType] || FARM_TYPE_ICONS.broiler;
+              const batchCount = batchCountByFarm[farm._id] || 0;
               return (
-                <div key={farm._id} className="flex items-center gap-4 rounded-lg border bg-card p-4 transition-colors hover:bg-accent/50">
+                <div
+                  key={farm._id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => navigate(`/dashboard/directory/farms/${farm._id}`)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/dashboard/directory/farms/${farm._id}`); } }}
+                  className="flex items-center gap-4 rounded-lg border bg-card p-4 transition-colors hover:bg-accent/50 cursor-pointer"
+                >
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                     <TypeIcon className="h-5 w-5 text-primary" />
                   </div>
@@ -531,7 +565,7 @@ export default function FarmsPage() {
                         {t(`farms.farmTypes.${farm.farmType || 'broiler'}`)}
                       </Badge>
                     </div>
-                    <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
                       {farm.business?.companyName && (
                         <span className="flex items-center gap-1">
                           <Building2 className="h-3 w-3" />
@@ -549,7 +583,10 @@ export default function FarmsPage() {
                           </span>
                         );
                       })()}
-                      {farm.business?.trnNumber && <span>TRN: {farm.business.trnNumber}</span>}
+                      <span className="flex items-center gap-1">
+                        <Layers className="h-3 w-3" />
+                        {batchCount} {batchCount === 1 ? t('farms.detail.batch', 'batch') : t('farms.detail.batchesPlural', 'batches')}
+                      </span>
                     </div>
                     {farm.location?.lat != null && farm.location?.lng != null && (
                       <div className="flex items-center gap-1 mt-1">
@@ -564,20 +601,24 @@ export default function FarmsPage() {
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="shrink-0">
+                      <Button variant="ghost" size="icon" className="shrink-0" onClick={(e) => e.stopPropagation()}>
                         <MoreVertical className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => openEditSheet(farm)}>
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/dashboard/directory/farms/${farm._id}`); }}>
+                        <Eye className="mr-2 h-4 w-4" />
+                        {t('common.view')}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openEditSheet(farm); }}>
                         <Pencil className="mr-2 h-4 w-4" />
                         {t('common.edit')}
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-destructive" onClick={() => deleteFarm(
+                      <DropdownMenuItem className="text-destructive" onClick={(e) => { e.stopPropagation(); deleteFarm(
                         { action: 'delete', id: farm._id },
                         { onSuccess: () => toast({ title: t('farms.farmDeleted') }) }
-                      )}>
+                      ); }}>
                         <Trash2 className="mr-2 h-4 w-4" />
                         {t('common.delete')}
                       </DropdownMenuItem>

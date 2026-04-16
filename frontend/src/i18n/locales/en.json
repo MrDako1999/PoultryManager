@@ -308,8 +308,19 @@
       "generating": "Generating...",
       "noTransfers": "No transfers recorded",
       "noSales": "No sales found",
-      "noExpenses": "No expenses found"
-    }
+      "noExpenses": "No expenses found",
+      "businessInfo": "Business Info",
+      "openInMaps": "Open in Maps",
+      "associatedContacts": "Associated Contacts",
+      "linkedFarms": "Linked Farms",
+      "noContacts": "No contacts linked",
+      "noFarms": "No farms linked",
+      "farm": "farm",
+      "farmsPlural": "farms"
+    },
+    "backToBusinesses": "Back to Businesses",
+    "deleteTitle": "Delete Business",
+    "deleteWarning": "This will permanently delete this business and cannot be undone."
   },
   "transfers": {
     "title": "Transfers",
@@ -414,7 +425,29 @@
     "createError": "Failed to register farm",
     "updateError": "Failed to update farm",
     "deleteError": "Failed to remove farm",
-    "searchPlaceholder": "Search farms..."
+    "searchPlaceholder": "Search farms...",
+    "backToFarms": "Back to Farms",
+    "deleteFarmTitle": "Delete Farm",
+    "deleteFarmWarning": "This will permanently delete this farm and cannot be undone.",
+    "detail": {
+      "totalBatches": "Total Batches",
+      "birdsProcessed": "Birds Processed",
+      "overallMortality": "Mortality Rate",
+      "totalRevenue": "Total Revenue",
+      "farmInfo": "Farm Information",
+      "openInMaps": "Open in Maps",
+      "allTimeStats": "All-Time Statistics",
+      "totalFeedConsumed": "Feed Consumed",
+      "totalWaterConsumed": "Water Consumed",
+      "totalDeaths": "Total Deaths",
+      "totalExpenses": "Total Expenses",
+      "avgMortality": "Avg Mortality",
+      "avgBatchDuration": "Avg Batch Duration",
+      "batchHistory": "Batch History",
+      "noBatches": "No batches have been created for this farm yet.",
+      "batch": "batch",
+      "batchesPlural": "batches"
+    }
   },
   "workers": {
     "title": "Workers",
