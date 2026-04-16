@@ -30,7 +30,7 @@ export default function BatchHouseOpsView() {
     <OperationsListView
       items={houseLogs}
       selectedId={logId}
-      basePath={`/dashboard/batches/${id}/operations/${houseId}`}
+      basePath={`/dashboard/batches/${id}/performance/${houseId}`}
       batchId={id}
       houseId={houseId}
       houseName={houseName}

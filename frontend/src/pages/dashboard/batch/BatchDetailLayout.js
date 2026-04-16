@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import ScrollableTabs from '@/components/ui/scrollable-tabs';
 import {
   Sheet,
   SheetContent,
@@ -67,7 +68,7 @@ const SEGMENT_LABELS = {
   sources: 'batches.sourcesTab',
   'feed-orders': 'batches.feedOrdersTab',
   sales: 'batches.salesTab',
-  operations: 'batches.operationsTab',
+  performance: 'batches.performanceTab',
 };
 
 export default function BatchDetailLayout() {
@@ -186,7 +187,7 @@ export default function BatchDetailLayout() {
       to: `/dashboard/batches/${id}/${subView}`,
     });
 
-    if (subView === 'operations' && segments[1]) {
+    if (subView === 'performance' && segments[1]) {
       const houseEntry = (batch.houses || []).find((e) => {
         const hId = typeof e.house === 'object' ? e.house._id : e.house;
         return hId === segments[1];
@@ -196,7 +197,7 @@ export default function BatchDetailLayout() {
         : t('batches.house');
       breadcrumbs.push({
         label: houseName,
-        to: `/dashboard/batches/${id}/operations/${segments[1]}`,
+        to: `/dashboard/batches/${id}/performance/${segments[1]}`,
       });
     }
   }
@@ -235,8 +236,8 @@ export default function BatchDetailLayout() {
         })()}
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-2xl font-heading font-bold tracking-tight">{batch.batchName}</h1>
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            <h1 className="text-lg sm:text-2xl font-heading font-bold tracking-tight break-all">{batch.batchName}</h1>
             {(() => {
               const status = STATUS_CONFIG[batch.status] || STATUS_CONFIG.OTHER;
               const StatusIcon = status.icon;
@@ -248,19 +249,19 @@ export default function BatchDetailLayout() {
               );
             })()}
           </div>
-          <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+          <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground mt-1 flex-wrap">
             {batch.farm?.farmName && (
               <span className="flex items-center gap-1">
-                <Warehouse className="h-3.5 w-3.5" />
-                {batch.farm.farmName}
+                <Warehouse className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{batch.farm.farmName}</span>
               </span>
             )}
             <span className="flex items-center gap-1">
-              <Calendar className="h-3.5 w-3.5" />
+              <Calendar className="h-3.5 w-3.5 shrink-0" />
               {new Date(batch.startDate).toLocaleDateString()}
             </span>
             {dayCount && (
-              <span className="tabular-nums font-medium">
+              <span className="tabular-nums font-medium whitespace-nowrap">
                 {dayCount.completed ? `${dayCount.days} days` : `Day ${dayCount.days}`}
               </span>
             )}
@@ -298,16 +299,22 @@ export default function BatchDetailLayout() {
       </div>
 
       <Tabs
-        value={subView === 'operations' ? 'operations' : 'overview'}
+        value={['performance', 'sources', 'feed-orders', 'expenses', 'sales'].includes(subView) ? subView : 'overview'}
         onValueChange={(val) => {
           if (val === 'overview') navigate(`/dashboard/batches/${id}`);
           else navigate(`/dashboard/batches/${id}/${val}`);
         }}
       >
-        <TabsList>
-          <TabsTrigger value="overview">{t('batches.overviewTab')}</TabsTrigger>
-          <TabsTrigger value="operations">{t('batches.operationsTab')}</TabsTrigger>
-        </TabsList>
+        <ScrollableTabs>
+          <TabsList>
+            <TabsTrigger value="overview">{t('batches.overviewTab')}</TabsTrigger>
+            <TabsTrigger value="performance">{t('batches.performanceTab')}</TabsTrigger>
+            <TabsTrigger value="sources">{t('batches.sourcesTab')}</TabsTrigger>
+            <TabsTrigger value="feed-orders">{t('batches.feedOrdersTab')}</TabsTrigger>
+            <TabsTrigger value="expenses">{t('batches.expensesTab')}</TabsTrigger>
+            <TabsTrigger value="sales">{t('batches.salesTab')}</TabsTrigger>
+          </TabsList>
+        </ScrollableTabs>
       </Tabs>
 
       <Outlet context={{ batch }} />

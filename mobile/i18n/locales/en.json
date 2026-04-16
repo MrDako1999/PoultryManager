@@ -825,6 +825,7 @@
     },
     "overviewTab": "Overview",
     "operationsTab": "Operations",
+    "performanceTab": "Performance",
     "netProfit": "Net Profit",
     "operations": {
       "addEntry": "Add Entry",

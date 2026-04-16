@@ -266,7 +266,7 @@ export default function BatchOperationsView() {
                     )}
                   </span>
                 }
-                expandTo={`/dashboard/batches/${id}/operations/${houseId}`}
+                expandTo={`/dashboard/batches/${id}/performance/${houseId}`}
                 onAdd={() => openAdd(houseId)}
                 persistKey={`batch-${id}-ops-${houseId}`}
               >
@@ -286,7 +286,7 @@ export default function BatchOperationsView() {
                         key={log._id}
                         log={log}
                         t={t}
-                        onClick={() => navigate(`/dashboard/batches/${id}/operations/${houseId}/${log._id}`)}
+                        onClick={() => navigate(`/dashboard/batches/${id}/performance/${houseId}/${log._id}`)}
                       />
                     ))}
                   </ExpenseCategoryGroup>

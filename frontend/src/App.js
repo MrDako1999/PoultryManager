@@ -120,9 +120,9 @@ export default function App() {
             <Route path="feed-orders/:fid" element={<BatchFeedOrdersView />} />
             <Route path="sales" element={<BatchSalesView />} />
             <Route path="sales/:saleId" element={<BatchSalesView />} />
-            <Route path="operations" element={<BatchOperationsView />} />
-            <Route path="operations/:houseId" element={<BatchHouseOpsView />} />
-            <Route path="operations/:houseId/:logId" element={<BatchHouseOpsView />} />
+            <Route path="performance" element={<BatchOperationsView />} />
+            <Route path="performance/:houseId" element={<BatchHouseOpsView />} />
+            <Route path="performance/:houseId/:logId" element={<BatchHouseOpsView />} />
           </Route>
 
           <Route path="/dashboard/farms" element={<Navigate to="/dashboard/directory/farms" replace />} />
