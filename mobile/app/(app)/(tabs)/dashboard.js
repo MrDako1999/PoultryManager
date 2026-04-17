@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { View, Text, ScrollView, Image } from 'react-native';
+import { useMemo, useState } from 'react';
+import { View, Text, ScrollView, Image, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import useAuthStore from '@/stores/authStore';
@@ -8,16 +8,18 @@ import useCapabilities from '@/hooks/useCapabilities';
 import SyncIconButton from '@/components/SyncIconButton';
 import ModuleSwitcher from '@/shared/components/ModuleSwitcher';
 import { MODULES } from '@/modules/registry';
+import { deltaSync } from '@/lib/syncEngine';
 
 const logoLight = require('@/assets/images/logo.png');
 const logoDark = require('@/assets/images/logo-white.png');
 
 export default function DashboardScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAuthStore();
   const { resolvedTheme } = useThemeStore();
   const insets = useSafeAreaInsets();
   const { visibleModules, can, role, activeModule } = useCapabilities();
+  const [refreshing, setRefreshing] = useState(false);
 
   const RoleDashboard = useMemo(() => {
     const mod = activeModule ? MODULES[activeModule] : null;
@@ -37,6 +39,26 @@ export default function DashboardScreen() {
     return out;
   }, [visibleModules, can]);
 
+  const primaryColor = resolvedTheme === 'dark' ? 'hsl(148, 48%, 38%)' : 'hsl(148, 60%, 20%)';
+
+  const todayLabel = useMemo(() => {
+    try {
+      return new Date().toLocaleDateString(i18n.language, {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+      });
+    } catch {
+      return new Date().toLocaleDateString();
+    }
+  }, [i18n.language]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try { await deltaSync(); } catch (e) { console.error(e); }
+    setRefreshing(false);
+  };
+
   if (RoleDashboard) {
     return <RoleDashboard />;
   }
@@ -45,6 +67,9 @@ export default function DashboardScreen() {
     <ScrollView
       className="flex-1 bg-background"
       contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: insets.bottom + 16 }}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={primaryColor} />
+      }
     >
       <View className="px-4 mb-4">
         <View className="flex-row items-center justify-between">
@@ -58,7 +83,9 @@ export default function DashboardScreen() {
               <Text className="text-2xl font-bold text-foreground">
                 {t('dashboard.welcome', { name: user?.firstName || '' })}
               </Text>
-              <Text className="text-sm text-muted-foreground">{t('dashboard.overview')}</Text>
+              <Text className="text-xs text-muted-foreground mt-0.5">
+                {todayLabel}
+              </Text>
             </View>
           </View>
           <View className="flex-row items-center gap-2">

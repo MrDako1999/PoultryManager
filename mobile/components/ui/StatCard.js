@@ -1,8 +1,14 @@
-import { View, Text } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 
-export default function StatCard({ label, value, valueClassName, icon: Icon }) {
-  return (
-    <View className="flex-1 rounded-lg border border-border bg-card p-3 min-w-[100px]">
+export default function StatCard({
+  label,
+  value,
+  valueClassName,
+  icon: Icon,
+  onPress,
+}) {
+  const content = (
+    <>
       {Icon && (
         <View className="flex-row items-center justify-between mb-1">
           <Text className="text-xs text-muted-foreground flex-1" numberOfLines={1}>{label}</Text>
@@ -15,6 +21,24 @@ export default function StatCard({ label, value, valueClassName, icon: Icon }) {
       <Text className={`text-lg font-bold text-foreground ${valueClassName || ''}`} numberOfLines={1}>
         {value}
       </Text>
+    </>
+  );
+
+  if (onPress) {
+    return (
+      <Pressable
+        onPress={onPress}
+        className="flex-1 rounded-lg border border-border bg-card p-3 min-w-[100px] active:bg-accent/40"
+        style={{ minHeight: 72 }}
+      >
+        {content}
+      </Pressable>
+    );
+  }
+
+  return (
+    <View className="flex-1 rounded-lg border border-border bg-card p-3 min-w-[100px]">
+      {content}
     </View>
   );
 }

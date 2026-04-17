@@ -1,51 +1,123 @@
 import { useState, useMemo } from 'react';
-import { View, Text, ScrollView, Pressable, RefreshControl } from 'react-native';
+import { View, Text, FlatList, RefreshControl, Pressable, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { router } from 'expo-router';
-import { Layers, Plus, Warehouse, Calendar, Home } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
+import { Layers, Plus, Warehouse } from 'lucide-react-native';
 import useLocalQuery from '@/hooks/useLocalQuery';
+import useOfflineMutation from '@/hooks/useOfflineMutation';
 import useThemeStore from '@/stores/themeStore';
-import { Badge } from '@/components/ui/Badge';
 import SearchInput from '@/components/ui/SearchInput';
 import EmptyState from '@/components/ui/EmptyState';
-import { STATUS_VARIANTS } from '@/lib/constants';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import Select from '@/components/ui/Select';
+import CollapsibleSection from '@/components/CollapsibleSection';
+import { SkeletonRow } from '@/components/skeletons';
+import { useToast } from '@/components/ui/Toast';
 import { deltaSync } from '@/lib/syncEngine';
 import BatchSheet from '@/modules/broiler/sheets/BatchSheet';
-import { SkeletonRow } from '@/components/skeletons';
+import BatchRow from '@/modules/broiler/components/BatchRow';
+import FarmCountPill from '@/modules/broiler/components/FarmCountPill';
+import { getStatusConfig } from '@/modules/broiler/lib/batchStatusConfig';
 
 export default function BatchesScreen() {
   const { t } = useTranslation();
   const { resolvedTheme } = useThemeStore();
   const insets = useSafeAreaInsets();
+  const { toast } = useToast();
+  const { remove } = useOfflineMutation('batches');
+
   const [searchQuery, setSearchQuery] = useState('');
+  const [farmFilter, setFarmFilter] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [batchSheet, setBatchSheet] = useState({ open: false, data: null });
+  const [batchToDelete, setBatchToDelete] = useState(null);
 
-  const [batches, batchesLoading] = useLocalQuery('batches');
+  const [allBatches, batchesLoading] = useLocalQuery('batches');
   const [farms] = useLocalQuery('farms');
+  const [allSaleOrders] = useLocalQuery('saleOrders');
+
+  const primaryColor = resolvedTheme === 'dark' ? 'hsl(148, 48%, 38%)' : 'hsl(148, 60%, 20%)';
 
   const farmsById = useMemo(
     () => Object.fromEntries(farms.map((f) => [f._id, f])),
     [farms]
   );
 
+  const resolveFarm = (batch) => {
+    if (batch.farm && typeof batch.farm === 'object') return batch.farm;
+    return farmsById[batch.farm] || null;
+  };
+
+  const lastSaleDateByBatch = useMemo(() => {
+    const map = {};
+    (allSaleOrders || []).forEach((sale) => {
+      const batchId = sale.batch?._id || sale.batch;
+      if (!batchId || !sale.saleDate) return;
+      const d = new Date(sale.saleDate);
+      if (!map[batchId] || d > map[batchId]) map[batchId] = d;
+    });
+    return map;
+  }, [allSaleOrders]);
+
+  const batchesByFarmFilter = useMemo(() => {
+    if (!farmFilter) return allBatches;
+    return allBatches.filter((b) => (b.farm?._id ?? b.farm) === farmFilter);
+  }, [allBatches, farmFilter]);
+
   const filteredBatches = useMemo(() => {
-    if (!searchQuery) return batches;
+    if (!searchQuery.trim()) return batchesByFarmFilter;
     const q = searchQuery.toLowerCase();
-    return batches.filter((b) =>
-      b.batchName?.toLowerCase().includes(q) ||
-      (farmsById[b.farm]?.farmName || b.farm?.farmName || '').toLowerCase().includes(q)
-    );
-  }, [batches, searchQuery, farmsById]);
+    return batchesByFarmFilter.filter((b) => {
+      if (b.batchName?.toLowerCase().includes(q)) return true;
+      const farm = resolveFarm(b);
+      return (
+        farm?.farmName?.toLowerCase().includes(q) ||
+        farm?.nickname?.toLowerCase().includes(q)
+      );
+    });
+  }, [batchesByFarmFilter, searchQuery, farmsById]);
 
-  const sortedBatches = useMemo(
-    () => [...filteredBatches].sort((a, b) => new Date(b.startDate || 0) - new Date(a.startDate || 0)),
-    [filteredBatches]
+  const groupedByFarm = useMemo(() => {
+    const groups = {};
+    filteredBatches.forEach((batch) => {
+      const farm = resolveFarm(batch);
+      const farmId = farm?._id || '_uncategorized';
+      const farmName = farm?.farmName || t('common.uncategorized', 'Uncategorized');
+      if (!groups[farmId]) {
+        groups[farmId] = { farmId, farmName, batches: [] };
+      }
+      groups[farmId].batches.push(batch);
+    });
+
+    return Object.values(groups)
+      .map((group) => {
+        group.batches.sort(
+          (a, b) => new Date(b.startDate || 0) - new Date(a.startDate || 0)
+        );
+        return group;
+      })
+      .sort((a, b) => {
+        if (a.farmId === '_uncategorized') return 1;
+        if (b.farmId === '_uncategorized') return -1;
+        const aDate = a.batches[0]?.startDate ? new Date(a.batches[0].startDate) : new Date(0);
+        const bDate = b.batches[0]?.startDate ? new Date(b.batches[0].startDate) : new Date(0);
+        return bDate - aDate;
+      });
+  }, [filteredBatches, farmsById, t]);
+
+  const farmFilterOptions = useMemo(
+    () => [
+      { value: '', label: t('common.all', 'All') },
+      ...farms.map((f) => ({
+        value: f._id,
+        label: f.farmName,
+        description: f.nickname || '',
+      })),
+    ],
+    [farms, t]
   );
-
-  const primaryColor = resolvedTheme === 'dark' ? 'hsl(148, 48%, 38%)' : 'hsl(148, 60%, 20%)';
-  const mutedColor = 'hsl(150, 10%, 45%)';
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -53,104 +125,208 @@ export default function BatchesScreen() {
     setRefreshing(false);
   };
 
-  const resolveFarm = (batch) => {
-    if (batch.farm && typeof batch.farm === 'object') return batch.farm;
-    return farmsById[batch.farm] || null;
+  const openCreate = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setBatchSheet({ open: true, data: null });
   };
+
+  const openEdit = (batch) => {
+    setBatchSheet({ open: true, data: batch });
+  };
+
+  const requestDelete = (batch) => {
+    setBatchToDelete(batch);
+  };
+
+  const confirmDelete = async () => {
+    if (!batchToDelete) return;
+    try {
+      await remove(batchToDelete._id);
+      toast({ title: t('batches.batchDeleted', 'Batch deleted') });
+    } catch (e) {
+      console.error(e);
+      toast({
+        title: t('batches.deleteError', 'Failed to delete batch'),
+        variant: 'destructive',
+      });
+    } finally {
+      setBatchToDelete(null);
+    }
+  };
+
+  const showToolbar = allBatches.length > 0 || farmFilter;
+  const isInitialLoading = batchesLoading && allBatches.length === 0;
+  const isEmpty = !isInitialLoading && filteredBatches.length === 0;
+  const isEmptyClean = isEmpty && !searchQuery && !farmFilter;
+  const fabBottom = insets.bottom + 72;
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
-      <View className="px-4 pt-2 pb-3">
-        <View className="flex-row items-center justify-between mb-3">
-          <Text className="text-xl font-bold text-foreground">{t('nav.batches')}</Text>
-          <Pressable
-            onPress={() => setBatchSheet({ open: true, data: null })}
-            className="h-9 w-9 rounded-md bg-primary items-center justify-center"
-          >
-            <Plus size={18} color="#f5f8f5" />
-          </Pressable>
-        </View>
-        <SearchInput
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholder={t('batches.searchPlaceholder', 'Search batches...')}
-        />
+      <View className="px-4 pt-3 pb-3">
+        <Text className="text-2xl font-bold text-foreground">
+          {t('batches.title', 'Batches')}
+        </Text>
+        <Text className="text-sm text-muted-foreground mt-0.5">
+          {t('batches.subtitle', 'Manage your broiler production cycles')}
+        </Text>
       </View>
 
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ paddingBottom: insets.bottom + 16, paddingHorizontal: 16 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={primaryColor} />}
-      >
-        {batchesLoading && batches.length === 0 ? (
-          <View>{[1,2,3,4,5].map(i => <SkeletonRow key={i} />)}</View>
-        ) : sortedBatches.length === 0 ? (
-          <EmptyState
-            icon={Layers}
-            title={searchQuery ? t('common.noResults', 'No results') : t('batches.noBatches', 'No batches yet')}
-            description={searchQuery ? t('common.tryDifferentSearch', 'Try a different search') : t('batches.noBatchesDesc', 'Create your first batch to get started')}
-            actionLabel={!searchQuery ? t('batches.addBatch') : undefined}
-            onAction={!searchQuery ? () => setBatchSheet({ open: true, data: null }) : undefined}
+      {showToolbar && (
+        <View className="px-4 pb-3 gap-2">
+          <SearchInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder={t('batches.searchPlaceholder', 'Search batches...')}
           />
-        ) : (
-          sortedBatches.map((batch) => {
-            const farm = resolveFarm(batch);
-            const birds = (batch.houses || []).reduce((s, h) => s + (h.quantity || 0), 0);
-            const houseCount = (batch.houses || []).length;
+          <Select
+            value={farmFilter}
+            onValueChange={setFarmFilter}
+            options={farmFilterOptions}
+            placeholder={t('batches.filterByFarm', 'All Farms')}
+            label={t('batches.filterByFarm', 'All Farms')}
+          />
+        </View>
+      )}
 
-            return (
-              <Pressable
-                key={batch._id}
-                onPress={() => router.push(`/(app)/batch/${batch._id}`)}
-                className="rounded-lg border border-border bg-card p-3 mb-2 active:bg-accent/50"
-              >
-                <View className="flex-row items-start justify-between mb-1">
-                  <View className="flex-1 min-w-0 mr-2">
-                    <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>
-                      {batch.batchName}
-                    </Text>
-                  </View>
-                  <Badge variant={STATUS_VARIANTS[batch.status] || 'secondary'}>
-                    <Text className="text-[10px] font-medium">
-                      {t(`batches.statuses.${batch.status}`, batch.status)}
-                    </Text>
-                  </Badge>
-                </View>
+      {isInitialLoading ? (
+        <View className="px-4">
+          {[1, 2, 3, 4, 5].map((i) => <SkeletonRow key={i} />)}
+        </View>
+      ) : isEmptyClean ? (
+        <EmptyState
+          icon={Layers}
+          title={t('batches.noBatches', 'No batches yet')}
+          description={t(
+            'batches.noBatchesDesc',
+            'Create your first batch to start tracking a production cycle.'
+          )}
+          actionLabel={t('batches.addFirstBatch', 'Create First Batch')}
+          onAction={openCreate}
+        />
+      ) : isEmpty ? (
+        <View className="flex-1 items-center justify-center px-6">
+          <Text className="text-sm text-muted-foreground text-center">
+            {t('common.noResults', 'No results found')}
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={groupedByFarm}
+          keyExtractor={(group) => group.farmId}
+          contentContainerStyle={{
+            paddingHorizontal: 16,
+            paddingBottom: insets.bottom + 96,
+            gap: 12,
+          }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={primaryColor}
+            />
+          }
+          renderItem={({ item: group }) => (
+            <CollapsibleSection
+              title={group.farmName}
+              icon={Warehouse}
+              defaultOpen
+              headerExtra={
+                <FarmCountPill
+                  count={group.batches.length}
+                  link={group.farmId !== '_uncategorized'}
+                  onLinkPress={() => router.push('/(app)/farms-list')}
+                />
+              }
+            >
+              <View>
+                {group.batches.map((batch, idx) => {
+                  const farm = resolveFarm(batch);
+                  const displayName =
+                    batch.batchName ||
+                    (farm
+                      ? `${farm.nickname || farm.farmName?.substring(0, 8).toUpperCase()}-B${batch.sequenceNumber ?? '?'}`
+                      : t('batches.addBatch', 'New Batch'));
+                  const avatarLetter = (
+                    farm?.nickname || farm?.farmName || '?'
+                  )[0].toUpperCase();
+                  const batchNum = batch.sequenceNumber ?? '';
+                  const status = getStatusConfig(batch.status);
 
-                <View className="flex-row items-center gap-3 mt-1">
-                  {farm?.farmName && (
-                    <View className="flex-row items-center gap-1">
-                      <Warehouse size={12} color={mutedColor} />
-                      <Text className="text-xs text-muted-foreground" numberOfLines={1}>{farm.farmName}</Text>
-                    </View>
-                  )}
-                  <View className="flex-row items-center gap-1">
-                    <Calendar size={12} color={mutedColor} />
-                    <Text className="text-xs text-muted-foreground">
-                      {batch.startDate ? new Date(batch.startDate).toLocaleDateString() : '—'}
-                    </Text>
-                  </View>
-                </View>
+                  let daySubline = '';
+                  if (batch.startDate) {
+                    const start = new Date(batch.startDate);
+                    const end = batch.status === 'COMPLETE'
+                      ? (lastSaleDateByBatch[batch._id] || start)
+                      : new Date();
+                    const days = Math.max(0, Math.floor((end - start) / 86400000));
+                    daySubline = batch.status === 'COMPLETE'
+                      ? `${days} days`
+                      : `Day ${days}`;
+                  }
 
-                <View className="flex-row items-center gap-3 mt-1.5">
-                  <View className="flex-row items-center gap-1">
-                    <Home size={12} color={mutedColor} />
-                    <Text className="text-xs text-muted-foreground">{houseCount} {t('farms.houses', 'houses')}</Text>
-                  </View>
-                  <Text className="text-xs text-muted-foreground">
-                    {birds.toLocaleString()} {t('farms.birds', 'birds')}
-                  </Text>
-                </View>
-              </Pressable>
-            );
-          })
-        )}
-      </ScrollView>
+                  return (
+                    <BatchRow
+                      key={batch._id}
+                      batch={batch}
+                      status={status}
+                      avatarLetter={avatarLetter}
+                      batchNum={batchNum}
+                      displayName={displayName}
+                      daySubline={daySubline}
+                      onPress={(b) => router.push(`/(app)/batch/${b._id}`)}
+                      onEdit={openEdit}
+                      onDelete={requestDelete}
+                      isLast={idx === group.batches.length - 1}
+                    />
+                  );
+                })}
+              </View>
+            </CollapsibleSection>
+          )}
+        />
+      )}
+
+      {!batchSheet.open && (
+        <Pressable
+          onPress={openCreate}
+          className="absolute right-4 h-14 w-14 rounded-full bg-primary items-center justify-center active:opacity-90"
+          style={{
+            bottom: fabBottom,
+            ...Platform.select({
+              ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.18,
+                shadowRadius: 8,
+              },
+              android: { elevation: 6 },
+            }),
+          }}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={t('batches.addBatch', 'New Batch')}
+        >
+          <Plus size={26} color="hsl(140, 20%, 97%)" strokeWidth={2.4} />
+        </Pressable>
+      )}
 
       <BatchSheet
         open={batchSheet.open}
         onClose={() => setBatchSheet({ open: false, data: null })}
         editData={batchSheet.data}
+      />
+
+      <ConfirmDialog
+        open={!!batchToDelete}
+        onOpenChange={(o) => { if (!o) setBatchToDelete(null); }}
+        title={t('batches.deleteTitle', 'Delete Batch')}
+        description={t(
+          'batches.deleteWarning',
+          'This will permanently delete this batch. This action cannot be undone.'
+        )}
+        confirmLabel={t('common.delete', 'Delete')}
+        cancelLabel={t('common.cancel', 'Cancel')}
+        onConfirm={confirmDelete}
       />
     </View>
   );

@@ -1,7 +1,8 @@
 import { Bird, Layers, Calculator, ClipboardList } from 'lucide-react-native';
 import broilerI18nEn from './i18n/en.json';
 import BroilerKpiCards from './dashboard/BroilerKpiCards';
-import BroilerRecentBatches from './dashboard/BroilerRecentBatches';
+import BroilerActiveBatches from './dashboard/BroilerActiveBatches';
+import BroilerFinancials from './dashboard/BroilerFinancials';
 import BroilerSalesView from './accounting/BroilerSalesView';
 import BroilerExpensesView from './accounting/BroilerExpensesView';
 import WorkerHome from './screens/WorkerHome';
@@ -76,10 +77,17 @@ const broilerModule = {
       fullWidth: true,
     },
     {
-      id: 'broilerRecentBatches',
-      component: BroilerRecentBatches,
+      id: 'broilerActiveBatches',
+      component: BroilerActiveBatches,
       capability: 'batch:read',
       order: 20,
+      fullWidth: true,
+    },
+    {
+      id: 'broilerFinancials',
+      component: BroilerFinancials,
+      capability: 'saleOrder:read',
+      order: 30,
       fullWidth: true,
     },
   ],
