@@ -471,20 +471,20 @@ export default function ExpenseSheet({
                     <div className="space-y-3 rounded-lg border p-4 bg-muted/30">
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">{t('batches.grossAmount')}</span>
-                        <span className="font-medium">{grossNum.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        <span className="font-medium">{grossNum.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                       </div>
                       {isTaxInvoice && (
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">
                             {t('batches.vat')} ({vatRate}%)
                           </span>
-                          <span className="font-medium">{taxable.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                          <span className="font-medium">{taxable.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                         </div>
                       )}
                       <Separator />
                       <div className="flex justify-between text-sm font-semibold">
                         <span>{t('batches.totalAmount')}</span>
-                        <span>{totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        <span>{totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                       </div>
                     </div>
 

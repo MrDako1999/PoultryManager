@@ -106,7 +106,7 @@ export default function BroilerActiveBatches() {
                     <Bird className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                     <div>
                       <p className="text-xs text-muted-foreground leading-none">{t('dashboard.birds')}</p>
-                      <p className="text-sm font-semibold tabular-nums">{b.remaining.toLocaleString()}</p>
+                      <p className="text-sm font-semibold tabular-nums">{b.remaining.toLocaleString('en-US')}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -120,7 +120,7 @@ export default function BroilerActiveBatches() {
                     <Wheat className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                     <div>
                       <p className="text-xs text-muted-foreground leading-none">{t('dashboard.feedConsumed')}</p>
-                      <p className="text-sm font-semibold tabular-nums">{b.feed.toLocaleString()} kg</p>
+                      <p className="text-sm font-semibold tabular-nums">{b.feed.toLocaleString('en-US')} kg</p>
                     </div>
                   </div>
                 </div>

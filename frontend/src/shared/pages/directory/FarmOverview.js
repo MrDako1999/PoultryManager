@@ -190,7 +190,7 @@ export default function FarmOverview() {
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
         {[
           { label: t('farms.detail.totalBatches', 'Total Batches'), value: quickStats.totalBatches, icon: Layers, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/30' },
-          { label: t('farms.detail.birdsProcessed', 'Birds Processed'), value: quickStats.totalInitial.toLocaleString(), icon: Bird, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-100 dark:bg-amber-900/30' },
+          { label: t('farms.detail.birdsProcessed', 'Birds Processed'), value: quickStats.totalInitial.toLocaleString('en-US'), icon: Bird, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-100 dark:bg-amber-900/30' },
           { label: t('farms.detail.overallMortality', 'Mortality Rate'), value: `${quickStats.mortalityRate}%`, icon: Skull, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/30' },
           { label: t('farms.detail.totalRevenue', 'Total Revenue'), value: `${currency} ${fmt(quickStats.totalRevenue)}`, icon: DollarSign, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-100 dark:bg-emerald-900/30' },
         ].map((kpi) => (
@@ -269,13 +269,13 @@ export default function FarmOverview() {
                         <span className="text-sm font-medium">{h.name}</span>
                       </div>
                       <span className="text-xs text-muted-foreground tabular-nums">
-                        {(h.capacity || 0).toLocaleString()} {t('farms.birds')}
+                        {(h.capacity || 0).toLocaleString('en-US')} {t('farms.birds')}
                       </span>
                     </div>
                   ))}
                   <div className="flex justify-end">
                     <span className="text-xs text-muted-foreground tabular-nums">
-                      {t('farms.totalCapacity', 'Total')}: {totalCapacity.toLocaleString()} {t('farms.birds')}
+                      {t('farms.totalCapacity', 'Total')}: {totalCapacity.toLocaleString('en-US')} {t('farms.birds')}
                     </span>
                   </div>
                 </div>
@@ -310,9 +310,9 @@ export default function FarmOverview() {
           <h3 className="text-sm font-semibold mb-3">{t('farms.detail.allTimeStats', 'All-Time Statistics')}</h3>
           <div className="grid gap-4 grid-cols-2 sm:grid-cols-3">
             {[
-              { label: t('farms.detail.totalFeedConsumed', 'Feed Consumed'), value: `${quickStats.totalFeed.toLocaleString()} kg`, icon: Wheat },
-              { label: t('farms.detail.totalWaterConsumed', 'Water Consumed'), value: `${quickStats.totalWater.toLocaleString()} L`, icon: Droplets },
-              { label: t('farms.detail.totalDeaths', 'Total Deaths'), value: quickStats.totalDeaths.toLocaleString(), icon: Skull },
+              { label: t('farms.detail.totalFeedConsumed', 'Feed Consumed'), value: `${quickStats.totalFeed.toLocaleString('en-US')} kg`, icon: Wheat },
+              { label: t('farms.detail.totalWaterConsumed', 'Water Consumed'), value: `${quickStats.totalWater.toLocaleString('en-US')} L`, icon: Droplets },
+              { label: t('farms.detail.totalDeaths', 'Total Deaths'), value: quickStats.totalDeaths.toLocaleString('en-US'), icon: Skull },
               { label: t('farms.detail.totalExpenses', 'Total Expenses'), value: `${currency} ${fmt(quickStats.totalExpenses)}`, icon: Receipt },
               { label: t('farms.detail.avgMortality', 'Avg Mortality'), value: `${quickStats.avgMortality}%`, icon: AlertTriangle },
               { label: t('farms.detail.avgBatchDuration', 'Avg Batch Duration'), value: quickStats.avgBatchDuration > 0 ? `${quickStats.avgBatchDuration} days` : '—', icon: Calendar },
@@ -376,7 +376,7 @@ export default function FarmOverview() {
                   <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5 flex-wrap">
                     <span>{fmtDate(b.startDate)}</span>
                     <span className="tabular-nums">{b.dayCount} days</span>
-                    <span className="tabular-nums">{b.initial.toLocaleString()} birds</span>
+                    <span className="tabular-nums">{b.initial.toLocaleString('en-US')} birds</span>
                     <span className="tabular-nums">{b.mortality}%</span>
                   </div>
                 </div>

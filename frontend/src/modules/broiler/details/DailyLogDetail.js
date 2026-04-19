@@ -111,7 +111,7 @@ export default function DailyLogDetail({ logId, onEdit }) {
           {log.logType === 'WEIGHT' && (
             <div className={CARD_CLS}>
               <div className="px-3 py-2.5 space-y-0.5">
-                <Row label={t('batches.operations.averageWeight')} value={log.averageWeight != null ? `${log.averageWeight.toLocaleString()} g` : '—'} bold />
+                <Row label={t('batches.operations.averageWeight')} value={log.averageWeight != null ? `${log.averageWeight.toLocaleString('en-US')} g` : '—'} bold />
               </div>
             </div>
           )}

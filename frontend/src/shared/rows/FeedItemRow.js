@@ -29,7 +29,7 @@ export default function FeedItemRow({ item, onClick, selected, actions }) {
         </p>
       </div>
       <div className="shrink-0 text-right">
-        <p className="text-sm font-medium tabular-nums">{totalKg.toLocaleString()} KG</p>
+        <p className="text-sm font-medium tabular-nums">{totalKg.toLocaleString('en-US')} KG</p>
         <p className="text-[10px] text-muted-foreground tabular-nums">{bags} × {sizePerBag}KG</p>
       </div>
     </EntityRowBase>

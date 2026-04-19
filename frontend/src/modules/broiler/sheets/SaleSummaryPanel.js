@@ -23,7 +23,7 @@ export default function SaleSummaryPanel({
   const [expanded, setExpanded] = useState(true);
 
   const fmt = (val) =>
-    Number(val || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    Number(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const hasSlaughteredBreakdown = wholeChickenTotal > 0 || portionsTotal > 0;
   const hasLiveBreakdown = liveSalesTotal > 0;

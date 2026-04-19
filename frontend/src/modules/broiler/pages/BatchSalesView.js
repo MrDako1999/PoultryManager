@@ -22,7 +22,7 @@ export default function BatchSalesView() {
   const currency = accounting?.currency || 'AED';
 
   const fmt = (val) =>
-    Number(val || 0).toLocaleString(undefined, {
+    Number(val || 0).toLocaleString('en-US', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });

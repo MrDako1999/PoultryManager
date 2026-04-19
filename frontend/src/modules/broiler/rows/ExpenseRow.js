@@ -2,7 +2,7 @@ import { Link2 } from 'lucide-react';
 import EntityRowBase from '@/shared/rows/EntityRowBase';
 
 const fmt = (val) =>
-  Number(val || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  Number(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function ExpenseRow({ expense, onClick, selected, actions, categoryLabel }) {
   const hasLink = expense.source || expense.feedOrder || expense.saleOrder;

@@ -199,7 +199,7 @@ export default function FeedCataloguePage() {
       feedDescription: item.feedDescription || '',
       feedType: item.feedType || 'STARTER',
       pricePerQty: item.pricePerQty
-        ? Number(item.pricePerQty).toLocaleString(undefined, {
+        ? Number(item.pricePerQty).toLocaleString('en-US', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
           })
@@ -398,7 +398,7 @@ export default function FeedCataloguePage() {
                             <div className="flex items-center gap-3 text-sm text-muted-foreground mt-0.5">
                               <span>
                                 {currency}{' '}
-                                {item.grandTotal?.toLocaleString(undefined, {
+                                {item.grandTotal?.toLocaleString('en-US', {
                                   minimumFractionDigits: 2,
                                 })}{' '}
                                 / {item.quantitySize}
@@ -503,19 +503,19 @@ export default function FeedCataloguePage() {
               <div className="space-y-3 rounded-lg border p-4 bg-muted/30">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">{t('feed.subtotal')}</span>
-                  <span className="font-medium">{currency} {fSubtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                  <span className="font-medium">{currency} {fSubtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">
                     {t('feed.vat')} ({vatRate}%)
-                    {fSubtotal > 0 && (<span className="text-xs ml-1">({fSubtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })} × {vatRate}%)</span>)}
+                    {fSubtotal > 0 && (<span className="text-xs ml-1">({fSubtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })} × {vatRate}%)</span>)}
                   </span>
-                  <span className="font-medium">{currency} {fVat.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                  <span className="font-medium">{currency} {fVat.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between text-sm font-semibold">
                   <span>{t('feed.totalPerUnit')}</span>
-                  <span>{currency} {fGrandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                  <span>{currency} {fGrandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                 </div>
               </div>
             </form>

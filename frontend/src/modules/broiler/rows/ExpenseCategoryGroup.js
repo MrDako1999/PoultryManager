@@ -3,7 +3,7 @@ import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const fmt = (val) =>
-  Number(val || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  Number(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function ExpenseCategoryGroup({
   label, total, count, pills,

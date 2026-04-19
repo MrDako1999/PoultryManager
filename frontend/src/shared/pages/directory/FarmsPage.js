@@ -579,7 +579,7 @@ export default function FarmsPage() {
                         return (
                           <span className="flex items-center gap-1">
                             <Home className="h-3 w-3" />
-                            {fh.length} {fh.length === 1 ? t('farms.house', 'house') : t('farms.housesPlural', 'houses')} · {total.toLocaleString()} {t('farms.birds', 'birds')}
+                            {fh.length} {fh.length === 1 ? t('farms.house', 'house') : t('farms.housesPlural', 'houses')} · {total.toLocaleString('en-US')} {t('farms.birds', 'birds')}
                           </span>
                         );
                       })()}

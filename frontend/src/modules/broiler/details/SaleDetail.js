@@ -176,22 +176,22 @@ export default function SaleDetail({ saleId, onEdit, onViewExpense, onClose }) {
               <button type="button" onClick={() => setCountsOpen((v) => !v)} className="flex items-center justify-between w-full px-3 py-2 hover:bg-muted/30 transition-colors">
                 <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', !countsOpen && '-rotate-90')} />
-                  {cn_.chickensSent.toLocaleString()} {t('batches.saleForm.chickensSent').toLowerCase()}
+                  {cn_.chickensSent.toLocaleString('en-US')} {t('batches.saleForm.chickensSent').toLowerCase()}
                   {losses > 0 && <span className="text-red-500 dark:text-red-400">(-{losses})</span>}
                 </span>
-                <span className="text-sm font-semibold text-primary">{wholeChickenCount.toLocaleString()} {t('batches.saleDetail.gradeA')}</span>
+                <span className="text-sm font-semibold text-primary">{wholeChickenCount.toLocaleString('en-US')} {t('batches.saleDetail.gradeA')}</span>
               </button>
               {countsOpen && (
                 <div className="px-3 pb-2.5 pt-1 space-y-0.5 border-t">
-                  <Row label={t('batches.saleForm.chickensSent')} value={(cn_.chickensSent || 0).toLocaleString()} bold />
-                  {cn_.condemnation > 0 && <Row label={t('batches.saleForm.condemnation')} value={`-${cn_.condemnation.toLocaleString()}`} negative />}
-                  {cn_.deathOnArrival > 0 && <Row label={t('batches.saleForm.deathOnArrival')} value={`-${cn_.deathOnArrival.toLocaleString()}`} negative />}
-                  {cn_.rejections > 0 && <Row label={t('batches.saleForm.rejections')} value={`-${cn_.rejections.toLocaleString()}`} negative />}
-                  {cn_.shortage > 0 && <Row label={t('batches.saleForm.shortage')} value={`-${cn_.shortage.toLocaleString()}`} negative />}
-                  {cn_.bGrade > 0 && <Row label={t('batches.saleForm.bGradeCount')} value={`-${cn_.bGrade.toLocaleString()}`} negative />}
+                  <Row label={t('batches.saleForm.chickensSent')} value={(cn_.chickensSent || 0).toLocaleString('en-US')} bold />
+                  {cn_.condemnation > 0 && <Row label={t('batches.saleForm.condemnation')} value={`-${cn_.condemnation.toLocaleString('en-US')}`} negative />}
+                  {cn_.deathOnArrival > 0 && <Row label={t('batches.saleForm.deathOnArrival')} value={`-${cn_.deathOnArrival.toLocaleString('en-US')}`} negative />}
+                  {cn_.rejections > 0 && <Row label={t('batches.saleForm.rejections')} value={`-${cn_.rejections.toLocaleString('en-US')}`} negative />}
+                  {cn_.shortage > 0 && <Row label={t('batches.saleForm.shortage')} value={`-${cn_.shortage.toLocaleString('en-US')}`} negative />}
+                  {cn_.bGrade > 0 && <Row label={t('batches.saleForm.bGradeCount')} value={`-${cn_.bGrade.toLocaleString('en-US')}`} negative />}
                   <Separator className="my-1" />
-                  <Row label={t('batches.saleForm.netProcessed')} value={netProcessed.toLocaleString()} bold />
-                  <Row label={t('batches.saleDetail.wholeChickenGradeA')} value={wholeChickenCount.toLocaleString()} bold highlight />
+                  <Row label={t('batches.saleForm.netProcessed')} value={netProcessed.toLocaleString('en-US')} bold />
+                  <Row label={t('batches.saleDetail.wholeChickenGradeA')} value={wholeChickenCount.toLocaleString('en-US')} bold highlight />
                 </div>
               )}
             </div>
@@ -227,7 +227,7 @@ export default function SaleDetail({ saleId, onEdit, onViewExpense, onClose }) {
               {filledPortions.map((p, i) => (
                 <div key={p.partType} className={cn('grid grid-cols-[1fr_50px_55px_74px] gap-0', TABLE_ROW_CLS, i % 2 === 1 && 'bg-muted/30')}>
                   <span>{t(`settings.portionLabels.${p.partType}`)}</span>
-                  <span className={cn('text-right', VALUE_CLS, 'text-muted-foreground')}>{p.quantity.toLocaleString()}</span>
+                  <span className={cn('text-right', VALUE_CLS, 'text-muted-foreground')}>{p.quantity.toLocaleString('en-US')}</span>
                   <span className={cn('text-right', VALUE_CLS, 'text-muted-foreground')}>{fmt(p.rate)}</span>
                   <span className={cn('text-right', VALUE_CLS, 'font-medium')}>{fmt(p.amount)}</span>
                 </div>
@@ -246,7 +246,7 @@ export default function SaleDetail({ saleId, onEdit, onViewExpense, onClose }) {
               {isLiveByPiece && (
                 <div className={cn('grid grid-cols-[1fr_62px_62px_74px] gap-0', TABLE_ROW_CLS)}>
                   <span>{t('batches.saleForm.liveWeightDefault')}</span>
-                  <span className={cn('text-right', VALUE_CLS, 'text-muted-foreground')}>{(lv.birdCount || 0).toLocaleString()}</span>
+                  <span className={cn('text-right', VALUE_CLS, 'text-muted-foreground')}>{(lv.birdCount || 0).toLocaleString('en-US')}</span>
                   <span className={cn('text-right', VALUE_CLS, 'text-muted-foreground')}>{fmt(lv.ratePerBird)}</span>
                   <span className={cn('text-right', VALUE_CLS, 'font-medium')}>{fmt((lv.birdCount || 0) * (lv.ratePerBird || 0))}</span>
                 </div>

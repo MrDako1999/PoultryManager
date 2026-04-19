@@ -20,7 +20,7 @@ import useOfflineMutation from '@/hooks/useOfflineMutation';
 import useGroupExpand from '@/hooks/useGroupExpand';
 
 const fmt = (val) =>
-  Number(val || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  Number(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function SalesListView({ items: saleOrders, selectedId, basePath, persistId, batchId }) {
   const navigate = useNavigate();
@@ -91,7 +91,7 @@ export default function SalesListView({ items: saleOrders, selectedId, basePath,
           <p className="text-sm font-medium tabular-nums">{fmt(sale.totals?.grandTotal)}</p>
           <div className="flex items-center justify-end gap-2 text-[10px] text-muted-foreground tabular-nums">
             {chickens > 0 && (
-              <span>{chickens.toLocaleString()} {t('batches.birds', 'birds')}</span>
+              <span>{chickens.toLocaleString('en-US')} {t('batches.birds', 'birds')}</span>
             )}
             {trucks > 0 && (
               <span className="flex items-center gap-0.5">
@@ -167,7 +167,7 @@ export default function SalesListView({ items: saleOrders, selectedId, basePath,
               label={fmtDateLabel(dateKey)}
               pills={[
                 { value: fmt(revenue) },
-                { value: `${chickens.toLocaleString()} ${t('batches.birds', 'birds')}` },
+                { value: `${chickens.toLocaleString('en-US')} ${t('batches.birds', 'birds')}` },
                 { value: `${trucks} ${t('batches.trucks', 'trucks')}` },
               ]}
               open={isOpen(dateKey)}

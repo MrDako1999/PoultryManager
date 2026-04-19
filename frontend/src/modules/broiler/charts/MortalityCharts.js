@@ -50,7 +50,7 @@ function CustomTooltip({ active, payload, label }) {
           />
           <span className="text-muted-foreground">{entry.name}:</span>
           <span className="font-medium tabular-nums">
-            {Number(entry.value).toLocaleString()}
+            {Number(entry.value).toLocaleString('en-US')}
           </span>
         </div>
       ))}
@@ -179,7 +179,7 @@ export default function MortalityCharts({ houses, dailyLogs, benchmarkData }) {
                 <YAxis
                   tick={{ fontSize: 12 }}
                   className="text-muted-foreground"
-                  tickFormatter={(v) => v.toLocaleString()}
+                  tickFormatter={(v) => v.toLocaleString('en-US')}
                 />
                 <RechartsTooltip content={<CustomTooltip />} />
                 <Legend

@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import EntityRowBase from '@/shared/rows/EntityRowBase';
 
 const fmt = (val) =>
-  Number(val || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  Number(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function TransferRow({ transfer, onClick, selected, actions }) {
   const { t } = useTranslation();

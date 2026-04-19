@@ -94,13 +94,13 @@ export default function SourceDetail({ sourceId, onEdit, onClose }) {
               {t('batches.sourceDetail.purchaseBreakdown')}
             </div>
             <div className="px-3 py-2.5 space-y-0.5">
-              <Row label={t('batches.quantityPurchased')} value={(source.quantityPurchased || 0).toLocaleString()} />
+              <Row label={t('batches.quantityPurchased')} value={(source.quantityPurchased || 0).toLocaleString('en-US')} />
               <Row label={t('batches.sourceDetail.ratePerChick')} value={`${currency} ${fmt(source.chicksRate)}`} />
               {source.focPercentage > 0 && (
-                <Row label={t('batches.sourceDetail.focBonus')} value={`+${focChicks.toLocaleString()} (${source.focPercentage}%)`} highlight />
+                <Row label={t('batches.sourceDetail.focBonus')} value={`+${focChicks.toLocaleString('en-US')} (${source.focPercentage}%)`} highlight />
               )}
               <Separator className="my-1" />
-              <Row label={t('batches.totalChicksField')} value={(source.totalChicks || 0).toLocaleString()} bold />
+              <Row label={t('batches.totalChicksField')} value={(source.totalChicks || 0).toLocaleString('en-US')} bold />
             </div>
           </div>
 

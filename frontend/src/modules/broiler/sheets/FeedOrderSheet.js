@@ -407,7 +407,7 @@ export default function FeedOrderSheet({ open, onOpenChange, batchId, editingFee
                       const productOptions = matchingItems.map((fi) => ({
                         value: fi._id,
                         label: fi.feedDescription,
-                        description: `${fi.quantitySize}${fi.quantityUnit} — ${fi.pricePerQty?.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+                        description: `${fi.quantitySize}${fi.quantityUnit} — ${fi.pricePerQty?.toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
                       }));
                       const liSub = (lineItem.pricePerBag || 0) * (lineItem.bags || 0);
                       const FtIcon = FEED_TYPE_ICONS[lineItem.feedType];
@@ -423,7 +423,7 @@ export default function FeedOrderSheet({ open, onOpenChange, batchId, editingFee
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium truncate">{lineItem.feedDescription}</p>
                               <p className="text-xs text-muted-foreground">
-                                {lineItem.bags} {t('batches.bags')} × {(lineItem.pricePerBag || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} = {liSub.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                {lineItem.bags} {t('batches.bags')} × {(lineItem.pricePerBag || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} = {liSub.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                               </p>
                             </div>
                             <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -571,31 +571,31 @@ export default function FeedOrderSheet({ open, onOpenChange, batchId, editingFee
                           return (
                             <div key={idx} className="flex justify-between text-xs">
                               <span className="text-muted-foreground truncate mr-2">
-                                {li.feedDescription || t(`feed.feedTypes.${li.feedType}`)} — {li.bags} × {(li.pricePerBag || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                {li.feedDescription || t(`feed.feedTypes.${li.feedType}`)} — {li.bags} × {(li.pricePerBag || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                               </span>
-                              <span className="font-medium shrink-0">{liSub.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                              <span className="font-medium shrink-0">{liSub.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                             </div>
                           );
                         })}
                         <Separator />
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">{t('batches.subtotal')}</span>
-                          <span className="font-medium">{foSubtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                          <span className="font-medium">{foSubtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                         </div>
                         {(deliveryCharge || 0) > 0 && (
                           <div className="flex justify-between text-sm">
                             <span className="text-muted-foreground">{t('batches.deliveryCharge')}</span>
-                            <span className="font-medium">{(deliveryCharge || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                            <span className="font-medium">{(deliveryCharge || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                           </div>
                         )}
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">{t('batches.vat')} ({vatRate}%)</span>
-                          <span className="font-medium">{foVat.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                          <span className="font-medium">{foVat.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                         </div>
                         <Separator />
                         <div className="flex justify-between text-sm font-semibold">
                           <span>{t('batches.grandTotal')}</span>
-                          <span>{foGrandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                          <span>{foGrandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                         </div>
                       </div>
                     </>

@@ -18,7 +18,7 @@ import useOfflineMutation from '@/hooks/useOfflineMutation';
 import useGroupExpand from '@/hooks/useGroupExpand';
 
 const fmt = (val) =>
-  Number(val || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  Number(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const FEED_TYPE_ORDER = { STARTER: 0, GROWER: 1, FINISHER: 2, OTHER: 3 };
 
@@ -106,7 +106,7 @@ export default function FeedOrdersListView({ items: feedOrders, selectedId, base
               label={t(`feed.feedTypes.${type}`)}
               pills={[
                 { value: fmt(totalCost) },
-                { value: `${totalKg.toLocaleString()} KG` },
+                { value: `${totalKg.toLocaleString('en-US')} KG` },
                 { value: items.length },
               ]}
               open={isOpen(type)}
@@ -140,7 +140,7 @@ export default function FeedOrdersListView({ items: feedOrders, selectedId, base
                       </div>
                     </div>
                     <div className="shrink-0 text-right">
-                      <p className="text-sm font-medium tabular-nums">{itemTotalKg.toLocaleString()} KG</p>
+                      <p className="text-sm font-medium tabular-nums">{itemTotalKg.toLocaleString('en-US')} KG</p>
                       <p className="text-[10px] text-muted-foreground tabular-nums">{bags} × {sizePerBag}KG</p>
                     </div>
                     <DropdownMenu>

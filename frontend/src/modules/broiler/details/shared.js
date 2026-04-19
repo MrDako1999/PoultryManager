@@ -3,7 +3,7 @@ import { FileText, File, Image as ImageIcon, ChevronDown, ExternalLink } from 'l
 import { cn } from '@/lib/utils';
 
 export const fmt = (val) =>
-  Number(val || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  Number(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export const fmtDate = (d) => {
   if (!d) return '—';

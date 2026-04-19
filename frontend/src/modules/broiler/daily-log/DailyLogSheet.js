@@ -308,7 +308,7 @@ export default function DailyLogSheet({
                             <span className="flex items-center gap-2">
                               <Home className="h-3.5 w-3.5 text-muted-foreground" />
                               {name}
-                              <span className="text-xs text-muted-foreground">({entry.quantity?.toLocaleString()} {t('farms.birds')})</span>
+                              <span className="text-xs text-muted-foreground">({entry.quantity?.toLocaleString('en-US')} {t('farms.birds')})</span>
                             </span>
                           </SelectItem>
                         );

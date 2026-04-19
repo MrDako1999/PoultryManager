@@ -21,7 +21,7 @@ export default function BatchSourcesView() {
   const currency = accounting?.currency || 'AED';
 
   const fmt = (val) =>
-    Number(val || 0).toLocaleString(undefined, {
+    Number(val || 0).toLocaleString('en-US', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
@@ -139,7 +139,7 @@ export default function BatchSourcesView() {
             <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2">
               <div className="text-right">
                 <p className="text-xs text-muted-foreground leading-none">{t('batches.totalChicks', 'Total Chicks')}</p>
-                <p className="text-sm font-semibold tabular-nums">{totalChicks.toLocaleString()}</p>
+                <p className="text-sm font-semibold tabular-nums">{totalChicks.toLocaleString('en-US')}</p>
               </div>
             </div>
             <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2">

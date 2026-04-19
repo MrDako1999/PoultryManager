@@ -106,7 +106,7 @@ export default function FeedOrderDetail({ feedOrderId, onEdit, onClose }) {
                       <span className="truncate block">{desc}</span>
                       {size && <span className="text-xs text-muted-foreground">{size}</span>}
                     </div>
-                    <span className={cn('text-right', VALUE_CLS, 'text-muted-foreground')}>{(item.bags || 0).toLocaleString()}</span>
+                    <span className={cn('text-right', VALUE_CLS, 'text-muted-foreground')}>{(item.bags || 0).toLocaleString('en-US')}</span>
                     <span className={cn('text-right', VALUE_CLS, 'text-muted-foreground')}>{fmt(item.pricePerBag)}</span>
                     <span className={cn('text-right', VALUE_CLS, 'font-medium')}>{fmt(item.subtotal)}</span>
                   </div>

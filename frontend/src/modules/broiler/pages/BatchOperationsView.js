@@ -135,7 +135,7 @@ export default function BatchOperationsView() {
                 <Skull className="h-4 w-4 text-red-500" />
                 <p className="text-xs text-muted-foreground">{t('charts.totalDeaths', 'Total Deaths')}</p>
               </div>
-              <div className="text-2xl font-bold tabular-nums">{mortalityStats.totalDeaths.toLocaleString()}</div>
+              <div className="text-2xl font-bold tabular-nums">{mortalityStats.totalDeaths.toLocaleString('en-US')}</div>
             </CardContent>
           </Card>
           <Card>
@@ -165,7 +165,7 @@ export default function BatchOperationsView() {
                 </div>
                 <div className="text-2xl font-bold truncate">{mortalityStats.worstHouse.name}</div>
                 <p className="text-xs text-muted-foreground tabular-nums mt-0.5">
-                  {mortalityStats.worstHouse.deaths.toLocaleString()} {t('charts.deaths', 'deaths')} ({mortalityStats.worstHouse.rate.toFixed(2)}%)
+                  {mortalityStats.worstHouse.deaths.toLocaleString('en-US')} {t('charts.deaths', 'deaths')} ({mortalityStats.worstHouse.rate.toFixed(2)}%)
                 </p>
               </CardContent>
             </Card>
@@ -185,7 +185,7 @@ export default function BatchOperationsView() {
                 <Wheat className="h-4 w-4 text-amber-600" />
                 <p className="text-xs text-muted-foreground">{t('charts.totalFeed', 'Total Feed')}</p>
               </div>
-              <div className="text-2xl font-bold tabular-nums">{consumptionStats.totalFeed.toLocaleString()} kg</div>
+              <div className="text-2xl font-bold tabular-nums">{consumptionStats.totalFeed.toLocaleString('en-US')} kg</div>
             </CardContent>
           </Card>
           <Card>
@@ -203,7 +203,7 @@ export default function BatchOperationsView() {
                 <Droplets className="h-4 w-4 text-blue-500" />
                 <p className="text-xs text-muted-foreground">{t('charts.totalWater', 'Total Water')}</p>
               </div>
-              <div className="text-2xl font-bold tabular-nums">{consumptionStats.totalWater.toLocaleString()} L</div>
+              <div className="text-2xl font-bold tabular-nums">{consumptionStats.totalWater.toLocaleString('en-US')} L</div>
             </CardContent>
           </Card>
           <Card>
@@ -245,7 +245,7 @@ export default function BatchOperationsView() {
                 icon={Home}
                 headerExtra={
                   <span className="inline-flex items-center rounded-full border bg-background/80 text-[10px] font-semibold tabular-nums text-muted-foreground">
-                    <span className="px-1.5 py-0">{(entry.quantity || 0).toLocaleString()} {t('farms.birds')}</span>
+                    <span className="px-1.5 py-0">{(entry.quantity || 0).toLocaleString('en-US')} {t('farms.birds')}</span>
                     <span className="w-px self-stretch bg-border" />
                     <span className="px-1.5 py-0">{houseLogs.length}</span>
                     {dateGroups.length > 1 && (

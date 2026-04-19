@@ -39,7 +39,7 @@ export default function HouseConfigurator({ houses = [], onChange, disabled = fa
         </div>
         {houses.length > 0 && (
           <span className="text-xs text-muted-foreground tabular-nums">
-            {t('farms.totalCapacity', 'Total')}: {totalCapacity.toLocaleString()} {t('farms.birds', 'birds')}
+            {t('farms.totalCapacity', 'Total')}: {totalCapacity.toLocaleString('en-US')} {t('farms.birds', 'birds')}
           </span>
         )}
       </div>
@@ -69,7 +69,7 @@ export default function HouseConfigurator({ houses = [], onChange, disabled = fa
           />
           <Input
             inputMode="numeric"
-            value={house.capacity === '' ? '' : Number(house.capacity).toLocaleString()}
+            value={house.capacity === '' ? '' : Number(house.capacity).toLocaleString('en-US')}
             onChange={(e) => {
               const raw = e.target.value.replace(/[^0-9]/g, '');
               updateHouse(index, 'capacity', raw ? parseInt(raw, 10) : '');

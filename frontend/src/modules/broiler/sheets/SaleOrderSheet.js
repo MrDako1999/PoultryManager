@@ -26,7 +26,7 @@ import SaleSummaryPanel from '@/modules/broiler/sheets/SaleSummaryPanel';
 import useFormGuard from '@/hooks/useFormGuard';
 import api from '@/lib/api';
 import db from '@/lib/db';
-import { parseNum, fmtInt, fmtDec, formatDateForInput, todayStr, intOnChange, decOnChange } from '@/lib/format';
+import { parseNum, fmtInt, fmtDec, fmtMoney, formatDateForInput, todayStr, intOnChange, decOnChange, decFormat } from '@/lib/format';
 import { COUNTRY_VAT_MAP, DOC_ACCEPT } from '@/lib/constants';
 
 const PART_TYPES = [
@@ -39,13 +39,6 @@ function addDays(dateStr, days) {
   const d = new Date(dateStr);
   d.setDate(d.getDate() + days);
   return d.toISOString().split('T')[0];
-}
-
-function decFormat(e) {
-  const raw = e.target.value.replace(/[^0-9.]/g, '');
-  const parts = raw.split('.');
-  const intPart = parts[0] ? Number(parts[0].replace(/,/g, '')).toLocaleString() : '';
-  return parts.length > 1 ? `${intPart}.${parts[1].slice(0, 2)}` : intPart;
 }
 
 export default function SaleOrderSheet({ open, onOpenChange, batchId, editingSaleOrder, stacked, onSuccess }) {
@@ -565,7 +558,7 @@ export default function SaleOrderSheet({ open, onOpenChange, batchId, editingSal
     markDirty();
   };
 
-  const fmt = (val) => Number(val || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmt = fmtMoney;
 
   // Tab 2 & 3 labels change based on sale method
   const tab2Label = isSlaughtered ? t('batches.saleForm.stepQuantity') : t('batches.saleForm.stepSaleDetails');
@@ -574,7 +567,7 @@ export default function SaleOrderSheet({ open, onOpenChange, batchId, editingSal
   const stepTruckCount = (delta) => {
     const current = parseNum(truckCount);
     const next = Math.max(0, current + delta);
-    setTruckCount(next ? next.toLocaleString() : '');
+    setTruckCount(fmtInt(next));
     markDirty();
   };
 
@@ -975,11 +968,11 @@ export default function SaleOrderSheet({ open, onOpenChange, batchId, editingSal
                       <div className="rounded-lg border bg-muted/50 p-4 space-y-2">
                         <div className="flex justify-between text-sm">
                           <span>{t('batches.saleForm.netProcessed')}</span>
-                          <span className="font-semibold">{netProcessed.toLocaleString()}</span>
+                          <span className="font-semibold">{netProcessed.toLocaleString('en-US')}</span>
                         </div>
                         <div className="flex justify-between text-sm">
                           <span>{t('batches.saleForm.wholeChickenCount')}</span>
-                          <span className="font-semibold text-primary">{wholeChickenCount.toLocaleString()}</span>
+                          <span className="font-semibold text-primary">{wholeChickenCount.toLocaleString('en-US')}</span>
                         </div>
                       </div>
                     </>
@@ -1075,7 +1068,7 @@ export default function SaleOrderSheet({ open, onOpenChange, batchId, editingSal
                                 value={p.quantity}
                                 onChange={(e) => {
                                   const raw = e.target.value.replace(/[^0-9]/g, '');
-                                  updatePortion(i, 'quantity', raw ? Number(raw).toLocaleString() : '');
+                                  updatePortion(i, 'quantity', fmtInt(Number(raw)));
                                 }}
                                 className="h-8 text-sm"
                               />

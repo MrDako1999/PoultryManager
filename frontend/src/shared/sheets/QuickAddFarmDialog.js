@@ -149,7 +149,7 @@ export default function QuickAddFarmDialog({ open, onOpenChange, onCreated, init
               {...register('capacity', {
                 onChange: (e) => {
                   const raw = e.target.value.replace(/[^0-9]/g, '');
-                  e.target.value = raw ? Number(raw).toLocaleString() : '';
+                  e.target.value = raw ? Number(raw).toLocaleString('en-US') : '';
                 },
               })}
               placeholder={t('farms.capacityQuickPlaceholder', 'e.g. 5,000')}

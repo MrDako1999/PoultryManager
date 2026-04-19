@@ -6,7 +6,7 @@ import useLocalQuery from '@/hooks/useLocalQuery';
 import useSettings from '@/hooks/useSettings';
 
 const fmt = (val) =>
-  Number(val || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  Number(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function BroilerKpiRow() {
   const { t } = useTranslation();
@@ -76,7 +76,7 @@ export default function BroilerKpiRow() {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold tabular-nums">
-            {kpis.totalBirds.toLocaleString()}
+            {kpis.totalBirds.toLocaleString('en-US')}
           </div>
         </CardContent>
       </Card>

@@ -17,7 +17,7 @@ export default function SourceRow({ source, onClick, selected, actions }) {
         </p>
       </div>
       <span className="text-sm font-medium tabular-nums shrink-0">
-        {(source.totalChicks || 0).toLocaleString()}
+        {(source.totalChicks || 0).toLocaleString('en-US')}
       </span>
     </EntityRowBase>
   );

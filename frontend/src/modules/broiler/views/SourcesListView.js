@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils';
 import useOfflineMutation from '@/hooks/useOfflineMutation';
 
 const fmt = (val) =>
-  Number(val || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  Number(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function SourcesListView({ items: sources, selectedId, basePath, persistId, batchId }) {
   const navigate = useNavigate();
@@ -74,7 +74,7 @@ export default function SourcesListView({ items: sources, selectedId, basePath, 
                     {source.deliveryDate ? new Date(source.deliveryDate).toLocaleDateString() : '—'}
                   </span>
                   <Badge variant="secondary" className="text-[10px] px-1 py-0">
-                    {(source.totalChicks || 0).toLocaleString()} {t('batches.chicks')}
+                    {(source.totalChicks || 0).toLocaleString('en-US')} {t('batches.chicks')}
                   </Badge>
                 </div>
               </div>

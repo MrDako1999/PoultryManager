@@ -24,7 +24,7 @@ import api from '@/lib/api';
 import { formatDateForInput } from '@/lib/format';
 
 const fmt = (val) =>
-  Number(val || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  Number(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function BusinessOverview() {
   const { id } = useParams();
@@ -482,7 +482,7 @@ export default function BusinessOverview() {
                   <p className="truncate">{source.sourceFrom?.companyName || '—'}</p>
                   <p className="text-xs text-muted-foreground">
                     {source.invoiceDate ? new Date(source.invoiceDate).toLocaleDateString() : '—'}
-                    {source.totalChicks > 0 && ` · ${source.totalChicks.toLocaleString()} chicks`}
+                    {source.totalChicks > 0 && ` · ${source.totalChicks.toLocaleString('en-US')} chicks`}
                   </p>
                 </div>
                 <span className="text-sm tabular-nums shrink-0">{fmt(source.grandTotal)}</span>

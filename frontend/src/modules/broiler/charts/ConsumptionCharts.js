@@ -50,7 +50,7 @@ function CustomTooltip({ active, payload, label, unit }) {
           />
           <span className="text-muted-foreground">{entry.name}:</span>
           <span className="font-medium tabular-nums">
-            {Number(entry.value).toLocaleString()} {unit}
+            {Number(entry.value).toLocaleString('en-US')} {unit}
           </span>
         </div>
       ))}
@@ -208,7 +208,7 @@ export default function ConsumptionCharts({ houses, dailyLogs }) {
                 <YAxis
                   tick={{ fontSize: 12 }}
                   className="text-muted-foreground"
-                  tickFormatter={(v) => v.toLocaleString()}
+                  tickFormatter={(v) => v.toLocaleString('en-US')}
                 />
                 <RechartsTooltip content={<CustomTooltip unit={unit} />} />
                 <Legend

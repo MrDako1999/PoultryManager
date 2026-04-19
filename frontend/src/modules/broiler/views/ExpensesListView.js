@@ -21,7 +21,7 @@ import useOfflineMutation from '@/hooks/useOfflineMutation';
 import useGroupExpand from '@/hooks/useGroupExpand';
 
 const fmt = (val) =>
-  Number(val || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  Number(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function ExpensesListView({ items: expenses, selectedId, basePath, persistId, batchId }) {
   const navigate = useNavigate();

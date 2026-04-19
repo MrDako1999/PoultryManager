@@ -6,7 +6,7 @@ import useLocalQuery from '@/hooks/useLocalQuery';
 import useSettings from '@/hooks/useSettings';
 
 const fmt = (val) =>
-  Number(val || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  Number(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function BroilerFinancials() {
   const { t } = useTranslation();

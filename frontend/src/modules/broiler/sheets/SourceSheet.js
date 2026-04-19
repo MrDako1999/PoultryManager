@@ -120,7 +120,7 @@ export default function SourceSheet({ open, onOpenChange, batchId, editingSource
 
   useEffect(() => {
     if (!editingSource && open) {
-      sourceForm.setValue('totalChicks', calcTotalChicks ? calcTotalChicks.toLocaleString() : '');
+      sourceForm.setValue('totalChicks', calcTotalChicks ? calcTotalChicks.toLocaleString('en-US') : '');
     }
   }, [calcTotalChicks, editingSource, open, sourceForm]);
 
@@ -351,11 +351,11 @@ export default function SourceSheet({ open, onOpenChange, batchId, editingSource
                     {t('batches.subtotal')}
                     {qtyNum > 0 && rateNum > 0 && (
                       <span className="text-xs ml-1">
-                        ({qtyNum.toLocaleString()} × {rateNum.toLocaleString(undefined, { minimumFractionDigits: 2 })})
+                        ({qtyNum.toLocaleString('en-US')} × {rateNum.toLocaleString('en-US', { minimumFractionDigits: 2 })})
                       </span>
                     )}
                   </span>
-                  <span className="font-medium">{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                  <span className="font-medium">{subtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                 </div>
                 {watchInvoiceType === 'TAX_INVOICE' && (
                   <div className="flex justify-between text-sm">
@@ -363,17 +363,17 @@ export default function SourceSheet({ open, onOpenChange, batchId, editingSource
                       {t('batches.vat')} ({vatRate}%)
                       {subtotal > 0 && (
                         <span className="text-xs ml-1">
-                          ({subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })} × {vatRate}%)
+                          ({subtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })} × {vatRate}%)
                         </span>
                       )}
                     </span>
-                    <span className="font-medium">{vat.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    <span className="font-medium">{vat.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                   </div>
                 )}
                 <Separator />
                 <div className="flex justify-between text-sm font-semibold">
                   <span>{t('batches.grandTotal')}</span>
-                  <span>{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                  <span>{grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                 </div>
               </div>
 

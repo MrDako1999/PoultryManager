@@ -369,12 +369,12 @@ export default function BatchDetailLayout() {
                           <div className="flex items-center gap-1.5 flex-1 min-w-0">
                             <Home className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                             <span className="text-sm truncate">{house.name}</span>
-                            <span className="text-xs text-muted-foreground">({house.capacity.toLocaleString()} cap)</span>
+                            <span className="text-xs text-muted-foreground">({house.capacity.toLocaleString('en-US')} cap)</span>
                           </div>
                           {isChecked && (
                             <Input
                               inputMode="numeric"
-                              value={entry.quantity === 0 ? '' : entry.quantity.toLocaleString()}
+                              value={entry.quantity === 0 ? '' : entry.quantity.toLocaleString('en-US')}
                               onChange={(e) => {
                                 const raw = e.target.value.replace(/[^0-9]/g, '');
                                 const num = raw ? parseInt(raw, 10) : 0;
@@ -392,7 +392,7 @@ export default function BatchDetailLayout() {
                     {selectedHouses.length > 0 && (
                       <div className="flex justify-end pt-1 border-t mt-2">
                         <span className="text-xs text-muted-foreground tabular-nums">
-                          {t('batches.totalBirds', 'Total')}: {selectedHouses.reduce((s, h) => s + (h.quantity || 0), 0).toLocaleString()} {t('farms.birds', 'birds')}
+                          {t('batches.totalBirds', 'Total')}: {selectedHouses.reduce((s, h) => s + (h.quantity || 0), 0).toLocaleString('en-US')} {t('farms.birds', 'birds')}
                         </span>
                       </div>
                     )}

@@ -42,7 +42,7 @@ function LogSummary({ log, t }) {
       return <span>{parts.join(' · ') || '—'}</span>;
     }
     case 'WEIGHT':
-      return <span>{log.averageWeight != null ? `${log.averageWeight.toLocaleString()}g` : '—'}</span>;
+      return <span>{log.averageWeight != null ? `${log.averageWeight.toLocaleString('en-US')}g` : '—'}</span>;
     case 'ENVIRONMENT': {
       const parts = [];
       if (log.temperature != null) parts.push(`${log.temperature}°C`);

@@ -17,7 +17,7 @@ import SaleOrderSheet from '@/modules/broiler/sheets/SaleOrderSheet';
 import useLocalQuery from '@/hooks/useLocalQuery';
 
 const fmt = (val) =>
-  Number(val || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  Number(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function BatchOverview() {
   const { id } = useParams();
@@ -169,7 +169,7 @@ export default function BatchOverview() {
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold">{totalSourceChicks.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{totalSourceChicks.toLocaleString('en-US')}</div>
             <p className="text-xs text-muted-foreground">{t('batches.totalChicksReceived')}</p>
           </CardContent>
         </Card>
@@ -207,7 +207,7 @@ export default function BatchOverview() {
             <Home className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm font-medium">{t('batches.housesBreakdown', 'Houses')}</span>
             <span className="text-xs text-muted-foreground">
-              ({batch.houses.reduce((s, h) => s + (h.quantity || 0), 0).toLocaleString()} {t('farms.birds', 'birds')})
+              ({batch.houses.reduce((s, h) => s + (h.quantity || 0), 0).toLocaleString('en-US')} {t('farms.birds', 'birds')})
             </span>
           </div>
           <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
@@ -221,7 +221,7 @@ export default function BatchOverview() {
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm font-medium truncate">{name || t('batches.house', 'House')}</p>
-                    <p className="text-xs text-muted-foreground tabular-nums">{(entry.quantity || 0).toLocaleString()} {t('farms.birds', 'birds')}</p>
+                    <p className="text-xs text-muted-foreground tabular-nums">{(entry.quantity || 0).toLocaleString('en-US')} {t('farms.birds', 'birds')}</p>
                   </div>
                 </div>
               );
@@ -241,7 +241,7 @@ export default function BatchOverview() {
               <span className="inline-flex items-center rounded-full border bg-background/80 text-[10px] font-semibold tabular-nums text-muted-foreground">
                 <span className="px-1.5 py-0">{fmt(totalSourceCost)}</span>
                 <span className="w-px self-stretch bg-border" />
-                <span className="px-1.5 py-0">{totalSourceChicks.toLocaleString()} {t('batches.chicks', 'chicks')}</span>
+                <span className="px-1.5 py-0">{totalSourceChicks.toLocaleString('en-US')} {t('batches.chicks', 'chicks')}</span>
                 <span className="w-px self-stretch bg-border" />
                 <span className="px-1.5 py-0">{sources.length}</span>
               </span>
@@ -267,7 +267,7 @@ export default function BatchOverview() {
               <span className="inline-flex items-center rounded-full border bg-background/80 text-[10px] font-semibold tabular-nums text-muted-foreground">
                 <span className="px-1.5 py-0">{fmt(totalFeedCost)}</span>
                 <span className="w-px self-stretch bg-border" />
-                <span className="px-1.5 py-0">{totalFeedKg.toLocaleString()} KG</span>
+                <span className="px-1.5 py-0">{totalFeedKg.toLocaleString('en-US')} KG</span>
                 <span className="w-px self-stretch bg-border" />
                 <span className="px-1.5 py-0">{feedOrders.length}</span>
                 {sortedFeedTypes.length > 1 && (
@@ -298,7 +298,7 @@ export default function BatchOverview() {
                 label={t(`feed.feedTypes.${type}`)}
                 pills={[
                   { value: fmt(totalCost) },
-                  { value: `${totalKg.toLocaleString()} KG` },
+                  { value: `${totalKg.toLocaleString('en-US')} KG` },
                   { value: items.length },
                 ]}
                 open={feedCatOpen[type] ?? true}
@@ -383,7 +383,7 @@ export default function BatchOverview() {
               <span className="inline-flex items-center rounded-full border bg-background/80 text-[10px] font-semibold tabular-nums text-muted-foreground">
                 <span className="px-1.5 py-0">{fmt(totalRevenue)}</span>
                 <span className="w-px self-stretch bg-border" />
-                <span className="px-1.5 py-0">{totalSaleChickens.toLocaleString()} {t('batches.birds', 'birds')}</span>
+                <span className="px-1.5 py-0">{totalSaleChickens.toLocaleString('en-US')} {t('batches.birds', 'birds')}</span>
                 <span className="w-px self-stretch bg-border" />
                 <span className="px-1.5 py-0">{totalSaleTrucks} {t('batches.trucks', 'trucks')}</span>
                 {sortedSaleDates.length > 1 && (
@@ -414,7 +414,7 @@ export default function BatchOverview() {
                 label={fmtDateLabel(dateKey)}
                 pills={[
                   { value: fmt(revenue) },
-                  { value: `${chickens.toLocaleString()} ${t('batches.birds', 'birds')}` },
+                  { value: `${chickens.toLocaleString('en-US')} ${t('batches.birds', 'birds')}` },
                   { value: `${trucks} ${t('batches.trucks', 'trucks')}` },
                 ]}
                 open={saleDateOpen[dateKey] ?? true}

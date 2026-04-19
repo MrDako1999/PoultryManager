@@ -243,7 +243,7 @@ export default function WorkersPage() {
       firstName: worker.firstName,
       lastName: worker.lastName,
       phone: worker.phone || '',
-      compensation: worker.compensation != null ? Number(worker.compensation).toLocaleString() : '',
+      compensation: worker.compensation != null ? Number(worker.compensation).toLocaleString('en-US') : '',
       emiratesIdNumber: worker.emiratesIdNumber || '',
       emiratesIdExpiry: worker.emiratesIdExpiry || '',
       passportNumber: worker.passportNumber || '',
@@ -682,7 +682,7 @@ export default function WorkersPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="wk-compensation">{t('workers.compensation')}</Label>
-                <Input id="wk-compensation" inputMode="numeric" {...register('compensation', { onChange: (e) => { const raw = e.target.value.replace(/[^0-9]/g, ''); e.target.value = raw ? Number(raw).toLocaleString() : ''; } })} placeholder={t('workers.compensationPlaceholder')} />
+                <Input id="wk-compensation" inputMode="numeric" {...register('compensation', { onChange: (e) => { const raw = e.target.value.replace(/[^0-9]/g, ''); e.target.value = raw ? Number(raw).toLocaleString('en-US') : ''; } })} placeholder={t('workers.compensationPlaceholder')} />
               </div>
 
               <Separator />
