@@ -165,33 +165,42 @@ function DatePicker({ value, onChange, placeholder, label, onOpen }, ref) {
 
   return (
     <>
+      {/* Compact form-grade trigger. Layout (flexDirection, border, height)
+          lives in StyleSheet + on a plain inner <View>; the Pressable's
+          style is a STATIC array so NativeWind's css-interop can't strip
+          layout from it. See DESIGN_LANGUAGE.md §9. */}
       <Pressable
         onPress={openSheet}
-        style={({ pressed }) => [
+        android_ripple={{
+          color: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+          borderless: false,
+        }}
+        style={[
           styles.trigger,
-          {
-            flexDirection: isRTL ? 'row-reverse' : 'row',
-            backgroundColor: pressed
-              ? (dark ? 'rgba(255,255,255,0.04)' : 'hsl(148, 18%, 92%)')
-              : inputBg,
-            borderColor: open ? accentColor : inputBorderIdle,
-          },
+          { backgroundColor: inputBg, borderColor: inputBorderIdle },
         ]}
       >
-        <Text
-          style={{
-            flex: 1,
-            fontSize: 15,
-            fontFamily: 'Poppins-Regular',
-            color: displayValue ? textColor : mutedColor,
-            textAlign: isRTL ? 'right' : 'left',
-            writingDirection: isRTL ? 'rtl' : 'ltr',
-          }}
-          numberOfLines={1}
+        <View
+          style={[
+            styles.triggerRow,
+            { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          ]}
         >
-          {displayValue || placeholder || t('common.selectDate', 'Select date…')}
-        </Text>
-        <Calendar size={18} color={iconColor} strokeWidth={2.2} />
+          <Text
+            style={{
+              flex: 1,
+              fontSize: 14,
+              fontFamily: 'Poppins-Regular',
+              color: displayValue ? textColor : mutedColor,
+              textAlign: isRTL ? 'right' : 'left',
+              writingDirection: isRTL ? 'rtl' : 'ltr',
+            }}
+            numberOfLines={1}
+          >
+            {displayValue || placeholder || t('common.selectDate', 'Select date…')}
+          </Text>
+          <Calendar size={16} color={iconColor} strokeWidth={2.2} />
+        </View>
       </Pressable>
 
       <Modal transparent visible={open} animationType="none" onRequestClose={slideOut}>
@@ -527,13 +536,16 @@ function fmtChipDate(d) {
 
 const styles = StyleSheet.create({
   trigger: {
+    height: 48,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  triggerRow: {
     alignItems: 'center',
-    backgroundColor: 'transparent',
-    borderWidth: 1.5,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    height: 52,
-    gap: 10,
+    gap: 8,
   },
   dragZone: {
     height: 16,

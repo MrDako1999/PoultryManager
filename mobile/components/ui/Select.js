@@ -113,19 +113,18 @@ function Select({
         </Pressable>
       );
 
-  // Header-right pills carried over from the legacy header (Clear + Add New).
+  // Header-right pills (Clear + Add New). Same rule as the trigger: static
+  // style on the Pressable, layout on a plain inner View. See §9.
   const headerRight = (clearable && selected) || onCreateNew ? (
     <>
       {clearable && selected ? (
         <Pressable
           onPress={() => { handleClear(); closeSheet(); }}
           hitSlop={8}
-          style={({ pressed }) => [
+          style={[
             triggerStyles.headerPill,
             {
-              backgroundColor: pressed
-                ? (dark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.08)')
-                : (dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'),
+              backgroundColor: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
             },
           ]}
         >
@@ -149,27 +148,32 @@ function Select({
             setTimeout(() => onCreateNew(s), 250);
           }}
           hitSlop={8}
-          style={({ pressed }) => [
-            triggerStyles.headerPillIcon,
+          style={[
+            triggerStyles.headerPill,
             {
-              flexDirection: isRTL ? 'row-reverse' : 'row',
-              backgroundColor: pressed
-                ? (dark ? 'rgba(148,210,165,0.22)' : 'hsl(148, 35%, 88%)')
-                : (dark ? 'rgba(148,210,165,0.14)' : 'hsl(148, 35%, 94%)'),
+              backgroundColor: dark ? 'rgba(148,210,165,0.14)' : 'hsl(148, 35%, 94%)',
             },
           ]}
         >
-          <Plus size={14} color={accentColor} strokeWidth={2.4} />
-          <Text
+          <View
             style={{
-              fontSize: 12.5,
-              fontFamily: 'Poppins-SemiBold',
-              color: accentColor,
-              letterSpacing: 0.1,
+              flexDirection: isRTL ? 'row-reverse' : 'row',
+              alignItems: 'center',
+              gap: 6,
             }}
           >
-            {createNewLabel || 'Add New'}
-          </Text>
+            <Plus size={14} color={accentColor} strokeWidth={2.4} />
+            <Text
+              style={{
+                fontSize: 12.5,
+                fontFamily: 'Poppins-SemiBold',
+                color: accentColor,
+                letterSpacing: 0.1,
+              }}
+            >
+              {createNewLabel || 'Add New'}
+            </Text>
+          </View>
         </Pressable>
       ) : null}
     </>
@@ -202,28 +206,33 @@ function Select({
           closeSheet();
           setTimeout(() => onCreateNew(s), 250);
         }}
-        style={({ pressed }) => [
+        style={[
           triggerStyles.createCta,
           {
-            flexDirection: isRTL ? 'row-reverse' : 'row',
             borderColor: accentColor,
-            backgroundColor: pressed
-              ? (dark ? 'rgba(148,210,165,0.18)' : 'hsl(148, 35%, 92%)')
-              : (dark ? 'rgba(148,210,165,0.10)' : 'hsl(148, 35%, 96%)'),
+            backgroundColor: dark ? 'rgba(148,210,165,0.10)' : 'hsl(148, 35%, 96%)',
           },
         ]}
       >
-        <Plus size={15} color={accentColor} strokeWidth={2.4} />
-        <Text
+        <View
           style={{
-            fontSize: 14,
-            fontFamily: 'Poppins-SemiBold',
-            color: accentColor,
-            letterSpacing: 0.1,
+            flexDirection: isRTL ? 'row-reverse' : 'row',
+            alignItems: 'center',
+            gap: 8,
           }}
         >
-          Create &ldquo;{search}&rdquo;
-        </Text>
+          <Plus size={15} color={accentColor} strokeWidth={2.4} />
+          <Text
+            style={{
+              fontSize: 14,
+              fontFamily: 'Poppins-SemiBold',
+              color: accentColor,
+              letterSpacing: 0.1,
+            }}
+          >
+            Create &ldquo;{search}&rdquo;
+          </Text>
+        </View>
       </Pressable>
     </View>
   ) : undefined;
@@ -290,16 +299,7 @@ const triggerStyles = StyleSheet.create({
     paddingVertical: 7,
     borderRadius: 999,
   },
-  headerPillIcon: {
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 999,
-  },
   createCta: {
-    alignItems: 'center',
-    gap: 8,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 12,
