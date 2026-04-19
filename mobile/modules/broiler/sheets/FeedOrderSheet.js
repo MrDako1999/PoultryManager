@@ -1,34 +1,26 @@
 import { useState, useEffect, useMemo } from 'react';
-import { View, Text, Modal, Pressable, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { X, Plus, Trash2 } from 'lucide-react-native';
-import { Input } from '@/components/ui/Input';
-import { Label } from '@/components/ui/Label';
-import { Button } from '@/components/ui/Button';
+import { Plus, Trash2, Wheat } from 'lucide-react-native';
+import SheetInput from '@/components/SheetInput';
 import Select from '@/components/ui/Select';
 import EnumButtonSelect from '@/components/ui/EnumButtonSelect';
 import DatePicker from '@/components/ui/DatePicker';
-import Separator from '@/components/ui/Separator';
 import MultiFileUpload from '@/components/MultiFileUpload';
 import QuickAddBusinessSheet from '@/shared/sheets/QuickAddBusinessSheet';
+import FormSheet from '@/components/FormSheet';
+import {
+  FormSection, FormField, SummaryCard, SummaryRow, CardDivider, AddRowButton,
+} from '@/components/FormSheetParts';
+import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
+import { useIsRTL } from '@/stores/localeStore';
 import useLocalQuery from '@/hooks/useLocalQuery';
 import useSettings from '@/hooks/useSettings';
 import useOfflineMutation from '@/hooks/useOfflineMutation';
-import useThemeStore from '@/stores/themeStore';
 import { FEED_TYPES, FEED_TYPE_ICONS } from '@/lib/constants';
 import { useToast } from '@/components/ui/Toast';
 
 const parseNum = (v) => { const n = parseFloat(String(v).replace(/,/g, '')); return isNaN(n) ? 0 : n; };
-
-function FieldError({ message }) {
-  if (!message) return null;
-  return <Text className="text-xs text-destructive mt-1">{message}</Text>;
-}
-
-function RequiredStar() {
-  return <Text className="text-destructive"> *</Text>;
-}
 
 const emptyLineItem = () => ({
   key: Date.now() + Math.random(),
@@ -38,13 +30,9 @@ const emptyLineItem = () => ({
 
 export default function FeedOrderSheet({ open, onClose, batchId, editData }) {
   const { t } = useTranslation();
-  const { bottom: safeBottom } = useSafeAreaInsets();
   const { toast } = useToast();
-  const { resolvedTheme } = useThemeStore();
-  const primaryColor = resolvedTheme === 'dark' ? 'hsl(148, 48%, 38%)' : 'hsl(148, 60%, 20%)';
   const accounting = useSettings('accounting');
   const [businesses] = useLocalQuery('businesses');
-  const [feedItems] = useLocalQuery('feedItems');
   const { create, update } = useOfflineMutation('feedOrders');
   const [saving, setSaving] = useState(false);
   const [quickAddBiz, setQuickAddBiz] = useState(false);
@@ -108,7 +96,10 @@ export default function FeedOrderSheet({ open, onClose, batchId, editData }) {
     return opts;
   }, [businesses, pendingBiz]);
 
-  const feedTypeOptions = FEED_TYPES.map((v) => ({ value: v, label: t(`feed.feedTypes.${v}`), icon: FEED_TYPE_ICONS[v] }));
+  const feedTypeOptions = useMemo(
+    () => FEED_TYPES.map((v) => ({ value: v, label: t(`feed.feedTypes.${v}`), icon: FEED_TYPE_ICONS[v] })),
+    [t]
+  );
 
   const updateLine = (index, field, value) => {
     setLineItems((prev) => prev.map((li, i) => i === index ? { ...li, [field]: value } : li));
@@ -178,131 +169,103 @@ export default function FeedOrderSheet({ open, onClose, batchId, editData }) {
     }
   };
 
-  if (!open) return null;
+  const fmtMoney = (n) => `${currency} ${(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
-    <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1 bg-background">
-        <View className="flex-row items-center justify-between px-4 pt-4 pb-2">
-          <Text className="text-lg font-bold text-foreground">
-            {editData ? t('batches.editFeedOrder') : t('batches.addFeedOrder')}
-          </Text>
-          <Pressable onPress={onClose} hitSlop={8}>
-            <X size={20} color="hsl(150, 10%, 45%)" />
-          </Pressable>
-        </View>
-        <Separator />
-        <ScrollView className="flex-1 px-4" contentContainerClassName="py-4 gap-4" keyboardShouldPersistTaps="handled">
-          <View className="gap-2">
-            <Label>{t('batches.feedCompany')}</Label>
-            <Select value={selectedCompany} onValueChange={setSelectedCompany} options={businessOptions} placeholder={t('batches.selectFeedCompany')} label={t('batches.feedCompany')} onCreateNew={(searchText) => { setBizInitialName(searchText || ''); setQuickAddBiz(true); }} createNewLabel={t('businesses.addBusiness', 'Add Business')} />
-          </View>
+    <>
+      <FormSheet
+        open={open}
+        onClose={onClose}
+        title={editData ? t('batches.editFeedOrder') : t('batches.addFeedOrder')}
+        subtitle={`${lineItems.length} ${lineItems.length === 1 ? t('batches.lineItem', 'line item') : t('batches.lineItems', 'line items')}`}
+        icon={Wheat}
+        onSubmit={handleSave}
+        submitLabel={editData ? t('common.save') : t('common.create')}
+        loading={saving}
+        disabled={saving || lineItems.length === 0}
+      >
+        {/* Vendor & invoice */}
+        <FormSection title={t('batches.feedVendor', 'Vendor & Invoice')}>
+          <FormField label={t('batches.feedCompany')}>
+            <Select
+              value={selectedCompany}
+              onValueChange={setSelectedCompany}
+              options={businessOptions}
+              placeholder={t('batches.selectFeedCompany')}
+              label={t('batches.feedCompany')}
+              onCreateNew={(searchText) => { setBizInitialName(searchText || ''); setQuickAddBiz(true); }}
+              createNewLabel={t('businesses.addBusiness', 'Add Business')}
+            />
+          </FormField>
 
-          <View className="gap-2">
-            <Label>{t('batches.taxInvoiceId')}<RequiredStar /></Label>
-            <Input value={taxInvoiceId} onChangeText={setTaxInvoiceId} placeholder={t('batches.invoiceIdPlaceholder')} />
-            <FieldError message={fieldErrors.taxInvoiceId} />
-          </View>
+          <SheetInput
+            label={`${t('batches.taxInvoiceId')} *`}
+            value={taxInvoiceId}
+            onChangeText={setTaxInvoiceId}
+            placeholder={t('batches.invoiceIdPlaceholder')}
+            error={fieldErrors.taxInvoiceId}
+          />
+        </FormSection>
 
-          <View className="gap-2">
-            <Label>{t('batches.orderDate')}</Label>
+        {/* Dates */}
+        <FormSection title={t('batches.feedDates', 'Dates')}>
+          <FormField label={t('batches.orderDate')}>
             <DatePicker value={orderDate} onChange={setOrderDate} label={t('batches.orderDate')} />
-          </View>
-          <View className="gap-2">
-            <Label>{t('batches.deliveryDate')}</Label>
+          </FormField>
+          <FormField label={t('batches.deliveryDate')}>
             <DatePicker value={deliveryDate} onChange={setDeliveryDate} label={t('batches.deliveryDate')} />
-          </View>
+          </FormField>
+        </FormSection>
 
-          <Separator />
-
-          <View className="flex-row items-center justify-between">
-            <Text className="text-sm font-semibold text-foreground">{t('batches.lineItems')}</Text>
-            <Pressable onPress={() => setLineItems((prev) => [...prev, emptyLineItem()])} className="flex-row items-center gap-1">
-              <Plus size={14} color={primaryColor} />
-              <Text className="text-xs text-primary font-medium">{t('batches.addLineItem')}</Text>
-            </Pressable>
-          </View>
-
+        {/* Line items */}
+        <FormSection
+          title={t('batches.lineItems', 'Line Items')}
+          headerRight={
+            <AddRowButton
+              icon={Plus}
+              label={t('batches.addLineItem', 'Add Line Item')}
+              onPress={() => setLineItems((prev) => [...prev, emptyLineItem()])}
+            />
+          }
+        >
           {lineItems.map((item, index) => (
-            <View key={item.key} className="rounded-lg border border-border p-3 gap-3">
-              <View className="flex-row items-center justify-between">
-                <Text className="text-xs font-semibold text-muted-foreground uppercase">Item {index + 1}</Text>
-                {lineItems.length > 1 && (
-                  <Pressable onPress={() => removeLine(index)} hitSlop={8}>
-                    <Trash2 size={14} color="hsl(0, 72%, 51%)" />
-                  </Pressable>
-                )}
-              </View>
-              <View className="gap-2">
-                <Label>{t('batches.selectFeedType')}<RequiredStar /></Label>
-                <EnumButtonSelect
-                  value={item.feedType}
-                  onChange={(v) => updateLine(index, 'feedType', v)}
-                  options={feedTypeOptions}
-                  columns={4}
-                  compact
-                />
-                <FieldError message={fieldErrors[`line_${index}_feedType`]} />
-              </View>
-              <View className="gap-2">
-                <Label>{t('feed.feedDescription')}</Label>
-                <Input
-                  value={item.feedDescription}
-                  onChangeText={(v) => updateLine(index, 'feedDescription', v)}
-                  placeholder={t('feed.feedDescriptionPlaceholder')}
-                />
-              </View>
-              <View className="flex-row gap-3">
-                <View className="flex-1 gap-2">
-                  <Label>{t('batches.bagsQuantity')}</Label>
-                  <Input
-                    value={item.bags}
-                    onChangeText={(v) => updateLine(index, 'bags', v)}
-                    keyboardType="number-pad"
-                    placeholder="0"
-                  />
-                </View>
-                <View className="flex-1 gap-2">
-                  <Label>{t('batches.pricePerBag')}</Label>
-                  <Input
-                    value={item.pricePerBag}
-                    onChangeText={(v) => updateLine(index, 'pricePerBag', v)}
-                    keyboardType="decimal-pad"
-                    placeholder="0.00"
-                  />
-                </View>
-              </View>
-            </View>
+            <FeedLineItemCard
+              key={item.key}
+              index={index}
+              item={item}
+              count={lineItems.length}
+              feedTypeOptions={feedTypeOptions}
+              fieldErrors={fieldErrors}
+              t={t}
+              onUpdate={updateLine}
+              onRemove={removeLine}
+            />
           ))}
+        </FormSection>
 
-          <View className="gap-2">
-            <Label>{t('batches.deliveryCharge')}</Label>
-            <Input value={deliveryCharge} onChangeText={setDeliveryCharge} keyboardType="decimal-pad" placeholder="0.00" />
-          </View>
+        {/* Charges & totals */}
+        <FormSection title={t('batches.feedTotals', 'Charges & Totals')}>
+          <SheetInput
+            label={t('batches.deliveryCharge')}
+            value={deliveryCharge}
+            onChangeText={setDeliveryCharge}
+            keyboardType="decimal-pad"
+            placeholder="0.00"
+            suffix={<CurrencyTag label={currency} />}
+          />
+          <SummaryCard>
+            <SummaryRow label={t('batches.subtotal')} value={fmtMoney(subtotal)} />
+            {deliveryChargeNum > 0 ? (
+              <SummaryRow label={t('batches.deliveryCharge')} value={fmtMoney(deliveryChargeNum)} />
+            ) : null}
+            <SummaryRow label={t('batches.vat')} value={fmtMoney(vatAmount)} />
+            <CardDivider marginVertical={2} />
+            <SummaryRow label={t('batches.grandTotal')} value={fmtMoney(grandTotal)} emphasis />
+          </SummaryCard>
+        </FormSection>
 
-          <View className="rounded-lg border border-border bg-muted/30 px-3 py-2.5 gap-1">
-            <View className="flex-row justify-between">
-              <Text className="text-xs text-muted-foreground">{t('batches.subtotal')}</Text>
-              <Text className="text-sm text-foreground" style={{ fontVariant: ['tabular-nums'] }}>{currency} {subtotal.toFixed(2)}</Text>
-            </View>
-            {deliveryChargeNum > 0 && (
-              <View className="flex-row justify-between">
-                <Text className="text-xs text-muted-foreground">{t('batches.deliveryCharge')}</Text>
-                <Text className="text-sm text-foreground" style={{ fontVariant: ['tabular-nums'] }}>{currency} {deliveryChargeNum.toFixed(2)}</Text>
-              </View>
-            )}
-            <View className="flex-row justify-between">
-              <Text className="text-xs text-muted-foreground">{t('batches.vat')}</Text>
-              <Text className="text-sm text-foreground" style={{ fontVariant: ['tabular-nums'] }}>{currency} {vatAmount.toFixed(2)}</Text>
-            </View>
-            <View className="flex-row justify-between">
-              <Text className="text-xs font-semibold text-foreground">{t('batches.grandTotal')}</Text>
-              <Text className="text-sm font-bold text-foreground" style={{ fontVariant: ['tabular-nums'] }}>{currency} {grandTotal.toFixed(2)}</Text>
-            </View>
-          </View>
-
-          <Separator />
-
+        {/* Documents */}
+        <FormSection title={t('batches.feedDocuments', 'Documents')}>
           <MultiFileUpload
             label={t('batches.taxInvoiceDocs', 'Tax Invoice Documents')}
             files={taxInvoiceDocs}
@@ -312,7 +275,6 @@ export default function FeedOrderSheet({ open, onClose, batchId, editData }) {
             entityId={editData?._id}
             category="feed-orders"
           />
-
           <MultiFileUpload
             label={t('batches.transferProofs', 'Transfer Proofs')}
             files={transferProofs}
@@ -322,7 +284,6 @@ export default function FeedOrderSheet({ open, onClose, batchId, editData }) {
             entityId={editData?._id}
             category="feed-orders"
           />
-
           <MultiFileUpload
             label={t('batches.deliveryNoteDocs', 'Delivery Note Documents')}
             files={deliveryNoteDocs}
@@ -332,14 +293,8 @@ export default function FeedOrderSheet({ open, onClose, batchId, editData }) {
             entityId={editData?._id}
             category="feed-orders"
           />
-        </ScrollView>
-
-        <View className="px-4 pt-4 border-t border-border" style={{ paddingBottom: Math.max(safeBottom, 16) }}>
-          <Button onPress={handleSave} loading={saving} disabled={saving || lineItems.length === 0}>
-            {editData ? t('common.save') : t('common.create')}
-          </Button>
-        </View>
-      </KeyboardAvoidingView>
+        </FormSection>
+      </FormSheet>
 
       <QuickAddBusinessSheet
         open={quickAddBiz}
@@ -351,6 +306,148 @@ export default function FeedOrderSheet({ open, onClose, batchId, editData }) {
           toast({ title: `${biz.companyName} ${t('common.created', 'created')}` });
         }}
       />
-    </Modal>
+    </>
+  );
+}
+
+function FeedLineItemCard({ index, item, count, feedTypeOptions, fieldErrors, t, onUpdate, onRemove }) {
+  const tokens = useHeroSheetTokens();
+  const isRTL = useIsRTL();
+  const { dark, mutedColor, errorColor } = tokens;
+
+  return (
+    <View
+      style={[
+        lineItemStyles.card,
+        {
+          backgroundColor: dark ? 'rgba(255,255,255,0.03)' : 'hsl(148, 22%, 96%)',
+          borderColor: dark ? 'hsl(150, 12%, 28%)' : 'hsl(148, 16%, 88%)',
+        },
+      ]}
+    >
+      <View
+        style={[
+          lineItemStyles.headerRow,
+          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+        ]}
+      >
+        <Text
+          style={{
+            fontSize: 11,
+            fontFamily: 'Poppins-SemiBold',
+            color: mutedColor,
+            letterSpacing: 1.2,
+            textTransform: 'uppercase',
+          }}
+        >
+          {t('batches.itemNumber', 'Item')} {index + 1}
+        </Text>
+        {count > 1 ? (
+          <Pressable
+            onPress={() => onRemove(index)}
+            hitSlop={8}
+            style={lineItemStyles.removeBtn}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.delete', 'Delete')}
+          >
+            <Trash2 size={14} color={errorColor} />
+          </Pressable>
+        ) : null}
+      </View>
+
+      <View style={{ gap: 12 }}>
+        <FormField
+          label={t('batches.selectFeedType')}
+          required
+          error={fieldErrors[`line_${index}_feedType`]}
+        >
+          <EnumButtonSelect
+            value={item.feedType}
+            onChange={(v) => onUpdate(index, 'feedType', v)}
+            options={feedTypeOptions}
+            columns={4}
+            compact
+          />
+        </FormField>
+
+        <SheetInput
+          label={t('feed.feedDescription')}
+          value={item.feedDescription}
+          onChangeText={(v) => onUpdate(index, 'feedDescription', v)}
+          placeholder={t('feed.feedDescriptionPlaceholder')}
+        />
+
+        <View
+          style={{
+            flexDirection: isRTL ? 'row-reverse' : 'row',
+            gap: 12,
+          }}
+        >
+          <View style={{ flex: 1 }}>
+            <SheetInput
+              label={t('batches.bagsQuantity')}
+              value={item.bags}
+              onChangeText={(v) => onUpdate(index, 'bags', v)}
+              keyboardType="number-pad"
+              placeholder="0"
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <SheetInput
+              label={t('batches.pricePerBag')}
+              value={item.pricePerBag}
+              onChangeText={(v) => onUpdate(index, 'pricePerBag', v)}
+              keyboardType="decimal-pad"
+              placeholder="0.00"
+            />
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const lineItemStyles = StyleSheet.create({
+  card: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    gap: 14,
+  },
+  headerRow: {
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  removeBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});
+
+function CurrencyTag({ label }) {
+  const { mutedColor, dark } = useHeroSheetTokens();
+  return (
+    <View
+      style={{
+        backgroundColor: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+        borderRadius: 8,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+      }}
+    >
+      <Text
+        style={{
+          fontSize: 11,
+          fontFamily: 'Poppins-SemiBold',
+          color: mutedColor,
+          letterSpacing: 0.4,
+        }}
+      >
+        {label}
+      </Text>
+    </View>
   );
 }

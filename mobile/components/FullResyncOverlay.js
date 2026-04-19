@@ -1,22 +1,40 @@
 import { useEffect, useRef } from 'react';
-import { View, Text, Modal, Animated } from 'react-native';
-import { DatabaseZap } from 'lucide-react-native';
+import { View, Text, Modal, Animated, StyleSheet } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { DatabaseZap, CloudDownload } from 'lucide-react-native';
 import useSyncStore from '@/stores/syncStore';
-import useThemeStore from '@/stores/themeStore';
+import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
+import { useIsRTL } from '@/stores/localeStore';
 
+/**
+ * Full-screen overlay shown during initial sync (after login) and the
+ * "Full Resync" flow. Blocks interaction with the rest of the app while
+ * the sync engine downloads everything.
+ *
+ * Visual: brand-tinted backdrop (the gradient behind a translucent screen)
+ * + a centred card that uses the design-language tokens (icon tile, accent
+ * progress bar, Poppins type stack). Matches the look of the rest of the
+ * sheets so the user feels like the app is doing something on their behalf,
+ * not that an old-fashioned dialog popped up.
+ */
 export default function FullResyncOverlay() {
-  const { isFullResyncing, syncProgress } = useSyncStore();
-  const { resolvedTheme } = useThemeStore();
+  const { isFullResyncing, isInitialSyncing, syncProgress } = useSyncStore();
+  const tokens = useHeroSheetTokens();
+  const {
+    dark, accentColor, textColor, mutedColor, sectionBg, sectionBorder,
+    heroGradient, borderColor,
+  } = tokens;
+  const isRTL = useIsRTL();
 
-  const dark = resolvedTheme === 'dark';
-  const primaryColor = dark ? 'hsl(148, 48%, 38%)' : 'hsl(148, 60%, 20%)';
-  const mutedColor = dark ? 'hsl(148, 10%, 55%)' : 'hsl(150, 10%, 45%)';
+  const visible = isFullResyncing || isInitialSyncing;
+  const isInitial = !isFullResyncing && isInitialSyncing;
 
   const pct = syncProgress
     ? Math.round((syncProgress.current / syncProgress.total) * 100)
     : 0;
 
   const animatedWidth = useRef(new Animated.Value(0)).current;
+  const indeterminateAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.timing(animatedWidth, {
@@ -24,118 +42,253 @@ export default function FullResyncOverlay() {
       duration: 400,
       useNativeDriver: false,
     }).start();
-  }, [pct]);
+  }, [animatedWidth, pct]);
 
-  if (!isFullResyncing) return null;
+  useEffect(() => {
+    if (!visible || syncProgress) return undefined;
+    indeterminateAnim.setValue(0);
+    const loop = Animated.loop(
+      Animated.timing(indeterminateAnim, {
+        toValue: 1,
+        duration: 1200,
+        useNativeDriver: false,
+      })
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [indeterminateAnim, visible, syncProgress]);
+
+  if (!visible) return null;
 
   const widthInterpolation = animatedWidth.interpolate({
     inputRange: [0, 100],
     outputRange: ['0%', '100%'],
   });
+  const indeterminateLeft = indeterminateAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['-40%', '100%'],
+  });
+
+  const Icon = isInitial ? CloudDownload : DatabaseZap;
+  const title = isInitial ? 'Setting up your account' : 'Full Resync';
+  const subtitle = isInitial
+    ? 'Downloading your data so it works offline. This only happens once.'
+    : 'Clearing local cache and re-downloading from the server.';
+
+  const textAlign = isRTL ? 'right' : 'left';
 
   return (
-    <Modal
-      visible={isFullResyncing}
-      transparent
-      animationType="fade"
-      statusBarTranslucent
-    >
+    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={() => {}}>
+      {/* Brand-tinted backdrop — the gradient sits behind a translucent
+          screen-coloured layer so the brand reads through but the rest of
+          the app stays soft. */}
+      <View style={StyleSheet.absoluteFill}>
+        <LinearGradient
+          colors={heroGradient}
+          start={isRTL ? { x: 1, y: 0 } : { x: 0, y: 0 }}
+          end={isRTL ? { x: 0, y: 1 } : { x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: dark ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.55)' },
+          ]}
+        />
+      </View>
+
       <View
         style={{
           flex: 1,
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: dark ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.88)',
           paddingHorizontal: 32,
         }}
       >
         <View
           style={{
             width: '100%',
-            maxWidth: 320,
-            borderRadius: 16,
-            padding: 24,
-            backgroundColor: dark ? 'hsl(150, 20%, 8%)' : '#fff',
+            maxWidth: 360,
+            borderRadius: 24,
+            paddingTop: 8,
+            paddingBottom: 24,
+            paddingHorizontal: 24,
+            backgroundColor: sectionBg,
             borderWidth: 1,
-            borderColor: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+            borderColor: sectionBorder,
             shadowColor: '#000',
-            shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: 0.15,
+            shadowOffset: { width: 0, height: 12 },
+            shadowOpacity: dark ? 0.5 : 0.18,
             shadowRadius: 24,
-            elevation: 12,
+            elevation: 16,
+            overflow: 'hidden',
           }}
         >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-            <DatabaseZap size={20} color={primaryColor} />
-            <Text
+          {/* Slim grab pill — purely decorative, echoes the bottom-sheet
+              vocabulary so the overlay feels familiar. */}
+          <View style={styles.dragPillRow}>
+            <View
               style={{
-                fontSize: 16,
-                fontFamily: 'Poppins-SemiBold',
-                color: dark ? '#e8ede8' : '#1a2e1a',
+                width: 36,
+                height: 4,
+                borderRadius: 2,
+                backgroundColor: dark ? 'hsl(150, 14%, 28%)' : 'hsl(148, 14%, 86%)',
               }}
-            >
-              Full Resync
-            </Text>
+            />
           </View>
+
+          {/* Big accent-tinted icon tile — matches §7 icon-tile hero. */}
+          <View
+            style={[
+              styles.iconTile,
+              {
+                backgroundColor: dark ? 'rgba(148,210,165,0.18)' : 'hsl(148, 35%, 92%)',
+              },
+            ]}
+          >
+            <Icon size={28} color={accentColor} strokeWidth={2.2} />
+          </View>
+
+          <Text
+            style={{
+              fontSize: 18,
+              fontFamily: 'Poppins-SemiBold',
+              color: textColor,
+              letterSpacing: -0.2,
+              textAlign: 'center',
+              marginTop: 16,
+            }}
+          >
+            {title}
+          </Text>
+          <Text
+            style={{
+              fontSize: 13,
+              fontFamily: 'Poppins-Regular',
+              color: mutedColor,
+              textAlign: 'center',
+              marginTop: 6,
+              lineHeight: 18,
+            }}
+          >
+            {subtitle}
+          </Text>
 
           {/* Progress bar */}
           <View
             style={{
               height: 6,
               borderRadius: 3,
-              backgroundColor: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+              backgroundColor: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
               overflow: 'hidden',
+              marginTop: 22,
               marginBottom: 12,
+              position: 'relative',
             }}
           >
-            <Animated.View
-              style={{
-                height: '100%',
-                borderRadius: 3,
-                backgroundColor: primaryColor,
-                width: widthInterpolation,
-              }}
-            />
+            {syncProgress ? (
+              <Animated.View
+                style={{
+                  height: '100%',
+                  borderRadius: 3,
+                  backgroundColor: accentColor,
+                  width: widthInterpolation,
+                }}
+              />
+            ) : (
+              <Animated.View
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  bottom: 0,
+                  left: indeterminateLeft,
+                  width: '40%',
+                  borderRadius: 3,
+                  backgroundColor: accentColor,
+                }}
+              />
+            )}
           </View>
 
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Text
-              style={{
-                fontSize: 13,
-                fontFamily: 'Poppins-Regular',
-                color: mutedColor,
-              }}
-            >
-              {syncProgress
-                ? `Fetching ${syncProgress.label}\u2026`
-                : 'Preparing\u2026'}
-            </Text>
-            <Text
-              style={{
-                fontSize: 13,
-                fontFamily: 'Poppins-Medium',
-                color: dark ? '#e8ede8' : '#1a2e1a',
-              }}
-            >
-              {pct}%
-            </Text>
-          </View>
-
-          {syncProgress && (
+          {/* Status row */}
+          <View
+            style={{
+              flexDirection: isRTL ? 'row-reverse' : 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
             <Text
               style={{
                 fontSize: 12,
                 fontFamily: 'Poppins-Regular',
                 color: mutedColor,
-                textAlign: 'center',
-                marginTop: 8,
+                flex: 1,
+                textAlign,
+              }}
+              numberOfLines={1}
+            >
+              {syncProgress
+                ? `Fetching ${syncProgress.label}\u2026`
+                : 'Preparing\u2026'}
+            </Text>
+            {syncProgress ? (
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontFamily: 'Poppins-SemiBold',
+                  color: accentColor,
+                  marginStart: 8,
+                }}
+              >
+                {pct}%
+              </Text>
+            ) : null}
+          </View>
+
+          {syncProgress ? (
+            <View
+              style={{
+                marginTop: 12,
+                paddingTop: 10,
+                borderTopWidth: 1,
+                borderTopColor: borderColor,
               }}
             >
-              Step {syncProgress.current} of {syncProgress.total}
-            </Text>
-          )}
+              <Text
+                style={{
+                  fontSize: 11,
+                  fontFamily: 'Poppins-Medium',
+                  color: mutedColor,
+                  textAlign: 'center',
+                  letterSpacing: 0.4,
+                }}
+              >
+                Step {syncProgress.current} of {syncProgress.total}
+              </Text>
+            </View>
+          ) : null}
         </View>
       </View>
     </Modal>
   );
 }
+
+const styles = StyleSheet.create({
+  dragPillRow: {
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 6,
+    marginHorizontal: -24,
+  },
+  iconTile: {
+    alignSelf: 'center',
+    marginTop: 14,
+    width: 64,
+    height: 64,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});

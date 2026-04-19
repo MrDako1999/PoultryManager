@@ -1,26 +1,31 @@
 import { useState, useEffect, useMemo } from 'react';
-import { View, Text, Modal, Pressable, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { X, Plus, Trash2 } from 'lucide-react-native';
-import { Input } from '@/components/ui/Input';
-import { Label } from '@/components/ui/Label';
-import { Button } from '@/components/ui/Button';
+import {
+  Plus, Trash2, ShoppingBag, Check, ChevronLeft, ChevronRight,
+} from 'lucide-react-native';
+import SheetInput from '@/components/SheetInput';
 import Select from '@/components/ui/Select';
 import EnumButtonSelect from '@/components/ui/EnumButtonSelect';
 import DatePicker from '@/components/ui/DatePicker';
-import Separator from '@/components/ui/Separator';
 import MultiFileUpload from '@/components/MultiFileUpload';
 import QuickAddBusinessSheet from '@/shared/sheets/QuickAddBusinessSheet';
+import FormSheet from '@/components/FormSheet';
+import {
+  FormSection, FormField, SummaryCard, SummaryRow, CardDivider, AddRowButton,
+} from '@/components/FormSheetParts';
+import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
+import { useIsRTL } from '@/stores/localeStore';
+import CtaButton from '@/components/ui/CtaButton';
 import useLocalQuery from '@/hooks/useLocalQuery';
 import useSettings from '@/hooks/useSettings';
 import useOfflineMutation from '@/hooks/useOfflineMutation';
-import useThemeStore from '@/stores/themeStore';
 import { SALE_METHODS, SALE_METHOD_ICONS, SALE_INVOICE_TYPES, SALE_INVOICE_TYPE_ICONS, PART_TYPES } from '@/lib/constants';
 import { useToast } from '@/components/ui/Toast';
 
 const parseNum = (v) => { const n = parseFloat(String(v).replace(/,/g, '')); return isNaN(n) ? 0 : n; };
-const fmtDec = (v) => { const n = Number(v || 0); return n ? n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''; };
+const fmtDec = (v) => { const n = Number(v || 0); return n ? n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''; };
 
 function addDays(dateStr, days) {
   if (!dateStr) return '';
@@ -29,22 +34,9 @@ function addDays(dateStr, days) {
   return d.toISOString().split('T')[0];
 }
 
-function FieldError({ message }) {
-  if (!message) return null;
-  return <Text className="text-xs text-destructive mt-1">{message}</Text>;
-}
-
-function RequiredStar() {
-  return <Text className="text-destructive"> *</Text>;
-}
-
 export default function SaleOrderSheet({ open, onClose, batchId, editData }) {
   const { t } = useTranslation();
-  const { bottom: safeBottom } = useSafeAreaInsets();
   const { toast } = useToast();
-  const { resolvedTheme } = useThemeStore();
-  const primaryColor = resolvedTheme === 'dark' ? 'hsl(148, 48%, 38%)' : 'hsl(148, 60%, 20%)';
-  const dangerColor = 'hsl(0, 72%, 51%)';
   const accounting = useSettings('accounting');
   const [businesses] = useLocalQuery('businesses');
   const saleDefaults = useSettings('saleDefaults');
@@ -174,7 +166,7 @@ export default function SaleOrderSheet({ open, onClose, batchId, editData }) {
   const isLiveByWeight = saleMethod === 'LIVE_BY_WEIGHT';
   const showVat = invoiceType === 'VAT_INVOICE';
 
-  // Computed counts (step 1)
+  // Computed counts
   const numSent = parseNum(chickensSent);
   const losses = parseNum(condemnation) + parseNum(deathOnArrival) + parseNum(rejections) + parseNum(shortage);
   const netProcessed = numSent - losses;
@@ -194,7 +186,6 @@ export default function SaleOrderSheet({ open, onClose, batchId, editData }) {
   const vat = showVat ? subtotal * (vatRate / 100) : 0;
   const grandTotal = subtotal + vat;
 
-  // Auto-fill helpers
   const handleSaleDateChange = (val) => {
     setSaleDate(val);
     if (isSlaughtered && !slaughterDateTouched) setSlaughterDate(addDays(val, -1));
@@ -300,46 +291,45 @@ export default function SaleOrderSheet({ open, onClose, batchId, editData }) {
     }
   };
 
-  if (!open) return null;
-
   const totalSteps = isSlaughtered ? 3 : 2;
 
+  const fmtMoney = (n) => `${currency} ${(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
   return (
-    <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1 bg-background">
-        <View className="flex-row items-center justify-between px-4 pt-4 pb-2">
-          <Text className="text-lg font-bold text-foreground">
-            {editData ? t('batches.editSale') : t('batches.addSale')}
-          </Text>
-          <Pressable onPress={onClose} hitSlop={8}>
-            <X size={20} color="hsl(150, 10%, 45%)" />
-          </Pressable>
-        </View>
-
-        <View className="flex-row px-4 pb-2 gap-1">
-          {Array.from({ length: totalSteps }).map((_, i) => (
-            <View key={i} className={`flex-1 h-1 rounded-full ${i <= step ? 'bg-primary' : 'bg-border'}`} />
-          ))}
-        </View>
-
-        <Separator />
-        <ScrollView className="flex-1 px-4" contentContainerClassName="py-4 gap-4" keyboardShouldPersistTaps="handled">
-
-          {/* ─── STEP 0: SALE DATA ─── */}
-          {step === 0 && (
-            <>
-              <View className="gap-2">
-                <Label>{t('batches.saleForm.saleMethod')}<RequiredStar /></Label>
+    <>
+      <FormSheet
+        open={open}
+        onClose={onClose}
+        title={editData ? t('batches.editSale') : t('batches.addSale')}
+        subtitle={`${t('common.step', 'Step')} ${step + 1} / ${totalSteps}`}
+        icon={ShoppingBag}
+        headerExtra={<StepProgress current={step} total={totalSteps} />}
+        footer={
+          <SaleFooter
+            step={step}
+            totalSteps={totalSteps}
+            saving={saving}
+            editData={editData}
+            onBack={() => setStep((s) => s - 1)}
+            onNext={() => { if (step === 0 && !validateStep0()) return; setStep((s) => s + 1); }}
+            onSave={handleSave}
+            t={t}
+          />
+        }
+      >
+        {/* ─── STEP 0: SALE DATA ─── */}
+        {step === 0 ? (
+          <>
+            <FormSection title={t('batches.saleForm.saleSetup', 'Sale Setup')}>
+              <FormField label={t('batches.saleForm.saleMethod')} required error={fieldErrors.saleMethod}>
                 <EnumButtonSelect
                   value={saleMethod}
                   onChange={setSaleMethod}
                   options={SALE_METHODS.map((v) => ({ value: v, label: t(`batches.saleMethods.${v}`, v), icon: SALE_METHOD_ICONS[v] }))}
                   columns={3}
                 />
-                <FieldError message={fieldErrors.saleMethod} />
-              </View>
-              <View className="gap-2">
-                <Label>{t('batches.saleForm.invoiceType')}<RequiredStar /></Label>
+              </FormField>
+              <FormField label={t('batches.saleForm.invoiceType')} required error={fieldErrors.invoiceType}>
                 <EnumButtonSelect
                   value={invoiceType}
                   onChange={setInvoiceType}
@@ -347,39 +337,54 @@ export default function SaleOrderSheet({ open, onClose, batchId, editData }) {
                   columns={2}
                   compact
                 />
-                <FieldError message={fieldErrors.invoiceType} />
-              </View>
-              <View className="gap-2">
-                <Label>{t('batches.saleForm.saleDate')}<RequiredStar /></Label>
+              </FormField>
+              <FormField label={t('batches.saleForm.saleDate')} required error={fieldErrors.saleDate}>
                 <DatePicker value={saleDate} onChange={handleSaleDateChange} label={t('batches.saleForm.saleDate')} />
-                <FieldError message={fieldErrors.saleDate} />
-              </View>
-              <View className="gap-2">
-                <Label>{t('batches.saleForm.customer')}<RequiredStar /></Label>
-                <Select value={customer} onValueChange={handleCustomerChange} options={businessOptions} placeholder={t('batches.saleForm.selectCustomer')} label={t('batches.saleForm.customer')} onCreateNew={(searchText) => { setQuickAddBizField('customer'); setBizInitialName(searchText || ''); setQuickAddBiz(true); }} createNewLabel={t('businesses.addBusiness', 'Add Business')} />
-                <FieldError message={fieldErrors.customer} />
-              </View>
-              {isSlaughtered && (
-                <>
-                  <Separator />
-                  <View className="flex-row gap-3">
-                    <View className="flex-1 gap-2">
-                      <Label>{t('batches.saleForm.slaughterDate', 'Slaughter Date')}</Label>
-                      <DatePicker value={slaughterDate} onChange={handleSlaughterDateChange} label={t('batches.saleForm.slaughterDate', 'Slaughter Date')} />
-                    </View>
-                  </View>
-                  <View className="gap-2">
-                    <Label>{t('batches.saleForm.slaughterhouse')}</Label>
-                    <Select value={slaughterhouse} onValueChange={handleSlaughterhouseChange} options={businessOptions} placeholder={t('batches.saleForm.selectSlaughterhouse')} label={t('batches.saleForm.slaughterhouse')} onCreateNew={(searchText) => { setQuickAddBizField('slaughterhouse'); setBizInitialName(searchText || ''); setQuickAddBiz(true); }} createNewLabel={t('businesses.addBusiness', 'Add Business')} />
-                  </View>
-                  <View className="gap-2">
-                    <Label>{t('batches.saleForm.slaughterInvoiceRef', 'Invoice Reference')}</Label>
-                    <Input value={slaughterInvoiceRef} onChangeText={setSlaughterInvoiceRef} placeholder={t('batches.saleForm.slaughterInvoiceRefPlaceholder', 'e.g. INV-001')} />
-                  </View>
-                  <View className="gap-2">
-                    <Label>{t('batches.saleForm.processingCost')}</Label>
-                    <Input value={processingCost} onChangeText={setProcessingCost} keyboardType="decimal-pad" placeholder="0.00" />
-                  </View>
+              </FormField>
+              <FormField label={t('batches.saleForm.customer')} required error={fieldErrors.customer}>
+                <Select
+                  value={customer}
+                  onValueChange={handleCustomerChange}
+                  options={businessOptions}
+                  placeholder={t('batches.saleForm.selectCustomer')}
+                  label={t('batches.saleForm.customer')}
+                  onCreateNew={(searchText) => { setQuickAddBizField('customer'); setBizInitialName(searchText || ''); setQuickAddBiz(true); }}
+                  createNewLabel={t('businesses.addBusiness', 'Add Business')}
+                />
+              </FormField>
+            </FormSection>
+
+            {isSlaughtered ? (
+              <FormSection title={t('batches.saleForm.slaughterDetails', 'Slaughter Details')}>
+                <FormField label={t('batches.saleForm.slaughterDate', 'Slaughter Date')}>
+                  <DatePicker value={slaughterDate} onChange={handleSlaughterDateChange} label={t('batches.saleForm.slaughterDate', 'Slaughter Date')} />
+                </FormField>
+                <FormField label={t('batches.saleForm.slaughterhouse')}>
+                  <Select
+                    value={slaughterhouse}
+                    onValueChange={handleSlaughterhouseChange}
+                    options={businessOptions}
+                    placeholder={t('batches.saleForm.selectSlaughterhouse')}
+                    label={t('batches.saleForm.slaughterhouse')}
+                    onCreateNew={(searchText) => { setQuickAddBizField('slaughterhouse'); setBizInitialName(searchText || ''); setQuickAddBiz(true); }}
+                    createNewLabel={t('businesses.addBusiness', 'Add Business')}
+                  />
+                </FormField>
+                <SheetInput
+                  label={t('batches.saleForm.slaughterInvoiceRef', 'Invoice Reference')}
+                  value={slaughterInvoiceRef}
+                  onChangeText={setSlaughterInvoiceRef}
+                  placeholder={t('batches.saleForm.slaughterInvoiceRefPlaceholder', 'e.g. INV-001')}
+                />
+                <SheetInput
+                  label={t('batches.saleForm.processingCost')}
+                  value={processingCost}
+                  onChangeText={setProcessingCost}
+                  keyboardType="decimal-pad"
+                  placeholder="0.00"
+                  suffix={<CurrencyTag label={currency} />}
+                />
+                <View>
                   <MultiFileUpload
                     label={t('batches.saleForm.slaughterReportDocs', 'Slaughter Report Documents')}
                     files={slaughterReportDocs}
@@ -390,261 +395,195 @@ export default function SaleOrderSheet({ open, onClose, batchId, editData }) {
                     category="slaughterReport"
                     mediaType="document"
                   />
-                </>
-              )}
-            </>
-          )}
-
-          {/* ─── STEP 1: SLAUGHTERED COUNTS ─── */}
-          {step === 1 && isSlaughtered && (
-            <>
-              <Text className="text-sm font-semibold text-foreground">{t('batches.saleForm.stepQuantity')}</Text>
-              <View className="gap-3">
-                <View className="gap-2"><Label>{t('batches.saleForm.chickensSent')}</Label><Input value={chickensSent} onChangeText={setChickensSent} keyboardType="number-pad" /></View>
-                <View className="gap-2"><Label>{t('batches.saleForm.condemnation')}</Label><Input value={condemnation} onChangeText={setCondemnation} keyboardType="number-pad" /></View>
-                <View className="gap-2"><Label>{t('batches.saleForm.deathOnArrival')}</Label><Input value={deathOnArrival} onChangeText={setDeathOnArrival} keyboardType="number-pad" /></View>
-                <View className="gap-2"><Label>{t('batches.saleForm.rejections')}</Label><Input value={rejections} onChangeText={setRejections} keyboardType="number-pad" /></View>
-                <View className="gap-2"><Label>{t('batches.saleForm.shortage')}</Label><Input value={shortage} onChangeText={setShortage} keyboardType="number-pad" /></View>
-                <View className="gap-2"><Label>{t('batches.saleForm.bGradeCount')}</Label><Input value={bGradeCount} onChangeText={setBGradeCount} keyboardType="number-pad" /></View>
-              </View>
-
-              <View className="rounded-xl border border-border bg-card p-4 gap-3 mt-1">
-                <View className="flex-row items-center justify-between">
-                  <Text className="text-sm text-muted-foreground">{t('batches.saleForm.netProcessed', 'Net Processed')}</Text>
-                  <Text className="text-base font-bold text-foreground">{netProcessed.toLocaleString()}</Text>
                 </View>
-                <Separator />
-                <View className="flex-row items-center justify-between">
-                  <Text className="text-sm text-muted-foreground">{t('batches.saleForm.wholeChickenCount', 'Whole Chicken Count')}</Text>
-                  <Text className="text-base font-bold text-primary">{wholeChickenCount.toLocaleString()}</Text>
-                </View>
-              </View>
-            </>
-          )}
+              </FormSection>
+            ) : null}
+          </>
+        ) : null}
 
-          {/* ─── LAST STEP: ACCOUNTING ─── */}
-          {((step === 1 && !isSlaughtered) || (step === 2 && isSlaughtered)) && (
-            <>
-              {/* Whole Chicken Weight Rows (slaughtered) */}
-              {isSlaughtered && (
-                <View className="gap-3">
-                  <Text className="text-sm font-semibold text-foreground">{t('batches.saleForm.wholeChickenSection')}</Text>
-                  {wholeChickenItems.map((item, i) => (
-                    <View key={i} className="rounded-lg border border-border p-3 gap-2">
-                      <View className="flex-row items-center justify-between">
-                        <Text className="text-[10px] text-muted-foreground">#{i + 1}</Text>
-                        {wholeChickenItems.length > 1 && (
-                          <Pressable onPress={() => setWholeChickenItems((p) => p.filter((_, idx) => idx !== i))} hitSlop={8}>
-                            <Trash2 size={14} color={dangerColor} />
-                          </Pressable>
-                        )}
-                      </View>
-                      <Input
-                        value={item.description}
-                        onChangeText={(v) => { const next = [...wholeChickenItems]; next[i] = { ...next[i], description: v }; setWholeChickenItems(next); }}
-                        placeholder={t('batches.saleForm.description')}
-                      />
-                      <View className="flex-row gap-2">
-                        <View className="flex-1 gap-1">
-                          <Label>{t('batches.saleForm.weightKg', 'Weight (kg)')}</Label>
-                          <Input value={item.weightKg} onChangeText={(v) => {
-                            const next = [...wholeChickenItems]; next[i] = { ...next[i], weightKg: v }; setWholeChickenItems(next);
-                          }} keyboardType="decimal-pad" placeholder="0" />
-                        </View>
-                        <View className="flex-1 gap-1">
-                          <Label>{t('batches.saleForm.ratePerKg', 'Rate/kg')}</Label>
-                          <Input value={item.ratePerKg} onChangeText={(v) => {
-                            const next = [...wholeChickenItems]; next[i] = { ...next[i], ratePerKg: v }; setWholeChickenItems(next);
-                          }} keyboardType="decimal-pad" placeholder="0" />
-                        </View>
-                        <View className="flex-1 gap-1">
-                          <Label>{t('batches.saleForm.amount')}</Label>
-                          <Input value={fmtDec(parseNum(item.weightKg) * parseNum(item.ratePerKg))} editable={false} className="opacity-60" />
-                        </View>
-                      </View>
-                    </View>
-                  ))}
-                  <Pressable onPress={() => setWholeChickenItems((p) => [...p, { description: '', weightKg: '', ratePerKg: '' }])}
-                    className="flex-row items-center gap-1 self-start">
-                    <Plus size={14} color={primaryColor} /><Text className="text-xs text-primary font-medium">{t('batches.saleForm.addRow')}</Text>
-                  </Pressable>
-                  <View className="flex-row justify-between items-center border-t border-border pt-2">
-                    <Text className="text-xs font-semibold text-foreground">{t('batches.saleForm.wholeChickenTotal', 'Whole Chicken Total')}</Text>
-                    <Text className="text-sm font-semibold text-foreground" style={{ fontVariant: ['tabular-nums'] }}>{currency} {wholeChickenTotal.toFixed(2)}</Text>
-                  </View>
-                </View>
-              )}
+        {/* ─── STEP 1: SLAUGHTERED COUNTS ─── */}
+        {step === 1 && isSlaughtered ? (
+          <FormSection title={t('batches.saleForm.stepQuantity')}>
+            <SheetInput label={t('batches.saleForm.chickensSent')} value={chickensSent} onChangeText={setChickensSent} keyboardType="number-pad" placeholder="0" />
+            <SheetInput label={t('batches.saleForm.condemnation')} value={condemnation} onChangeText={setCondemnation} keyboardType="number-pad" placeholder="0" />
+            <SheetInput label={t('batches.saleForm.deathOnArrival')} value={deathOnArrival} onChangeText={setDeathOnArrival} keyboardType="number-pad" placeholder="0" />
+            <SheetInput label={t('batches.saleForm.rejections')} value={rejections} onChangeText={setRejections} keyboardType="number-pad" placeholder="0" />
+            <SheetInput label={t('batches.saleForm.shortage')} value={shortage} onChangeText={setShortage} keyboardType="number-pad" placeholder="0" />
+            <SheetInput label={t('batches.saleForm.bGradeCount')} value={bGradeCount} onChangeText={setBGradeCount} keyboardType="number-pad" placeholder="0" />
 
-              {/* Portions Grid (slaughtered) */}
-              {isSlaughtered && (
-                <>
-                  <Separator />
-                  <View className="gap-3">
-                    <Text className="text-sm font-semibold text-foreground">{t('batches.saleForm.portionsSection', 'Poultry Portions')}</Text>
-                    {portions.map((p, i) => (
-                      <View key={p.partType} className="flex-row items-center gap-2">
-                        <Text className="w-20 text-xs text-foreground" numberOfLines={1}>{t(`settings.portionLabels.${p.partType}`)}</Text>
-                        <View className="flex-1">
-                          <Input
-                            value={p.quantity}
-                            onChangeText={(v) => { const next = [...portions]; next[i] = { ...next[i], quantity: v }; setPortions(next); }}
-                            keyboardType="number-pad"
-                            placeholder="0"
-                          />
-                        </View>
-                        <View className="flex-1">
-                          <Input
-                            value={p.rate}
-                            onChangeText={(v) => { const next = [...portions]; next[i] = { ...next[i], rate: v }; setPortions(next); }}
-                            keyboardType="decimal-pad"
-                            placeholder="0"
-                          />
-                        </View>
-                        <Text className="w-16 text-right text-xs text-muted-foreground" style={{ fontVariant: ['tabular-nums'] }}>
-                          {fmtDec(parseNum(p.quantity) * parseNum(p.rate))}
-                        </Text>
-                      </View>
-                    ))}
-                    <View className="flex-row justify-between items-center border-t border-border pt-2">
-                      <Text className="text-xs font-semibold text-foreground">{t('batches.saleForm.portionsTotal', 'Portions Total')}</Text>
-                      <Text className="text-sm font-semibold text-foreground" style={{ fontVariant: ['tabular-nums'] }}>{currency} {portionsTotal.toFixed(2)}</Text>
-                    </View>
-                  </View>
-                </>
-              )}
+            <SummaryCard>
+              <SummaryRow label={t('batches.saleForm.netProcessed', 'Net Processed')} value={netProcessed.toLocaleString('en-US')} />
+              <CardDivider marginVertical={2} />
+              <SummaryRow label={t('batches.saleForm.wholeChickenCount', 'Whole Chicken Count')} value={wholeChickenCount.toLocaleString('en-US')} emphasis />
+            </SummaryCard>
+          </FormSection>
+        ) : null}
 
-              {/* Live By Piece */}
-              {isLiveByPiece && (
-                <View className="gap-3">
-                  <Text className="text-sm font-semibold text-foreground">{t('batches.saleForm.liveByPieceSection', 'Live Sale - By Piece')}</Text>
-                  <View className="gap-2"><Label>{t('batches.saleForm.birdCount')}</Label><Input value={liveBirdCount} onChangeText={setLiveBirdCount} keyboardType="number-pad" /></View>
-                  <View className="gap-2"><Label>{t('batches.saleForm.ratePerBird')}</Label><Input value={liveRatePerBird} onChangeText={setLiveRatePerBird} keyboardType="decimal-pad" /></View>
-                </View>
-              )}
-
-              {/* Live By Weight */}
-              {isLiveByWeight && (
-                <View className="gap-3">
-                  <Text className="text-sm font-semibold text-foreground">{t('batches.saleForm.liveByWeightSection')}</Text>
-                  <View className="gap-2"><Label>{t('batches.saleForm.birdCount')}</Label><Input value={liveBirdCount} onChangeText={setLiveBirdCount} keyboardType="number-pad" /></View>
-                  <Separator />
-                  {liveWeightItems.map((item, i) => (
-                    <View key={i} className="rounded-lg border border-border p-3 gap-2">
-                      <View className="flex-row items-center justify-between">
-                        <Text className="text-[10px] text-muted-foreground">#{i + 1}</Text>
-                        {liveWeightItems.length > 1 && (
-                          <Pressable onPress={() => setLiveWeightItems((p) => p.filter((_, idx) => idx !== i))} hitSlop={8}>
-                            <Trash2 size={14} color={dangerColor} />
-                          </Pressable>
-                        )}
-                      </View>
-                      <Input
-                        value={item.description}
-                        onChangeText={(v) => { const next = [...liveWeightItems]; next[i] = { ...next[i], description: v }; setLiveWeightItems(next); }}
-                        placeholder={t('batches.saleForm.description')}
-                      />
-                      <View className="flex-row gap-2">
-                        <View className="flex-1 gap-1">
-                          <Label>{t('batches.saleForm.weightKg', 'Weight (kg)')}</Label>
-                          <Input value={item.weightKg} onChangeText={(v) => {
-                            const next = [...liveWeightItems]; next[i] = { ...next[i], weightKg: v }; setLiveWeightItems(next);
-                          }} keyboardType="decimal-pad" />
-                        </View>
-                        <View className="flex-1 gap-1">
-                          <Label>{t('batches.saleForm.ratePerKg', 'Rate/kg')}</Label>
-                          <Input value={item.ratePerKg} onChangeText={(v) => {
-                            const next = [...liveWeightItems]; next[i] = { ...next[i], ratePerKg: v }; setLiveWeightItems(next);
-                          }} keyboardType="decimal-pad" />
-                        </View>
-                        <View className="flex-1 gap-1">
-                          <Label>{t('batches.saleForm.amount')}</Label>
-                          <Input value={fmtDec(parseNum(item.weightKg) * parseNum(item.ratePerKg))} editable={false} className="opacity-60" />
-                        </View>
-                      </View>
-                    </View>
-                  ))}
-                  <Pressable onPress={() => setLiveWeightItems((p) => [...p, { description: '', weightKg: '', ratePerKg: '' }])}
-                    className="flex-row items-center gap-1 self-start">
-                    <Plus size={14} color={primaryColor} /><Text className="text-xs text-primary font-medium">{t('batches.saleForm.addRow')}</Text>
-                  </Pressable>
-                </View>
-              )}
-
-              {/* Transport & Discounts */}
-              <Separator />
-              <View className="gap-3">
-                <Text className="text-sm font-semibold text-foreground">{t('batches.saleForm.transportSection')}</Text>
-                <View className="flex-row gap-3">
-                  <View className="flex-1 gap-2"><Label>{t('batches.saleForm.truckCount')}</Label><Input value={truckCount} onChangeText={setTruckCount} keyboardType="number-pad" /></View>
-                  <View className="flex-1 gap-2"><Label>{t('batches.saleForm.truckRate')}</Label><Input value={truckRate} onChangeText={setTruckRate} keyboardType="decimal-pad" /></View>
-                </View>
-              </View>
-
-              {/* Discount Line Items */}
-              <View className="gap-3">
-                <Text className="text-sm font-semibold text-foreground">{t('batches.saleForm.discountsSection', 'Discounts')}</Text>
-                {discountItems.map((d, i) => (
-                  <View key={i} className="rounded-lg border border-border p-3 gap-2">
-                    <View className="flex-row items-center justify-between">
-                      <Text className="text-[10px] text-muted-foreground">#{i + 1}</Text>
-                      <Pressable onPress={() => setDiscountItems((p) => p.filter((_, idx) => idx !== i))} hitSlop={8}>
-                        <Trash2 size={14} color={dangerColor} />
-                      </Pressable>
-                    </View>
-                    <View className="flex-row gap-2">
-                      <View className="flex-[2] gap-1">
-                        <Input
-                          value={d.description}
-                          onChangeText={(v) => { const next = [...discountItems]; next[i] = { ...next[i], description: v }; setDiscountItems(next); }}
-                          placeholder={t('batches.saleForm.discountDescription', 'Description')}
-                        />
-                      </View>
-                      <View className="flex-1 gap-1">
-                        <Input
-                          value={d.amount}
-                          onChangeText={(v) => { const next = [...discountItems]; next[i] = { ...next[i], amount: v }; setDiscountItems(next); }}
-                          keyboardType="decimal-pad"
-                          placeholder="0.00"
-                        />
-                      </View>
-                    </View>
-                  </View>
+        {/* ─── LAST STEP: ACCOUNTING ─── */}
+        {((step === 1 && !isSlaughtered) || (step === 2 && isSlaughtered)) ? (
+          <>
+            {isSlaughtered ? (
+              <FormSection
+                title={t('batches.saleForm.wholeChickenSection')}
+                headerRight={
+                  <AddRowButton
+                    icon={Plus}
+                    label={t('batches.saleForm.addRow')}
+                    onPress={() => setWholeChickenItems((p) => [...p, { description: '', weightKg: '', ratePerKg: '' }])}
+                  />
+                }
+              >
+                {wholeChickenItems.map((item, i) => (
+                  <WeightRowCard
+                    key={i}
+                    index={i}
+                    item={item}
+                    count={wholeChickenItems.length}
+                    onUpdate={(field, v) => {
+                      const next = [...wholeChickenItems];
+                      next[i] = { ...next[i], [field]: v };
+                      setWholeChickenItems(next);
+                    }}
+                    onRemove={() => setWholeChickenItems((p) => p.filter((_, idx) => idx !== i))}
+                    t={t}
+                  />
                 ))}
-                <Pressable onPress={() => setDiscountItems((p) => [...p, { description: '', amount: '' }])}
-                  className="flex-row items-center gap-1 self-start">
-                  <Plus size={14} color={primaryColor} /><Text className="text-xs text-primary font-medium">{t('batches.saleForm.addDiscount', 'Add Discount')}</Text>
-                </Pressable>
-              </View>
+                <View style={{ paddingTop: 4 }}>
+                  <SummaryRow
+                    label={t('batches.saleForm.wholeChickenTotal', 'Whole Chicken Total')}
+                    value={`${currency} ${wholeChickenTotal.toFixed(2)}`}
+                    emphasis
+                  />
+                </View>
+              </FormSection>
+            ) : null}
 
-              {/* Summary */}
-              <View className="rounded-lg border border-border bg-muted/30 px-3 py-2.5 gap-1">
-                <View className="flex-row justify-between"><Text className="text-xs text-muted-foreground">{t('batches.saleForm.grossSales')}</Text><Text className="text-sm text-foreground" style={{ fontVariant: ['tabular-nums'] }}>{currency} {grossSales.toFixed(2)}</Text></View>
-                {transportDeduction > 0 && <View className="flex-row justify-between"><Text className="text-xs text-muted-foreground">{t('batches.saleForm.transportDeduction')}</Text><Text className="text-sm text-red-500" style={{ fontVariant: ['tabular-nums'] }}>-{currency} {transportDeduction.toFixed(2)}</Text></View>}
-                {totalDiscounts > 0 && <View className="flex-row justify-between"><Text className="text-xs text-muted-foreground">{t('batches.saleForm.totalDiscounts', 'Total Discounts')}</Text><Text className="text-sm text-red-500" style={{ fontVariant: ['tabular-nums'] }}>-{currency} {totalDiscounts.toFixed(2)}</Text></View>}
-                {showVat && <View className="flex-row justify-between"><Text className="text-xs text-muted-foreground">{t('batches.saleForm.vat')}</Text><Text className="text-sm text-foreground" style={{ fontVariant: ['tabular-nums'] }}>{currency} {vat.toFixed(2)}</Text></View>}
-                <View className="flex-row justify-between"><Text className="text-xs font-semibold text-foreground">{t('batches.saleForm.grandTotal')}</Text><Text className="text-sm font-bold text-foreground" style={{ fontVariant: ['tabular-nums'] }}>{currency} {grandTotal.toFixed(2)}</Text></View>
-              </View>
-            </>
-          )}
-        </ScrollView>
+            {isSlaughtered ? (
+              <FormSection title={t('batches.saleForm.portionsSection', 'Poultry Portions')}>
+                <PortionsTable
+                  portions={portions}
+                  onUpdate={(i, field, v) => {
+                    const next = [...portions];
+                    next[i] = { ...next[i], [field]: v };
+                    setPortions(next);
+                  }}
+                  t={t}
+                  currency={currency}
+                  portionsTotal={portionsTotal}
+                />
+              </FormSection>
+            ) : null}
 
-        <View className="px-4 pt-4 border-t border-border flex-row gap-3" style={{ paddingBottom: Math.max(safeBottom, 16) }}>
-          {step > 0 && (
-            <Button variant="outline" onPress={() => setStep((s) => s - 1)} className="flex-1">
-              {t('common.back')}
-            </Button>
-          )}
-          {step < totalSteps - 1 ? (
-            <Button onPress={() => { if (step === 0 && !validateStep0()) return; setStep((s) => s + 1); }} className="flex-1">
-              {t('common.next')}
-            </Button>
-          ) : (
-            <Button onPress={handleSave} loading={saving} disabled={saving} className="flex-1">
-              {editData ? t('common.save') : t('common.create')}
-            </Button>
-          )}
-        </View>
-      </KeyboardAvoidingView>
+            {isLiveByPiece ? (
+              <FormSection title={t('batches.saleForm.liveByPieceSection', 'Live Sale - By Piece')}>
+                <SheetInput label={t('batches.saleForm.birdCount')} value={liveBirdCount} onChangeText={setLiveBirdCount} keyboardType="number-pad" placeholder="0" />
+                <SheetInput
+                  label={t('batches.saleForm.ratePerBird')}
+                  value={liveRatePerBird}
+                  onChangeText={setLiveRatePerBird}
+                  keyboardType="decimal-pad"
+                  placeholder="0.00"
+                  suffix={<CurrencyTag label={currency} />}
+                />
+              </FormSection>
+            ) : null}
+
+            {isLiveByWeight ? (
+              <FormSection
+                title={t('batches.saleForm.liveByWeightSection')}
+                headerRight={
+                  <AddRowButton
+                    icon={Plus}
+                    label={t('batches.saleForm.addRow')}
+                    onPress={() => setLiveWeightItems((p) => [...p, { description: '', weightKg: '', ratePerKg: '' }])}
+                  />
+                }
+              >
+                <SheetInput label={t('batches.saleForm.birdCount')} value={liveBirdCount} onChangeText={setLiveBirdCount} keyboardType="number-pad" placeholder="0" />
+                {liveWeightItems.map((item, i) => (
+                  <WeightRowCard
+                    key={i}
+                    index={i}
+                    item={item}
+                    count={liveWeightItems.length}
+                    onUpdate={(field, v) => {
+                      const next = [...liveWeightItems];
+                      next[i] = { ...next[i], [field]: v };
+                      setLiveWeightItems(next);
+                    }}
+                    onRemove={() => setLiveWeightItems((p) => p.filter((_, idx) => idx !== i))}
+                    t={t}
+                  />
+                ))}
+              </FormSection>
+            ) : null}
+
+            <FormSection title={t('batches.saleForm.transportSection')}>
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <View style={{ flex: 1 }}>
+                  <SheetInput label={t('batches.saleForm.truckCount')} value={truckCount} onChangeText={setTruckCount} keyboardType="number-pad" placeholder="0" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <SheetInput
+                    label={t('batches.saleForm.truckRate')}
+                    value={truckRate}
+                    onChangeText={setTruckRate}
+                    keyboardType="decimal-pad"
+                    placeholder="0.00"
+                  />
+                </View>
+              </View>
+            </FormSection>
+
+            <FormSection
+              title={t('batches.saleForm.discountsSection', 'Discounts')}
+              headerRight={
+                <AddRowButton
+                  icon={Plus}
+                  label={t('batches.saleForm.addDiscount', 'Add Discount')}
+                  onPress={() => setDiscountItems((p) => [...p, { description: '', amount: '' }])}
+                />
+              }
+            >
+              {discountItems.length === 0 ? (
+                <DiscountEmpty t={t} />
+              ) : (
+                discountItems.map((d, i) => (
+                  <DiscountRowCard
+                    key={i}
+                    index={i}
+                    item={d}
+                    onUpdate={(field, v) => {
+                      const next = [...discountItems];
+                      next[i] = { ...next[i], [field]: v };
+                      setDiscountItems(next);
+                    }}
+                    onRemove={() => setDiscountItems((p) => p.filter((_, idx) => idx !== i))}
+                    t={t}
+                  />
+                ))
+              )}
+            </FormSection>
+
+            <FormSection title={t('batches.saleForm.summary', 'Summary')}>
+              <SummaryCard>
+                <SummaryRow label={t('batches.saleForm.grossSales')} value={fmtMoney(grossSales)} />
+                {transportDeduction > 0 ? (
+                  <SummaryRow label={t('batches.saleForm.transportDeduction')} value={`- ${fmtMoney(transportDeduction)}`} negative />
+                ) : null}
+                {totalDiscounts > 0 ? (
+                  <SummaryRow label={t('batches.saleForm.totalDiscounts', 'Total Discounts')} value={`- ${fmtMoney(totalDiscounts)}`} negative />
+                ) : null}
+                {showVat ? (
+                  <SummaryRow label={t('batches.saleForm.vat')} value={fmtMoney(vat)} />
+                ) : null}
+                <CardDivider marginVertical={2} />
+                <SummaryRow label={t('batches.saleForm.grandTotal')} value={fmtMoney(grandTotal)} emphasis />
+              </SummaryCard>
+            </FormSection>
+          </>
+        ) : null}
+      </FormSheet>
 
       <QuickAddBusinessSheet
         open={quickAddBiz}
@@ -662,6 +601,413 @@ export default function SaleOrderSheet({ open, onClose, batchId, editData }) {
           toast({ title: `${biz.companyName} ${t('common.created', 'created')}` });
         }}
       />
-    </Modal>
+    </>
   );
 }
+
+/* -------------------- internal sub-components -------------------- */
+
+function StepProgress({ current, total }) {
+  const tokens = useHeroSheetTokens();
+  const isRTL = useIsRTL();
+  const { accentColor, dark } = tokens;
+  const dim = dark ? 'hsl(150, 14%, 24%)' : 'hsl(148, 14%, 88%)';
+  return (
+    <View style={[stepStyles.row, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+      {Array.from({ length: total }).map((_, i) => (
+        <View
+          key={i}
+          style={[
+            stepStyles.bar,
+            { backgroundColor: i <= current ? accentColor : dim },
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
+
+function SaleFooter({ step, totalSteps, saving, editData, onBack, onNext, onSave, t }) {
+  const insets = useSafeAreaInsets();
+  const tokens = useHeroSheetTokens();
+  const isRTL = useIsRTL();
+  const { sheetBg, borderColor } = tokens;
+
+  // Mirrored chevrons so Back / Next read correctly in Arabic.
+  const BackIcon = isRTL ? ChevronRight : ChevronLeft;
+  const ForwardIcon = isRTL ? ChevronLeft : ChevronRight;
+  const isLastStep = step >= totalSteps - 1;
+
+  return (
+    <View
+      style={[
+        footerStyles.bar,
+        {
+          flexDirection: isRTL ? 'row-reverse' : 'row',
+          backgroundColor: sheetBg,
+          borderTopColor: borderColor,
+          paddingBottom: Math.max(insets.bottom, 16),
+        },
+      ]}
+    >
+      {step > 0 ? (
+        <View style={{ flex: 1 }}>
+          <CtaButton
+            variant="secondary"
+            icon={BackIcon}
+            label={t('common.back')}
+            onPress={onBack}
+          />
+        </View>
+      ) : null}
+      <View style={{ flex: 1 }}>
+        {!isLastStep ? (
+          <CtaButton
+            variant="primary"
+            icon={ForwardIcon}
+            label={t('common.next')}
+            onPress={onNext}
+          />
+        ) : (
+          <CtaButton
+            variant="primary"
+            icon={editData ? Check : Plus}
+            label={editData ? t('common.save') : t('common.create')}
+            onPress={onSave}
+            loading={saving}
+            disabled={saving}
+          />
+        )}
+      </View>
+    </View>
+  );
+}
+
+function WeightRowCard({ index, item, count, onUpdate, onRemove, t }) {
+  const tokens = useHeroSheetTokens();
+  const isRTL = useIsRTL();
+  const { dark, mutedColor, errorColor } = tokens;
+  return (
+    <View
+      style={[
+        rowStyles.card,
+        {
+          backgroundColor: dark ? 'rgba(255,255,255,0.03)' : 'hsl(148, 22%, 96%)',
+          borderColor: dark ? 'hsl(150, 12%, 28%)' : 'hsl(148, 16%, 88%)',
+        },
+      ]}
+    >
+      <View
+        style={[
+          rowStyles.headerRow,
+          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+        ]}
+      >
+        <Text
+          style={{
+            fontSize: 11,
+            fontFamily: 'Poppins-SemiBold',
+            color: mutedColor,
+            letterSpacing: 1.2,
+            textTransform: 'uppercase',
+          }}
+        >
+          #{index + 1}
+        </Text>
+        {count > 1 ? (
+          <Pressable onPress={onRemove} hitSlop={8} style={rowStyles.removeBtn}>
+            <Trash2 size={14} color={errorColor} />
+          </Pressable>
+        ) : null}
+      </View>
+      <SheetInput
+        label={t('batches.saleForm.description')}
+        value={item.description}
+        onChangeText={(v) => onUpdate('description', v)}
+        placeholder={t('batches.saleForm.description')}
+      />
+      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10 }}>
+        <View style={{ flex: 1 }}>
+          <SheetInput
+            label={t('batches.saleForm.weightKg', 'Weight (kg)')}
+            value={item.weightKg}
+            onChangeText={(v) => onUpdate('weightKg', v)}
+            keyboardType="decimal-pad"
+            placeholder="0"
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <SheetInput
+            label={t('batches.saleForm.ratePerKg', 'Rate/kg')}
+            value={item.ratePerKg}
+            onChangeText={(v) => onUpdate('ratePerKg', v)}
+            keyboardType="decimal-pad"
+            placeholder="0"
+          />
+        </View>
+      </View>
+      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 4 }}>
+        <Text style={{ fontSize: 11, fontFamily: 'Poppins-SemiBold', color: mutedColor, letterSpacing: 1.2, textTransform: 'uppercase' }}>
+          {t('batches.saleForm.amount')}
+        </Text>
+        <Text
+          style={{
+            fontSize: 14,
+            fontFamily: 'Poppins-SemiBold',
+            color: tokens.textColor,
+            fontVariant: ['tabular-nums'],
+          }}
+        >
+          {fmtDec(parseNum(item.weightKg) * parseNum(item.ratePerKg)) || '0.00'}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function PortionsTable({ portions, onUpdate, t, currency, portionsTotal }) {
+  const tokens = useHeroSheetTokens();
+  const isRTL = useIsRTL();
+  const { mutedColor, textColor } = tokens;
+  return (
+    <>
+      <View
+        style={[
+          portionStyles.headerRow,
+          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+        ]}
+      >
+        <Text style={[portionStyles.headerCell, { flex: 1.2, color: mutedColor, textAlign: isRTL ? 'right' : 'left' }]}>
+          {t('batches.saleForm.partType', 'Part')}
+        </Text>
+        <Text style={[portionStyles.headerCell, { flex: 1, color: mutedColor, textAlign: 'center' }]}>
+          {t('batches.saleForm.quantity', 'Qty')}
+        </Text>
+        <Text style={[portionStyles.headerCell, { flex: 1, color: mutedColor, textAlign: 'center' }]}>
+          {t('batches.saleForm.rate', 'Rate')}
+        </Text>
+        <Text style={[portionStyles.headerCell, { flex: 0.9, color: mutedColor, textAlign: isRTL ? 'left' : 'right' }]}>
+          {t('batches.saleForm.amount', 'Amt')}
+        </Text>
+      </View>
+      {portions.map((p, i) => (
+        <View
+          key={p.partType}
+          style={[
+            portionStyles.row,
+            { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          ]}
+        >
+          <Text
+            style={{
+              flex: 1.2,
+              fontSize: 12.5,
+              fontFamily: 'Poppins-Medium',
+              color: textColor,
+              textAlign: isRTL ? 'right' : 'left',
+            }}
+            numberOfLines={1}
+          >
+            {t(`settings.portionLabels.${p.partType}`)}
+          </Text>
+          <View style={{ flex: 1, paddingHorizontal: 4 }}>
+            <SheetInput
+              dense
+              value={p.quantity}
+              onChangeText={(v) => onUpdate(i, 'quantity', v)}
+              keyboardType="number-pad"
+              placeholder="0"
+            />
+          </View>
+          <View style={{ flex: 1, paddingHorizontal: 4 }}>
+            <SheetInput
+              dense
+              value={p.rate}
+              onChangeText={(v) => onUpdate(i, 'rate', v)}
+              keyboardType="decimal-pad"
+              placeholder="0"
+            />
+          </View>
+          <Text
+            style={{
+              flex: 0.9,
+              fontSize: 12.5,
+              fontFamily: 'Poppins-Medium',
+              color: mutedColor,
+              textAlign: isRTL ? 'left' : 'right',
+              fontVariant: ['tabular-nums'],
+            }}
+          >
+            {fmtDec(parseNum(p.quantity) * parseNum(p.rate)) || '-'}
+          </Text>
+        </View>
+      ))}
+      <View style={{ paddingTop: 4 }}>
+        <SummaryRow
+          label={t('batches.saleForm.portionsTotal', 'Portions Total')}
+          value={`${currency} ${portionsTotal.toFixed(2)}`}
+          emphasis
+        />
+      </View>
+    </>
+  );
+}
+
+function DiscountRowCard({ index, item, onUpdate, onRemove, t }) {
+  const tokens = useHeroSheetTokens();
+  const isRTL = useIsRTL();
+  const { dark, mutedColor, errorColor } = tokens;
+  return (
+    <View
+      style={[
+        rowStyles.card,
+        {
+          backgroundColor: dark ? 'rgba(255,255,255,0.03)' : 'hsl(148, 22%, 96%)',
+          borderColor: dark ? 'hsl(150, 12%, 28%)' : 'hsl(148, 16%, 88%)',
+        },
+      ]}
+    >
+      <View
+        style={[
+          rowStyles.headerRow,
+          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+        ]}
+      >
+        <Text
+          style={{
+            fontSize: 11,
+            fontFamily: 'Poppins-SemiBold',
+            color: mutedColor,
+            letterSpacing: 1.2,
+            textTransform: 'uppercase',
+          }}
+        >
+          #{index + 1}
+        </Text>
+        <Pressable onPress={onRemove} hitSlop={8} style={rowStyles.removeBtn}>
+          <Trash2 size={14} color={errorColor} />
+        </Pressable>
+      </View>
+      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10 }}>
+        <View style={{ flex: 2 }}>
+          <SheetInput
+            value={item.description}
+            onChangeText={(v) => onUpdate('description', v)}
+            placeholder={t('batches.saleForm.discountDescription', 'Description')}
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <SheetInput
+            value={item.amount}
+            onChangeText={(v) => onUpdate('amount', v)}
+            keyboardType="decimal-pad"
+            placeholder="0.00"
+          />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function DiscountEmpty({ t }) {
+  const { mutedColor } = useHeroSheetTokens();
+  const isRTL = useIsRTL();
+  return (
+    <Text
+      style={{
+        fontSize: 12.5,
+        fontFamily: 'Poppins-Regular',
+        color: mutedColor,
+        textAlign: isRTL ? 'right' : 'left',
+        fontStyle: 'italic',
+      }}
+    >
+      {t('batches.saleForm.noDiscounts', 'No discounts added.')}
+    </Text>
+  );
+}
+
+function CurrencyTag({ label }) {
+  const { mutedColor, dark } = useHeroSheetTokens();
+  return (
+    <View
+      style={{
+        backgroundColor: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+        borderRadius: 8,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+      }}
+    >
+      <Text
+        style={{
+          fontSize: 11,
+          fontFamily: 'Poppins-SemiBold',
+          color: mutedColor,
+          letterSpacing: 0.4,
+        }}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+const stepStyles = StyleSheet.create({
+  row: {
+    gap: 6,
+  },
+  bar: {
+    flex: 1,
+    height: 4,
+    borderRadius: 2,
+  },
+});
+
+const footerStyles = StyleSheet.create({
+  bar: {
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: 10,
+  },
+});
+
+const rowStyles = StyleSheet.create({
+  card: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    gap: 12,
+  },
+  headerRow: {
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  removeBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});
+
+const portionStyles = StyleSheet.create({
+  headerRow: {
+    alignItems: 'center',
+    paddingBottom: 6,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'transparent',
+    marginBottom: 4,
+  },
+  headerCell: {
+    fontSize: 10.5,
+    fontFamily: 'Poppins-SemiBold',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  row: {
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+});

@@ -2,12 +2,26 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import { getLocales } from 'expo-localization';
 import en from './locales/en.json';
+import ar from './locales/ar.json';
 
-const deviceLanguage = getLocales()[0]?.languageCode || 'en';
+export const SUPPORTED_LANGUAGES = [
+  { code: 'en', label: 'English', native: 'English', rtl: false },
+  { code: 'ar', label: 'Arabic', native: 'العربية', rtl: true },
+];
+
+const SUPPORTED_CODES = SUPPORTED_LANGUAGES.map((l) => l.code);
+
+const deviceLanguageRaw = getLocales()[0]?.languageCode || 'en';
+const deviceLanguage = SUPPORTED_CODES.includes(deviceLanguageRaw) ? deviceLanguageRaw : 'en';
 
 const baseResources = {
   en: { translation: { ...en } },
+  ar: { translation: { ...ar } },
 };
+
+export function isRtlLanguage(code) {
+  return SUPPORTED_LANGUAGES.find((l) => l.code === code)?.rtl ?? false;
+}
 
 function deepMerge(target, source) {
   if (!source || typeof source !== 'object') return target;

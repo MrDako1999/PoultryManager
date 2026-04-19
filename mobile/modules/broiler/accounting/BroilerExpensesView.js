@@ -1,124 +1,231 @@
 import { useMemo, useState } from 'react';
-import { View, ScrollView, RefreshControl } from 'react-native';
+import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { router } from 'expo-router';
-import { DollarSign } from 'lucide-react-native';
+import {
+  Receipt, FolderTree, FileText, Building2, Layers,
+} from 'lucide-react-native';
 import useLocalQuery from '@/hooks/useLocalQuery';
-import useThemeStore from '@/stores/themeStore';
-import SearchInput from '@/components/ui/SearchInput';
-import EmptyState from '@/components/ui/EmptyState';
-import StatCard from '@/components/ui/StatCard';
-import ExpenseRow from '@/modules/broiler/rows/ExpenseRow';
-import ExpenseCategoryGroup from '@/components/rows/ExpenseCategoryGroup';
-import { deltaSync } from '@/lib/syncEngine';
-import { SkeletonRow, SkeletonStatCard } from '@/components/skeletons';
+import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
+import ExpensesListView from '@/components/views/ExpensesListView';
+import {
+  AccountingHero, AccountingToolbar,
+} from '@/components/views/AccountingFilterBar';
 
-const fmt = (val) =>
-  Number(val || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const EXPENSE_CATEGORIES = [
+  'MAINTENANCE', 'LABOUR', 'UTILITIES', 'FUEL', 'CONSUMABLES',
+  'FOOD', 'RENT', 'ANIMAL_PROCESSING', 'ANIMAL_WELFARE',
+  'FEED', 'SOURCE', 'ASSETS', 'OTHERS',
+];
+
+const INVOICE_TYPES = ['TAX_INVOICE', 'CASH_MEMO', 'NO_INVOICE'];
 
 export default function BroilerExpensesView() {
   const { t } = useTranslation();
-  const { resolvedTheme } = useThemeStore();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [refreshing, setRefreshing] = useState(false);
-  const [catOpen, setCatOpen] = useState({});
+  const { screenBg } = useHeroSheetTokens();
 
-  const [expenses, expensesLoading] = useLocalQuery('expenses');
-  const primaryColor = resolvedTheme === 'dark' ? 'hsl(148, 48%, 38%)' : 'hsl(148, 60%, 20%)';
+  const [allExpenses, expensesLoading] = useLocalQuery('expenses');
+  const [allBatches] = useLocalQuery('batches');
+  const [allBusinesses] = useLocalQuery('businesses');
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    try { await deltaSync(); } catch (e) { console.error(e); }
-    setRefreshing(false);
-  };
+  const [search, setSearch] = useState('');
+  const [dateRange, setDateRange] = useState(undefined);
+  const [categoryFilter, setCategoryFilter] = useState([]);
+  const [invoiceFilter, setInvoiceFilter] = useState([]);
+  const [supplierFilter, setSupplierFilter] = useState([]);
+  const [batchFilter, setBatchFilter] = useState([]);
 
-  const q = searchQuery.toLowerCase();
+  const batchMap = useMemo(() => {
+    const m = {};
+    allBatches.forEach((b) => { m[b._id] = b; });
+    return m;
+  }, [allBatches]);
 
-  const filteredExpenses = useMemo(() => {
-    if (!q) return expenses;
-    return expenses.filter((e) =>
-      (e.description || '').toLowerCase().includes(q) ||
-      (e.tradingCompany?.companyName || '').toLowerCase().includes(q)
-    );
-  }, [expenses, q]);
+  const businessMap = useMemo(() => {
+    const m = {};
+    allBusinesses.forEach((b) => { m[b._id] = b; });
+    return m;
+  }, [allBusinesses]);
 
-  const totalExpense = useMemo(
-    () => filteredExpenses.reduce((s, e) => s + (e.totalAmount || 0), 0),
-    [filteredExpenses]
+  const categoryOptions = useMemo(
+    () => EXPENSE_CATEGORIES.map((c) => ({
+      value: c,
+      label: t(`batches.expenseCategories.${c}`, c),
+    })),
+    [t]
   );
 
-  const sortedExpenseCategories = useMemo(() => {
-    const groups = {};
-    filteredExpenses.forEach((e) => {
-      const cat = e.category || 'OTHER';
-      if (!groups[cat]) groups[cat] = { items: [], total: 0 };
-      groups[cat].items.push(e);
-      groups[cat].total += e.totalAmount || 0;
-    });
-    return Object.entries(groups).sort(([a], [b]) =>
-      t(`batches.expenseCategories.${a}`).localeCompare(t(`batches.expenseCategories.${b}`))
-    );
-  }, [filteredExpenses, t]);
+  const invoiceOptions = useMemo(
+    () => INVOICE_TYPES.map((it) => ({
+      value: it,
+      label: t(`batches.expenseInvoiceTypes.${it}`, it),
+    })),
+    [t]
+  );
 
-  const toggleCat = (key) => setCatOpen((p) => ({ ...p, [key]: !(p[key] ?? true) }));
+  const supplierOptions = useMemo(() => {
+    const seen = new Set();
+    const opts = [];
+    allExpenses.forEach((e) => {
+      const sid = (typeof e.tradingCompany === 'object' ? e.tradingCompany?._id : e.tradingCompany);
+      if (!sid || seen.has(sid)) return;
+      seen.add(sid);
+      const inline = typeof e.tradingCompany === 'object' ? e.tradingCompany?.companyName : null;
+      const biz = businessMap[sid];
+      opts.push({ value: sid, label: inline || biz?.companyName || sid });
+    });
+    return opts.sort((a, b) => a.label.localeCompare(b.label));
+  }, [allExpenses, businessMap]);
+
+  const batchOptions = useMemo(() => {
+    const seen = new Set();
+    const opts = [];
+    allExpenses.forEach((e) => {
+      const bid = (typeof e.batch === 'object' ? e.batch?._id : e.batch);
+      if (!bid || seen.has(bid)) return;
+      seen.add(bid);
+      const batch = batchMap[bid];
+      opts.push({ value: bid, label: batch?.batchName || bid });
+    });
+    return opts.sort((a, b) => a.label.localeCompare(b.label));
+  }, [allExpenses, batchMap]);
+
+  const filtered = useMemo(() => {
+    let items = allExpenses;
+
+    if (search) {
+      const q = search.toLowerCase();
+      items = items.filter((e) =>
+        (e.description || '').toLowerCase().includes(q)
+        || (e.invoiceId || '').toLowerCase().includes(q)
+        || (e.tradingCompany?.companyName || '').toLowerCase().includes(q)
+      );
+    }
+
+    // ISO date string compare — timezone-safe regardless of host. expenseDate
+    // is stored as YYYY-MM-DD; slicing the first 10 chars also covers full
+    // ISO timestamps from imported records.
+    if (dateRange?.from || dateRange?.to) {
+      const fromIso = dateRange.from;
+      const toIso = dateRange.to || dateRange.from;
+      items = items.filter((e) => {
+        if (!e.expenseDate) return false;
+        const sIso = String(e.expenseDate).slice(0, 10);
+        if (fromIso && sIso < fromIso) return false;
+        if (toIso && sIso > toIso) return false;
+        return true;
+      });
+    }
+
+    if (categoryFilter.length) {
+      items = items.filter((e) => categoryFilter.includes(e.category || 'OTHERS'));
+    }
+    if (invoiceFilter.length) {
+      items = items.filter((e) => invoiceFilter.includes(e.invoiceType));
+    }
+    if (supplierFilter.length) {
+      items = items.filter((e) => {
+        const sid = (typeof e.tradingCompany === 'object' ? e.tradingCompany?._id : e.tradingCompany);
+        return supplierFilter.includes(sid);
+      });
+    }
+    if (batchFilter.length) {
+      items = items.filter((e) => {
+        const bid = (typeof e.batch === 'object' ? e.batch?._id : e.batch);
+        return batchFilter.includes(bid);
+      });
+    }
+    return items;
+  }, [allExpenses, search, dateRange, categoryFilter, invoiceFilter, supplierFilter, batchFilter]);
+
+  const totalSpend = useMemo(
+    () => filtered.reduce((s, e) => s + (e.totalAmount || 0), 0),
+    [filtered]
+  );
+
+  const filters = useMemo(() => ([
+    {
+      key: 'category',
+      label: t('batches.expenseForm.category', 'Category'),
+      icon: FolderTree,
+      options: categoryOptions,
+      values: categoryFilter,
+      onChange: setCategoryFilter,
+    },
+    {
+      key: 'invoice',
+      label: t('batches.expenseForm.invoiceType', 'Invoice Type'),
+      icon: FileText,
+      options: invoiceOptions,
+      values: invoiceFilter,
+      onChange: setInvoiceFilter,
+    },
+    {
+      key: 'supplier',
+      label: t('batches.expenseForm.supplier', 'Supplier'),
+      icon: Building2,
+      options: supplierOptions,
+      values: supplierFilter,
+      onChange: setSupplierFilter,
+    },
+    {
+      key: 'batch',
+      label: t('nav.batches', 'Batch'),
+      icon: Layers,
+      options: batchOptions,
+      values: batchFilter,
+      onChange: setBatchFilter,
+    },
+  ]), [
+    t,
+    categoryOptions, categoryFilter,
+    invoiceOptions, invoiceFilter,
+    supplierOptions, supplierFilter,
+    batchOptions, batchFilter,
+  ]);
+
+  const resetAll = () => {
+    setSearch('');
+    setDateRange(undefined);
+    setCategoryFilter([]);
+    setInvoiceFilter([]);
+    setSupplierFilter([]);
+    setBatchFilter([]);
+  };
 
   return (
-    <View className="flex-1 bg-background">
-      <View className="px-4 pb-3">
-        <SearchInput
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholder={t('accounting.searchExpenses', 'Search expenses...')}
-        />
-      </View>
-
-      <ScrollView
-        className="flex-1"
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={primaryColor} />}
-      >
-        {expensesLoading && expenses.length === 0 ? (
-          <View className="px-4 gap-3">
-            <View className="flex-row gap-2"><SkeletonStatCard /><SkeletonStatCard /></View>
-            {[1, 2, 3, 4].map((i) => <SkeletonRow key={i} />)}
-          </View>
-        ) : (
-          <>
-            <View className="px-4 mb-3">
-              <View className="flex-row gap-2">
-                <StatCard label={t('accounting.totalSpend', 'Total Spend')} value={fmt(totalExpense)} icon={DollarSign} />
-                <StatCard label={t('accounting.expenseCount', 'Expenses')} value={filteredExpenses.length} />
-              </View>
-            </View>
-            {filteredExpenses.length === 0 ? (
-              <EmptyState icon={DollarSign} title={t('batches.noExpenses', 'No expenses')} />
-            ) : (
-              <View className="px-4">
-                <View className="rounded-lg border border-border bg-card overflow-hidden">
-                  {sortedExpenseCategories.map(([category, { items, total }]) => (
-                    <ExpenseCategoryGroup
-                      key={category}
-                      label={t(`batches.expenseCategories.${category}`, category)}
-                      total={total}
-                      count={items.length}
-                      open={catOpen[category] ?? true}
-                      onToggle={() => toggleCat(category)}
-                    >
-                      {items.map((expense) => (
-                        <ExpenseRow
-                          key={expense._id}
-                          expense={expense}
-                          categoryLabel={t(`batches.expenseCategories.${expense.category}`, expense.category)}
-                          onClick={() => router.push(`/(app)/expense/${expense._id}`)}
-                        />
-                      ))}
-                    </ExpenseCategoryGroup>
-                  ))}
-                </View>
-              </View>
-            )}
-          </>
+    <View style={{ flex: 1, backgroundColor: screenBg }}>
+      <ExpensesListView
+        expenses={filtered}
+        loading={expensesLoading}
+        hideHero
+        hideSearch
+        hideCategoryChips
+        emptyTitle={t('batches.noExpenses', 'No expenses')}
+        headerComponent={(
+          <AccountingHero
+            HeaderIcon={Receipt}
+            heroTitle={t('accounting.totalSpend', 'Total Spend')}
+            count={filtered.length}
+            total={totalSpend}
+            allCount={allExpenses.length}
+            search={search}
+            filters={filters}
+            dateRange={dateRange}
+            loading={expensesLoading}
+          />
         )}
-      </ScrollView>
+        stickyToolbar={({ collapseButton }) => (
+          <AccountingToolbar
+            search={search}
+            setSearch={setSearch}
+            dateRange={dateRange}
+            setDateRange={setDateRange}
+            filters={filters}
+            onResetAll={resetAll}
+            searchTrailing={collapseButton}
+          />
+        )}
+      />
     </View>
   );
 }

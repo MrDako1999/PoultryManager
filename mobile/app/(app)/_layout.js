@@ -2,8 +2,6 @@ import { View, ActivityIndicator } from 'react-native';
 import { Redirect, Stack } from 'expo-router';
 import useAuthStore from '@/stores/authStore';
 import useThemeStore from '@/stores/themeStore';
-import SyncStatusBar from '@/components/SyncStatusBar';
-import FullResyncOverlay from '@/components/FullResyncOverlay';
 
 export default function AppLayout() {
   const { user, isLoading } = useAuthStore();
@@ -39,6 +37,7 @@ export default function AppLayout() {
         <Stack.Screen name="expense/[id]" />
         <Stack.Screen name="source/[id]" />
         <Stack.Screen name="feed-order/[id]" />
+        <Stack.Screen name="feed-item/[id]" />
         <Stack.Screen name="sale/[id]" />
         <Stack.Screen name="daily-log/[id]" />
         <Stack.Screen name="farm/[id]" />
@@ -51,12 +50,11 @@ export default function AppLayout() {
         <Stack.Screen name="workers-list" />
         <Stack.Screen name="feed-catalogue" />
         <Stack.Screen name="settings-profile" />
+        <Stack.Screen name="settings-security" />
         <Stack.Screen name="settings-modules" />
         <Stack.Screen name="settings-accounting" />
         <Stack.Screen name="settings-sale-defaults" />
       </Stack>
-      <SyncStatusBar />
-      <FullResyncOverlay />
     </View>
   );
 }

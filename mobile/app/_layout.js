@@ -9,7 +9,9 @@ import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from 'nativewind';
 import { ToastProvider } from '@/components/ui/Toast';
 import useThemeStore from '@/stores/themeStore';
+import useLocaleStore from '@/stores/localeStore';
 import useNetwork from '@/hooks/useNetwork';
+import FullResyncOverlay from '@/components/FullResyncOverlay';
 import '../i18n';
 
 SplashScreen.preventAutoHideAsync();
@@ -28,11 +30,13 @@ export default function RootLayout() {
   });
 
   const { initTheme } = useThemeStore();
+  const initLocale = useLocaleStore((s) => s.initLocale);
 
   useNetwork();
 
   useEffect(() => {
     initTheme();
+    initLocale();
   }, []);
 
   useEffect(() => {
@@ -57,6 +61,7 @@ export default function RootLayout() {
             <Stack.Screen name="(auth)" />
             <Stack.Screen name="(app)" />
           </Stack>
+          <FullResyncOverlay />
         </ToastProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

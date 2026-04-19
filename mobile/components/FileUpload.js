@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { View, Text, Pressable, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { Upload, FileText, Image as ImageIcon, X, Camera } from 'lucide-react-native';
 import * as DocumentPicker from 'expo-document-picker';
-import * as ImagePicker from 'expo-image-picker';
 import { useTranslation } from 'react-i18next';
 import useThemeStore from '@/stores/themeStore';
 import api from '@/lib/api';
+import { uploadMedia, getUploadErrorMessage } from '@/lib/uploadMedia';
 import FileViewer from './FileViewer';
+import InstantCamera from './InstantCamera';
 
 function formatFileSize(bytes) {
   if (!bytes) return '';
@@ -57,48 +58,30 @@ export default function FileUpload({ value, onUpload, onRemove, label, entityTyp
   const [uploadSource, setUploadSource] = useState(null);
   const uploading = !!uploadSource;
   const [error, setError] = useState(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
 
   const isDark = resolvedTheme === 'dark';
   const mutedColor = isDark ? 'hsl(148, 10%, 55%)' : 'hsl(150, 10%, 45%)';
   const primaryColor = isDark ? 'hsl(148, 48%, 38%)' : 'hsl(148, 60%, 20%)';
 
-  const doUpload = async (uri, filename, mimeType) => {
-    const type = mimeType || 'application/octet-stream';
-    const formData = new FormData();
-    formData.append('file', { uri, name: filename, type });
-    if (entityType) formData.append('entityType', entityType);
-    if (entityId) formData.append('entityId', entityId);
-    if (category) formData.append('category', category);
-    formData.append('mediaType', mediaType);
-
-    const { data } = await api.post('/media/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+  const doUpload = (uri, filename, mimeType) =>
+    uploadMedia({
+      uri,
+      name: filename,
+      mimeType,
+      entityType,
+      entityId,
+      category,
+      mediaType,
     });
-    return data;
+
+  const handleCamera = () => {
+    setError(null);
+    setCameraOpen(true);
   };
 
-  const handleCamera = async () => {
-    setError(null);
-    try {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert(t('common.error', 'Error'), t('documents.permissionDenied', 'Permission required.'));
-        return;
-      }
-    } catch {
-      Alert.alert(t('common.error', 'Error'), t('documents.cameraUnavailable', 'Camera is not available on this device.'));
-      return;
-    }
-    let result;
-    try {
-      result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.8 });
-    } catch {
-      Alert.alert(t('common.error', 'Error'), t('documents.cameraUnavailable', 'Camera is not available on this device.'));
-      return;
-    }
-    if (result.canceled || !result.assets?.length) return;
-
-    const asset = result.assets[0];
+  const handleCameraCapture = async (asset) => {
+    if (!asset?.uri) return;
     setUploadSource('camera');
     try {
       const fname = asset.uri.split('/').pop() || 'photo.jpg';
@@ -107,7 +90,7 @@ export default function FileUpload({ value, onUpload, onRemove, label, entityTyp
       const data = await doUpload(asset.uri, fname, mimeType);
       onUpload?.(data);
     } catch (err) {
-      setError(err.response?.data?.message || t('documents.uploadError', 'Upload failed'));
+      setError(getUploadErrorMessage(err, t('documents.uploadError', 'Upload failed')));
     } finally {
       setUploadSource(null);
     }
@@ -128,7 +111,7 @@ export default function FileUpload({ value, onUpload, onRemove, label, entityTyp
       const data = await doUpload(asset.uri, fname, asset.mimeType);
       onUpload?.(data);
     } catch (err) {
-      setError(err.response?.data?.message || t('documents.uploadError', 'Upload failed'));
+      setError(getUploadErrorMessage(err, t('documents.uploadError', 'Upload failed')));
     } finally {
       setUploadSource(null);
     }
@@ -192,6 +175,12 @@ export default function FileUpload({ value, onUpload, onRemove, label, entityTyp
         </Pressable>
       </View>
       {error && <Text className="text-xs text-destructive">{error}</Text>}
+
+      <InstantCamera
+        visible={cameraOpen}
+        onClose={() => setCameraOpen(false)}
+        onCapture={handleCameraCapture}
+      />
     </View>
   );
 }

@@ -1,66 +1,131 @@
-import { useState } from 'react';
-import { View, Text, ScrollView, Pressable, Alert, Image } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRef } from 'react';
+import { View, Text, Pressable, Alert, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { router } from 'expo-router';
 import {
   User, Shield, Puzzle, Calculator, ShoppingCart,
-  ChevronRight, LogOut, Moon, Sun, Monitor,
+  ChevronRight, LogOut, Moon, Sun, Monitor, Languages,
 } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
+import Constants from 'expo-constants';
 import useAuthStore from '@/stores/authStore';
 import useThemeStore from '@/stores/themeStore';
+import useLocaleStore, { SUPPORTED_LANGUAGES } from '@/stores/localeStore';
 import useSettings from '@/hooks/useSettings';
 import useCapabilities from '@/hooks/useCapabilities';
-import { Input } from '@/components/ui/Input';
-import { Label } from '@/components/ui/Label';
-import { Button } from '@/components/ui/Button';
-import Separator from '@/components/ui/Separator';
-import api from '@/lib/api';
-import { useToast } from '@/components/ui/Toast';
+import HeroSheetScreen, { useHeroSheetTokens } from '@/components/HeroSheetScreen';
+import SheetSection from '@/components/SheetSection';
+import { LanguagePickerSheet } from '@/components/LanguageSelector';
+import FlagTile, { getFlagComponent } from '@/components/flags';
 
-const logoLight = require('@/assets/images/logo.png');
-const logoDark = require('@/assets/images/logo-white.png');
-
-function SettingsRow({ icon: Icon, label, value, onPress, destructive }) {
-  const { resolvedTheme } = useThemeStore();
-  const iconColor = destructive
-    ? 'hsl(0, 72%, 51%)'
-    : (resolvedTheme === 'dark' ? 'hsl(148, 10%, 55%)' : 'hsl(150, 10%, 45%)');
-  const chevronColor = resolvedTheme === 'dark' ? 'hsl(148, 10%, 55%)' : 'hsl(150, 10%, 45%)';
+function SettingsRow({ icon: Icon, label, value, valueAccessory, onPress, destructive, isLast }) {
+  const { iconColor, mutedColor, textColor, errorColor, borderColor, dark } = useHeroSheetTokens();
+  const rowIconColor = destructive ? errorColor : iconColor;
+  const iconBg = destructive
+    ? (dark ? 'rgba(252,165,165,0.12)' : 'rgba(220,38,38,0.08)')
+    : (dark ? 'rgba(148,210,165,0.10)' : 'hsl(148, 30%, 95%)');
 
   return (
     <Pressable
-      onPress={onPress}
-      className="flex-row items-center px-4 py-3.5 active:bg-accent/50"
+      onPress={() => {
+        Haptics.selectionAsync();
+        onPress?.();
+      }}
+      style={({ pressed }) => ({
+        backgroundColor: pressed ? (dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)') : 'transparent',
+        borderBottomWidth: isLast ? 0 : StyleSheet.hairlineWidth,
+        borderBottomColor: borderColor,
+        borderRadius: 14,
+      })}
     >
-      {Icon && <Icon size={18} color={iconColor} style={{ marginRight: 12 }} />}
-      <Text className={`text-sm flex-1 ${destructive ? 'text-destructive font-medium' : 'text-foreground'}`}>
-        {label}
-      </Text>
-      {value && <Text className="text-sm text-muted-foreground mr-2">{value}</Text>}
-      {onPress && !destructive && <ChevronRight size={16} color={chevronColor} />}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 14,
+          paddingVertical: 14,
+        }}
+      >
+        {Icon && (
+          <View
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 11,
+              backgroundColor: iconBg,
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginRight: 14,
+              flexShrink: 0,
+            }}
+          >
+            <Icon size={17} color={rowIconColor} strokeWidth={2.2} />
+          </View>
+        )}
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text
+            style={{
+              fontSize: 15,
+              fontFamily: destructive ? 'Poppins-SemiBold' : 'Poppins-Medium',
+              color: destructive ? errorColor : textColor,
+            }}
+            numberOfLines={1}
+          >
+            {label}
+          </Text>
+        </View>
+        {(value || valueAccessory) && (
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              marginLeft: 8,
+              marginRight: 8,
+              flexShrink: 1,
+              minWidth: 0,
+            }}
+          >
+            {valueAccessory}
+            {value ? (
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontFamily: 'Poppins-Regular',
+                  color: mutedColor,
+                  flexShrink: 1,
+                }}
+                numberOfLines={1}
+              >
+                {value}
+              </Text>
+            ) : null}
+          </View>
+        )}
+        {onPress && !destructive && (
+          <ChevronRight size={18} color={mutedColor} style={{ flexShrink: 0 }} />
+        )}
+      </View>
     </Pressable>
   );
 }
 
 export default function SettingsScreen() {
   const { t } = useTranslation();
-  const { resolvedTheme } = useThemeStore();
-  const insets = useSafeAreaInsets();
   const { user, logout } = useAuthStore();
   const { theme, setTheme } = useThemeStore();
-  const { toast } = useToast();
+  const language = useLocaleStore((s) => s.language);
+  const currentLanguage =
+    SUPPORTED_LANGUAGES.find((l) => l.code === language) || SUPPORTED_LANGUAGES[0];
+  const currentLanguageFlag = getFlagComponent(currentLanguage.code) ? (
+    <FlagTile code={currentLanguage.code} size={16} width={24} radius={3} />
+  ) : null;
+  const languageSheetRef = useRef(null);
   const accountingSettings = useSettings('accounting');
   const { workspace, can } = useCapabilities();
   const isOwner = !!workspace?.isOwner;
 
-  const [section, setSection] = useState('main');
-  const [oldPassword, setOldPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [savingPassword, setSavingPassword] = useState(false);
-
-  const primaryColor = resolvedTheme === 'dark' ? 'hsl(148, 48%, 38%)' : 'hsl(148, 60%, 20%)';
+  const { dark, accentColor, mutedColor } = useHeroSheetTokens();
 
   const handleLogout = () => {
     Alert.alert(
@@ -80,177 +145,226 @@ export default function SettingsScreen() {
     );
   };
 
-  const handleChangePassword = async () => {
-    if (newPassword !== confirmPassword) {
-      toast({ variant: 'destructive', title: t('auth.passwordMismatch', 'Passwords do not match') });
-      return;
-    }
-    if (newPassword.length < 8) {
-      toast({ variant: 'destructive', title: t('auth.passwordMin', 'Password must be at least 8 characters') });
-      return;
-    }
-    setSavingPassword(true);
-    try {
-      await api.put('/settings/password', { currentPassword: oldPassword, newPassword });
-      toast({ title: t('settings.passwordChanged', 'Password changed successfully') });
-      setSection('main');
-      setOldPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-    } catch (err) {
-      toast({ variant: 'destructive', title: err.response?.data?.message || t('common.error', 'Error') });
-    } finally {
-      setSavingPassword(false);
-    }
-  };
-
-  if (section === 'security') {
-    return (
-      <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
-        <View className="px-4 pt-2 pb-3 border-b border-border flex-row items-center gap-3">
-          <Pressable onPress={() => setSection('main')} hitSlop={8}>
-            <Text className="text-sm text-primary font-medium">{t('common.back', 'Back')}</Text>
-          </Pressable>
-          <Text className="text-lg font-bold text-foreground">{t('settings.security', 'Security')}</Text>
-        </View>
-        <ScrollView className="flex-1 px-4 pt-4" contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
-          <View className="gap-4">
-            <View className="gap-2">
-              <Label>{t('settings.currentPassword', 'Current Password')}</Label>
-              <Input secureTextEntry value={oldPassword} onChangeText={setOldPassword} />
-            </View>
-            <View className="gap-2">
-              <Label>{t('settings.newPassword', 'New Password')}</Label>
-              <Input secureTextEntry value={newPassword} onChangeText={setNewPassword} />
-            </View>
-            <View className="gap-2">
-              <Label>{t('auth.confirmPassword', 'Confirm Password')}</Label>
-              <Input secureTextEntry value={confirmPassword} onChangeText={setConfirmPassword} />
-            </View>
-            <Button onPress={handleChangePassword} loading={savingPassword} disabled={savingPassword}>
-              {t('settings.changePassword', 'Change Password')}
-            </Button>
-          </View>
-        </ScrollView>
-      </View>
-    );
-  }
+  const initials = `${(user?.firstName?.[0] || '').toUpperCase()}${(user?.lastName?.[0] || '').toUpperCase()}`;
+  const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.email;
 
   const themeIcons = { light: Sun, dark: Moon, system: Monitor };
-  const themeLabels = { light: 'Light', dark: 'Dark', system: 'System' };
+  const themeLabels = {
+    light: t('common.light', 'Light'),
+    dark: t('common.dark', 'Dark'),
+    system: t('common.system', 'System'),
+  };
+
+  const heroAvatar = (
+    <Pressable
+      onPress={() => router.push('/(app)/settings-profile')}
+      hitSlop={6}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}
+    >
+      <View
+        style={{
+          height: 64,
+          width: 64,
+          borderRadius: 22,
+          backgroundColor: 'rgba(255,255,255,0.95)',
+          alignItems: 'center',
+          justifyContent: 'center',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.18,
+          shadowRadius: 12,
+          elevation: 6,
+        }}
+      >
+        <Text
+          style={{
+            fontFamily: 'Poppins-Bold',
+            fontSize: 24,
+            color: dark ? 'hsl(148, 60%, 22%)' : 'hsl(148, 60%, 22%)',
+            letterSpacing: -0.5,
+          }}
+        >
+          {initials || '?'}
+        </Text>
+      </View>
+      <View style={{ flex: 1, gap: 4 }}>
+        <Text
+          style={{
+            fontSize: 18,
+            fontFamily: 'Poppins-SemiBold',
+            color: '#ffffff',
+            letterSpacing: -0.3,
+          }}
+          numberOfLines={1}
+        >
+          {fullName}
+        </Text>
+        <Text
+          style={{
+            fontSize: 13,
+            fontFamily: 'Poppins-Regular',
+            color: 'rgba(255,255,255,0.78)',
+          }}
+          numberOfLines={1}
+        >
+          {user?.email}
+        </Text>
+        {user?.accountRole && (
+          <View
+            style={{
+              alignSelf: 'flex-start',
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: 'rgba(255,255,255,0.18)',
+              borderRadius: 999,
+              paddingHorizontal: 8,
+              paddingVertical: 2,
+              marginTop: 2,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 10,
+                fontFamily: 'Poppins-SemiBold',
+                color: '#ffffff',
+                letterSpacing: 0.6,
+                textTransform: 'uppercase',
+              }}
+            >
+              {t(`settings.roles.${user.accountRole}`, user.accountRole)}
+            </Text>
+          </View>
+        )}
+      </View>
+    </Pressable>
+  );
 
   return (
-    <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
-      <View className="px-4 pt-2 pb-3">
-        <Text className="text-xl font-bold text-foreground">{t('nav.settings')}</Text>
+    <HeroSheetScreen
+      title={t('nav.settings')}
+      subtitle={t('settings.subtitle', 'Manage your account, team, and preferences')}
+      showBack={false}
+      heroExtra={heroAvatar}
+    >
+      {/* Theme switcher + Language */}
+      <SheetSection title={t('settings.appearance', 'Appearance')} padded={false}>
+        <View style={{ flexDirection: 'row', gap: 6, padding: 6 }}>
+          {['light', 'dark', 'system'].map((mode) => {
+            const ThemeIcon = themeIcons[mode];
+            const isActive = theme === mode;
+            return (
+              <Pressable
+                key={mode}
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  setTheme(mode);
+                }}
+                style={{
+                  flex: 1,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  paddingVertical: 11,
+                  borderRadius: 12,
+                  backgroundColor: isActive
+                    ? (dark ? 'rgba(148,210,165,0.16)' : 'hsl(148, 35%, 92%)')
+                    : 'transparent',
+                  borderWidth: 1,
+                  borderColor: isActive ? accentColor : 'transparent',
+                }}
+              >
+                <ThemeIcon size={15} color={isActive ? accentColor : mutedColor} />
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontFamily: 'Poppins-Medium',
+                    color: isActive ? accentColor : mutedColor,
+                  }}
+                >
+                  {themeLabels[mode]}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <SettingsRow
+          icon={Languages}
+          label={t('common.language', 'Language')}
+          value={currentLanguage.native}
+          valueAccessory={currentLanguageFlag}
+          onPress={() => languageSheetRef.current?.open()}
+          isLast
+        />
+      </SheetSection>
+
+      {/* Account */}
+      <SheetSection title={t('settings.account', 'Account')} padded={false}>
+        <SettingsRow
+          icon={User}
+          label={t('settings.profile', 'Profile')}
+          onPress={() => router.push('/(app)/settings-profile')}
+        />
+        <SettingsRow
+          icon={Shield}
+          label={t('settings.security', 'Security')}
+          onPress={() => router.push('/(app)/settings-security')}
+          isLast={!isOwner}
+        />
+        {isOwner && (
+          <SettingsRow
+            icon={Puzzle}
+            label={t('settings.modules', 'Modules')}
+            onPress={() => router.push('/(app)/settings-modules')}
+            isLast
+          />
+        )}
+      </SheetSection>
+
+      {/* Preferences */}
+      {(can('settings:accounting:read') || can('settings:saleDefaults:read') || isOwner) && (
+        <SheetSection title={t('settings.preferences', 'Preferences')} padded={false}>
+          {(isOwner || can('settings:accounting:read')) && (
+            <SettingsRow
+              icon={Calculator}
+              label={t('settings.accounting', 'Accounting')}
+              value={accountingSettings?.currency || '—'}
+              onPress={() => router.push('/(app)/settings-accounting')}
+            />
+          )}
+          {(isOwner || can('settings:saleDefaults:read')) && (
+            <SettingsRow
+              icon={ShoppingCart}
+              label={t('settings.saleDefaults', 'Sale Defaults')}
+              onPress={() => router.push('/(app)/settings-sale-defaults')}
+              isLast
+            />
+          )}
+        </SheetSection>
+      )}
+
+      {/* Logout */}
+      <SheetSection padded={false}>
+        <SettingsRow
+          icon={LogOut}
+          label={t('auth.logout', 'Log Out')}
+          onPress={handleLogout}
+          destructive
+          isLast
+        />
+      </SheetSection>
+
+      {/* Footer */}
+      <View style={{ alignItems: 'center', marginTop: 8, marginBottom: 16, gap: 4 }}>
+        <Text style={{ fontSize: 11, fontFamily: 'Poppins-Medium', color: mutedColor }}>
+          PoultryManager.io · v{Constants.expoConfig?.version ?? '—'}
+        </Text>
+        <Text style={{ fontSize: 10, fontFamily: 'Poppins-Regular', color: mutedColor }}>
+          © {new Date().getFullYear()} Estera Tech LLC
+        </Text>
       </View>
 
-      <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
-        {/* Profile Section */}
-        <Pressable onPress={() => router.push('/(app)/settings-profile')} className="px-4 py-3 active:bg-accent/50">
-          <View className="flex-row items-center gap-3">
-            <View className="h-14 w-14 rounded-full bg-primary/10 items-center justify-center">
-              <Text className="text-xl font-bold text-primary">
-                {(user?.firstName?.[0] || '')}{(user?.lastName?.[0] || '')}
-              </Text>
-            </View>
-            <View className="flex-1">
-              <Text className="text-base font-semibold text-foreground">
-                {user?.firstName} {user?.lastName}
-              </Text>
-              <Text className="text-sm text-muted-foreground">{user?.email}</Text>
-            </View>
-            <ChevronRight size={16} color={resolvedTheme === 'dark' ? 'hsl(148, 10%, 55%)' : 'hsl(150, 10%, 45%)'} />
-          </View>
-        </Pressable>
-
-        <Separator className="my-1" />
-
-        {/* Theme */}
-        <View className="px-4 py-3">
-          <Text className="text-xs font-semibold text-muted-foreground uppercase mb-2">
-            {t('settings.appearance', 'Appearance')}
-          </Text>
-          <View className="flex-row gap-2">
-            {['light', 'dark', 'system'].map((mode) => {
-              const ThemeIcon = themeIcons[mode];
-              const isActive = theme === mode;
-              return (
-                <Pressable
-                  key={mode}
-                  onPress={() => setTheme(mode)}
-                  className={`flex-1 flex-row items-center justify-center gap-1.5 py-2.5 rounded-lg border ${
-                    isActive ? 'border-primary bg-primary/5' : 'border-border'
-                  }`}
-                >
-                  <ThemeIcon size={14} color={isActive ? primaryColor : (resolvedTheme === 'dark' ? 'hsl(148, 10%, 55%)' : 'hsl(150, 10%, 45%)')} />
-                  <Text className={`text-xs font-medium ${isActive ? 'text-primary' : 'text-muted-foreground'}`}>
-                    {themeLabels[mode]}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-
-        <Separator className="my-1" />
-
-        {/* Account */}
-        <View>
-          <Text className="text-xs font-semibold text-muted-foreground uppercase px-4 py-2">
-            {t('settings.account', 'Account')}
-          </Text>
-          <SettingsRow icon={Shield} label={t('settings.security', 'Security')} onPress={() => setSection('security')} />
-          {isOwner && (
-            <SettingsRow icon={Puzzle} label={t('settings.modules', 'Modules')} onPress={() => router.push('/(app)/settings-modules')} />
-          )}
-        </View>
-
-        {(can('settings:accounting:read') || can('settings:saleDefaults:read') || isOwner) && (
-          <>
-            <Separator className="my-1" />
-
-            {/* Preferences */}
-            <View>
-              <Text className="text-xs font-semibold text-muted-foreground uppercase px-4 py-2">
-                {t('settings.preferences', 'Preferences')}
-              </Text>
-              {(isOwner || can('settings:accounting:read')) && (
-                <SettingsRow
-                  icon={Calculator}
-                  label={t('settings.accounting', 'Accounting')}
-                  value={accountingSettings?.currency || '—'}
-                  onPress={() => router.push('/(app)/settings-accounting')}
-                />
-              )}
-              {(isOwner || can('settings:saleDefaults:read')) && (
-                <SettingsRow
-                  icon={ShoppingCart}
-                  label={t('settings.saleDefaults', 'Sale Defaults')}
-                  onPress={() => router.push('/(app)/settings-sale-defaults')}
-                />
-              )}
-            </View>
-          </>
-        )}
-
-        <Separator className="my-1" />
-
-        <View className="mt-2">
-          <SettingsRow icon={LogOut} label={t('auth.logout', 'Log Out')} onPress={handleLogout} destructive />
-        </View>
-
-        {/* Branding Footer */}
-        <View className="px-4 pt-8 pb-4 items-center gap-2">
-          <Image
-            source={resolvedTheme === 'dark' ? logoDark : logoLight}
-            style={{ width: 36, height: 36, borderRadius: 8 }}
-            resizeMode="contain"
-          />
-          <Text className="text-xs text-muted-foreground">PoultryManager.io v1.0.0</Text>
-          <Text className="text-[10px] text-muted-foreground">&copy; {new Date().getFullYear()} Estera Tech LLC</Text>
-        </View>
-      </ScrollView>
-    </View>
+      <LanguagePickerSheet ref={languageSheetRef} />
+    </HeroSheetScreen>
   );
 }

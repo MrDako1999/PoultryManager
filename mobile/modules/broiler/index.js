@@ -1,8 +1,8 @@
 import { Bird, Layers, Calculator, ClipboardList } from 'lucide-react-native';
 import broilerI18nEn from './i18n/en.json';
-import BroilerKpiCards from './dashboard/BroilerKpiCards';
+import BroilerKpiHero from './dashboard/BroilerKpiHero';
 import BroilerActiveBatches from './dashboard/BroilerActiveBatches';
-import BroilerFinancials from './dashboard/BroilerFinancials';
+import useBroilerQuickStats from './dashboard/broilerQuickStats';
 import BroilerSalesView from './accounting/BroilerSalesView';
 import BroilerExpensesView from './accounting/BroilerExpensesView';
 import WorkerHome from './screens/WorkerHome';
@@ -70,8 +70,8 @@ const broilerModule = {
 
   dashboardWidgets: [
     {
-      id: 'broilerKpiCards',
-      component: BroilerKpiCards,
+      id: 'broilerKpiHero',
+      component: BroilerKpiHero,
       capability: 'batch:read',
       order: 10,
       fullWidth: true,
@@ -83,14 +83,9 @@ const broilerModule = {
       order: 20,
       fullWidth: true,
     },
-    {
-      id: 'broilerFinancials',
-      component: BroilerFinancials,
-      capability: 'saleOrder:read',
-      order: 30,
-      fullWidth: true,
-    },
   ],
+
+  useDashboardQuickStats: useBroilerQuickStats,
 
   roleDashboards: {
     ground_staff: WorkerHome,
@@ -99,14 +94,20 @@ const broilerModule = {
   accountingViews: [
     {
       id: 'sales',
-      labelKey: 'modules.broiler.accounting.salesTab',
+      // Broiler i18n bundle defines this under `accounting.salesTab` and is
+      // deep-merged into the global `accounting` namespace at module-init
+      // time, so the key resolves at root. The previous
+      // `modules.broiler.accounting.salesTab` collided with the module's
+      // display-name namespace and never resolved — labels fell back to
+      // lowercase `id` ('sales' / 'expenses').
+      labelKey: 'accounting.salesTab',
       icon: Calculator,
       capability: 'saleOrder:read',
       component: BroilerSalesView,
     },
     {
       id: 'expenses',
-      labelKey: 'modules.broiler.accounting.expensesTab',
+      labelKey: 'accounting.expensesTab',
       icon: ClipboardList,
       capability: 'expense:read',
       component: BroilerExpensesView,

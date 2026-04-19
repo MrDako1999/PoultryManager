@@ -1,20 +1,21 @@
 import { useState, useEffect, useMemo } from 'react';
-import { View, Text, Modal, Pressable, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { X } from 'lucide-react-native';
-import { Input } from '@/components/ui/Input';
-import { Label } from '@/components/ui/Label';
-import { Button } from '@/components/ui/Button';
+import { PackagePlus } from 'lucide-react-native';
+import SheetInput from '@/components/SheetInput';
 import Select from '@/components/ui/Select';
 import EnumButtonSelect from '@/components/ui/EnumButtonSelect';
 import DatePicker from '@/components/ui/DatePicker';
-import Separator from '@/components/ui/Separator';
 import MultiFileUpload from '@/components/MultiFileUpload';
 import QuickAddBusinessSheet from '@/shared/sheets/QuickAddBusinessSheet';
+import FormSheet from '@/components/FormSheet';
+import {
+  FormSection, FormField, SummaryCard, SummaryRow, CardDivider,
+} from '@/components/FormSheetParts';
+import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import useLocalQuery from '@/hooks/useLocalQuery';
 import useSettings from '@/hooks/useSettings';
 import useOfflineMutation from '@/hooks/useOfflineMutation';
@@ -38,18 +39,8 @@ const sourceSchema = z.object({
   }
 });
 
-function FieldError({ error }) {
-  if (!error) return null;
-  return <Text className="text-xs text-destructive mt-1">{error.message}</Text>;
-}
-
-function RequiredStar() {
-  return <Text className="text-destructive"> *</Text>;
-}
-
 export default function SourceSheet({ open, onClose, batchId, editData }) {
   const { t } = useTranslation();
-  const { bottom: safeBottom } = useSafeAreaInsets();
   const { toast } = useToast();
   const accounting = useSettings('accounting');
   const [businesses] = useLocalQuery('businesses');
@@ -124,7 +115,10 @@ export default function SourceSheet({ open, onClose, batchId, editData }) {
     return opts;
   }, [businesses, pendingBiz]);
 
-  const invoiceTypeOptions = INVOICE_TYPES.map((v) => ({ value: v, label: t(`batches.invoiceTypes.${v}`), icon: INVOICE_TYPE_ICONS[v] }));
+  const invoiceTypeOptions = useMemo(
+    () => INVOICE_TYPES.map((v) => ({ value: v, label: t(`batches.invoiceTypes.${v}`), icon: INVOICE_TYPE_ICONS[v] })),
+    [t]
+  );
 
   const onSubmit = async (formData) => {
     setSaving(true);
@@ -160,125 +154,149 @@ export default function SourceSheet({ open, onClose, batchId, editData }) {
     }
   };
 
-  if (!open) return null;
+  const fmtMoney = (n) => `${currency} ${(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
-    <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1 bg-background">
-        <View className="flex-row items-center justify-between px-4 pt-4 pb-2">
-          <Text className="text-lg font-bold text-foreground">
-            {editData ? t('batches.editSource') : t('batches.addSource')}
-          </Text>
-          <Pressable onPress={onClose} hitSlop={8}>
-            <X size={20} color="hsl(150, 10%, 45%)" />
-          </Pressable>
-        </View>
-        <Separator />
-        <ScrollView className="flex-1 px-4" contentContainerClassName="py-4 gap-4" keyboardShouldPersistTaps="handled">
-          <View className="gap-2">
-            <Label>{t('batches.sourceFrom')}</Label>
-            <Controller control={control} name="sourceFrom"
+    <>
+      <FormSheet
+        open={open}
+        onClose={onClose}
+        title={editData ? t('batches.editSource') : t('batches.addSource')}
+        subtitle={t(`batches.invoiceTypes.${watchInvoiceType}`, '')}
+        icon={PackagePlus}
+        onSubmit={handleSubmit(onSubmit)}
+        submitLabel={editData ? t('common.save') : t('common.create')}
+        loading={saving}
+      >
+        {/* Supplier */}
+        <FormSection title={t('batches.sourceSupplier', 'Supplier & Invoice')}>
+          <FormField label={t('batches.sourceFrom')}>
+            <Controller
+              control={control}
+              name="sourceFrom"
               render={({ field: { value, onChange } }) => (
-                <Select value={value} onValueChange={onChange} options={businessOptions} placeholder={t('batches.selectSupplier')} label={t('batches.sourceFrom')} onCreateNew={(searchText) => { setBizInitialName(searchText || ''); setQuickAddBiz(true); }} createNewLabel={t('businesses.addBusiness', 'Add Business')} />
+                <Select
+                  value={value}
+                  onValueChange={onChange}
+                  options={businessOptions}
+                  placeholder={t('batches.selectSupplier')}
+                  label={t('batches.sourceFrom')}
+                  onCreateNew={(searchText) => { setBizInitialName(searchText || ''); setQuickAddBiz(true); }}
+                  createNewLabel={t('businesses.addBusiness', 'Add Business')}
+                />
               )}
             />
-          </View>
+          </FormField>
 
-          <View className="gap-2">
-            <Label>{t('batches.invoiceType')}<RequiredStar /></Label>
-            <Controller control={control} name="invoiceType"
+          <FormField label={t('batches.invoiceType')} required error={errors.invoiceType?.message}>
+            <Controller
+              control={control}
+              name="invoiceType"
               render={({ field: { value, onChange } }) => (
                 <EnumButtonSelect value={value} onChange={onChange} options={invoiceTypeOptions} columns={3} />
               )}
             />
-            <FieldError error={errors.invoiceType} />
-          </View>
+          </FormField>
 
-          {isTax && (
-            <View className="gap-2">
-              <Label>{t('batches.taxInvoiceId')}<RequiredStar /></Label>
-              <Controller control={control} name="taxInvoiceId"
-                render={({ field: { value, onChange } }) => (
-                  <Input value={value} onChangeText={onChange} placeholder={t('batches.invoiceIdPlaceholder')} />
-                )}
+          {isTax ? (
+            <Controller
+              control={control}
+              name="taxInvoiceId"
+              render={({ field: { value, onChange } }) => (
+                <SheetInput
+                  label={`${t('batches.taxInvoiceId')} *`}
+                  value={value}
+                  onChangeText={onChange}
+                  placeholder={t('batches.invoiceIdPlaceholder')}
+                  error={errors.taxInvoiceId?.message}
+                />
+              )}
+            />
+          ) : null}
+        </FormSection>
+
+        {/* Pricing */}
+        <FormSection title={t('batches.sourcePricing', 'Pricing & Quantity')}>
+          <Controller
+            control={control}
+            name="chicksRate"
+            render={({ field: { value, onChange } }) => (
+              <SheetInput
+                label={t('batches.chicksRate')}
+                value={value}
+                onChangeText={onChange}
+                keyboardType="decimal-pad"
+                placeholder="0.00"
+                suffix={<CurrencyTag label={currency} />}
               />
-              <FieldError error={errors.taxInvoiceId} />
-            </View>
-          )}
-
-          <View className="gap-2">
-            <Label>{t('batches.chicksRate')}</Label>
-            <Controller control={control} name="chicksRate"
-              render={({ field: { value, onChange } }) => (
-                <Input value={value} onChangeText={onChange} keyboardType="decimal-pad" placeholder="0.00" />
-              )}
-            />
-          </View>
-
-          <View className="gap-2">
-            <Label>{t('batches.quantityPurchased')}</Label>
-            <Controller control={control} name="quantityPurchased"
-              render={({ field: { value, onChange } }) => (
-                <Input value={value} onChangeText={onChange} keyboardType="number-pad" placeholder="0" />
-              )}
-            />
-          </View>
-
-          <View className="gap-2">
-            <Label>{t('batches.focPercentage')}</Label>
-            <Controller control={control} name="focPercentage"
-              render={({ field: { value, onChange } }) => (
-                <Input value={value} onChangeText={onChange} keyboardType="decimal-pad" placeholder="0" />
-              )}
-            />
-          </View>
-
-          <View className="rounded-lg border border-border bg-muted/30 px-3 py-2.5 gap-1">
-            <View className="flex-row justify-between">
-              <Text className="text-xs text-muted-foreground">{t('batches.totalChicksField')}</Text>
-              <Text className="text-sm font-semibold text-foreground">{totalChicks.toLocaleString()}</Text>
-            </View>
-            <View className="flex-row justify-between">
-              <Text className="text-xs text-muted-foreground">{t('batches.subtotal')}</Text>
-              <Text className="text-sm text-foreground" style={{ fontVariant: ['tabular-nums'] }}>
-                {currency} {subtotal.toFixed(2)}
-              </Text>
-            </View>
-            {isTax && (
-              <View className="flex-row justify-between">
-                <Text className="text-xs text-muted-foreground">{t('batches.vat')}</Text>
-                <Text className="text-sm text-foreground" style={{ fontVariant: ['tabular-nums'] }}>
-                  {currency} {vatAmount.toFixed(2)}
-                </Text>
-              </View>
             )}
-            <View className="flex-row justify-between">
-              <Text className="text-xs font-semibold text-foreground">{t('batches.grandTotal')}</Text>
-              <Text className="text-sm font-bold text-foreground" style={{ fontVariant: ['tabular-nums'] }}>
-                {currency} {grandTotal.toFixed(2)}
-              </Text>
-            </View>
-          </View>
+          />
+          <Controller
+            control={control}
+            name="quantityPurchased"
+            render={({ field: { value, onChange } }) => (
+              <SheetInput
+                label={t('batches.quantityPurchased')}
+                value={value}
+                onChangeText={onChange}
+                keyboardType="number-pad"
+                placeholder="0"
+              />
+            )}
+          />
+          <Controller
+            control={control}
+            name="focPercentage"
+            render={({ field: { value, onChange } }) => (
+              <SheetInput
+                label={t('batches.focPercentage')}
+                value={value}
+                onChangeText={onChange}
+                keyboardType="decimal-pad"
+                placeholder="0"
+                suffix={<CurrencyTag label="%" />}
+              />
+            )}
+          />
 
-          <View className="gap-2">
-            <Label>{t('batches.invoiceDate')}</Label>
-            <Controller control={control} name="invoiceDate"
+          <SummaryCard>
+            <SummaryRow
+              label={t('batches.totalChicksField')}
+              value={totalChicks.toLocaleString('en-US')}
+            />
+            <SummaryRow label={t('batches.subtotal')} value={fmtMoney(subtotal)} />
+            {isTax ? (
+              <SummaryRow label={t('batches.vat')} value={fmtMoney(vatAmount)} />
+            ) : null}
+            <CardDivider marginVertical={2} />
+            <SummaryRow label={t('batches.grandTotal')} value={fmtMoney(grandTotal)} emphasis />
+          </SummaryCard>
+        </FormSection>
+
+        {/* Dates */}
+        <FormSection title={t('batches.sourceDates', 'Dates')}>
+          <FormField label={t('batches.invoiceDate')}>
+            <Controller
+              control={control}
+              name="invoiceDate"
               render={({ field: { value, onChange } }) => (
                 <DatePicker value={value} onChange={onChange} label={t('batches.invoiceDate')} />
               )}
             />
-          </View>
-          <View className="gap-2">
-            <Label>{t('batches.deliveryDate')}</Label>
-            <Controller control={control} name="deliveryDate"
+          </FormField>
+          <FormField label={t('batches.deliveryDate')}>
+            <Controller
+              control={control}
+              name="deliveryDate"
               render={({ field: { value, onChange } }) => (
                 <DatePicker value={value} onChange={onChange} label={t('batches.deliveryDate')} />
               )}
             />
-          </View>
+          </FormField>
+        </FormSection>
 
-          <Separator />
-
+        {/* Documents */}
+        <FormSection title={t('batches.sourceDocuments', 'Documents')}>
           <MultiFileUpload
             label={t('batches.taxInvoiceDocs', 'Tax Invoice Documents')}
             files={taxInvoiceDocs}
@@ -288,7 +306,6 @@ export default function SourceSheet({ open, onClose, batchId, editData }) {
             entityId={editData?._id}
             category="sources"
           />
-
           <MultiFileUpload
             label={t('batches.transferProofs', 'Transfer Proofs')}
             files={transferProofs}
@@ -298,7 +315,6 @@ export default function SourceSheet({ open, onClose, batchId, editData }) {
             entityId={editData?._id}
             category="sources"
           />
-
           <MultiFileUpload
             label={t('batches.deliveryNoteDocs', 'Delivery Note Documents')}
             files={deliveryNoteDocs}
@@ -308,14 +324,8 @@ export default function SourceSheet({ open, onClose, batchId, editData }) {
             entityId={editData?._id}
             category="sources"
           />
-        </ScrollView>
-
-        <View className="px-4 pt-4 border-t border-border" style={{ paddingBottom: Math.max(safeBottom, 16) }}>
-          <Button onPress={handleSubmit(onSubmit)} loading={saving} disabled={saving}>
-            {editData ? t('common.save') : t('common.create')}
-          </Button>
-        </View>
-      </KeyboardAvoidingView>
+        </FormSection>
+      </FormSheet>
 
       <QuickAddBusinessSheet
         open={quickAddBiz}
@@ -327,6 +337,31 @@ export default function SourceSheet({ open, onClose, batchId, editData }) {
           toast({ title: `${biz.companyName} ${t('common.created', 'created')}` });
         }}
       />
-    </Modal>
+    </>
+  );
+}
+
+function CurrencyTag({ label }) {
+  const { mutedColor, dark } = useHeroSheetTokens();
+  return (
+    <View
+      style={{
+        backgroundColor: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+        borderRadius: 8,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+      }}
+    >
+      <Text
+        style={{
+          fontSize: 11,
+          fontFamily: 'Poppins-SemiBold',
+          color: mutedColor,
+          letterSpacing: 0.4,
+        }}
+      >
+        {label}
+      </Text>
+    </View>
   );
 }

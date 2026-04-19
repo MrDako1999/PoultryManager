@@ -1,24 +1,37 @@
 import { useState } from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View, Text, Pressable, Image, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import * as Haptics from 'expo-haptics';
-import { ArrowLeft, ArrowRight, Check, Building2 } from 'lucide-react-native';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/Card';
+import {
+  ArrowRight, ArrowLeft, Check, Building2, Mail, Bird, Egg, Feather,
+  Factory, Lock, ShoppingBag, Wrench, Layers,
+} from 'lucide-react-native';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Label } from '@/components/ui/Label';
-import { Checkbox } from '@/components/ui/Checkbox';
-import { Badge } from '@/components/ui/Badge';
-import PasswordInput from '@/components/ui/PasswordInput';
-import PasswordStrength from '@/components/PasswordStrength';
-import PhoneInput from '@/components/PhoneInput';
 import { useToast } from '@/components/ui/Toast';
 import useAuthStore from '@/stores/authStore';
-import useThemeStore from '@/stores/themeStore';
+import { useIsRTL } from '@/stores/localeStore';
+import HeroSheetScreen, { useHeroSheetTokens } from '@/components/HeroSheetScreen';
+import SheetSection from '@/components/SheetSection';
+import SheetInput, { SheetPasswordInput } from '@/components/SheetInput';
+import PhoneInput from '@/components/PhoneInput';
+import PasswordStrength from '@/components/PasswordStrength';
+import AuthHeroToolbar from '@/components/AuthHeroToolbar';
+
+const banner = require('@/assets/images/banner-white.png');
+
+const MODULE_META = {
+  broiler:        { icon: Bird,       color: '#059669', darkColor: '#34d399' },
+  hatchery:       { icon: Egg,        color: '#d97706', darkColor: '#fbbf24' },
+  'free-range':   { icon: Feather,    color: '#0284c7', darkColor: '#38bdf8' },
+  'egg-production': { icon: Egg,      color: '#ea580c', darkColor: '#fb923c' },
+  slaughterhouse: { icon: Factory,    color: '#dc2626', darkColor: '#f87171' },
+  marketing:      { icon: ShoppingBag, color: '#9333ea', darkColor: '#a78bfa' },
+  equipment:      { icon: Wrench,     color: '#475569', darkColor: '#94a3b8' },
+};
 
 const AVAILABLE_MODULES = [
   { slug: 'broiler', labelKey: 'modules.broiler', descKey: 'modules.broilerDesc', available: true },
@@ -47,10 +60,13 @@ export default function RegisterScreen() {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedModules, setSelectedModules] = useState(['broiler']);
+
   const { register: registerUser } = useAuthStore();
-  const { resolvedTheme } = useThemeStore();
   const { t } = useTranslation();
   const { toast } = useToast();
+  const isRTL = useIsRTL();
+  const ForwardArrow = isRTL ? ArrowLeft : ArrowRight;
+  const row = isRTL ? 'row-reverse' : 'row';
 
   const {
     control,
@@ -84,6 +100,7 @@ export default function RegisterScreen() {
       toast({ variant: 'destructive', title: t('modules.selectAtLeastOne') });
       return;
     }
+    Haptics.selectionAsync().catch(() => {});
     setStep(2);
   };
 
@@ -106,255 +123,571 @@ export default function RegisterScreen() {
     }
   };
 
-  const selectedModuleNames = AVAILABLE_MODULES
-    .filter((m) => selectedModules.includes(m.slug))
-    .map((m) => t(m.labelKey));
-
-  const iconColor = resolvedTheme === 'dark' ? '#e0e8e0' : '#1a2e1a';
-  const mutedIconColor = 'hsl(150, 10%, 45%)';
-
   if (step === 1) {
     return (
-      <View>
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('modules.title')}</CardTitle>
-            <CardDescription>{t('modules.subtitle')}</CardDescription>
-          </CardHeader>
-
-          <CardContent className="gap-3">
-            {AVAILABLE_MODULES.map((mod) => (
-              <Pressable
-                key={mod.slug}
-                onPress={() => mod.available && toggleModule(mod.slug)}
-                disabled={!mod.available}
-              >
-                <View
-                  className={`flex-row items-start gap-3 rounded-lg border p-3 ${
-                    !mod.available
-                      ? 'opacity-50 border-border'
-                      : selectedModules.includes(mod.slug)
-                        ? 'border-primary bg-primary/5'
-                        : 'border-border'
-                  }`}
-                >
-                  <Checkbox
-                    checked={selectedModules.includes(mod.slug)}
-                    onCheckedChange={() => mod.available && toggleModule(mod.slug)}
-                    disabled={!mod.available}
-                    className="mt-0.5"
-                  />
-                  <View className="flex-1">
-                    <View className="flex-row items-center gap-2">
-                      <Text className="text-sm font-medium text-foreground">{t(mod.labelKey)}</Text>
-                      {!mod.available && (
-                        <Badge variant="muted">
-                          <Text className="text-xs text-muted-foreground">{t('modules.comingSoon')}</Text>
-                        </Badge>
-                      )}
-                    </View>
-                    <Text className="text-xs text-muted-foreground mt-0.5">{t(mod.descKey)}</Text>
-                  </View>
-                </View>
-              </Pressable>
-            ))}
-          </CardContent>
-
-          <CardFooter className="gap-4">
-            <Button className="w-full" onPress={goToStep2}>
-              <View className="flex-row items-center gap-2">
-                <Text className="text-sm font-medium text-primary-foreground">{t('common.next')}</Text>
-                <ArrowRight size={16} color="#f5f8f5" />
-              </View>
-            </Button>
-
-            <View className="flex-row items-center justify-center gap-1">
-              <Text className="text-sm text-muted-foreground">{t('auth.hasAccount')}</Text>
-              <Pressable onPress={() => router.push('/(auth)/login')}>
-                <Text className="text-sm text-primary font-medium">{t('auth.login')}</Text>
-              </Pressable>
-            </View>
-          </CardFooter>
-        </Card>
-      </View>
+      <ModulePickerStep
+        t={t}
+        isRTL={isRTL}
+        row={row}
+        ForwardArrow={ForwardArrow}
+        selectedModules={selectedModules}
+        onToggle={toggleModule}
+        onNext={goToStep2}
+      />
     );
   }
 
   return (
-      <View>
-        <Card>
-          <CardHeader>
-            <View className="flex-row items-center gap-2">
-              <Pressable
-                onPress={() => setStep(1)}
-                className="h-8 w-8 items-center justify-center rounded-md active:bg-accent"
-              >
-                <ArrowLeft size={16} color={iconColor} />
-              </Pressable>
-              <View className="flex-1">
-                <CardTitle>{t('auth.registerTitle')}</CardTitle>
-                <CardDescription>{t('auth.registerSubtitle')}</CardDescription>
-              </View>
-            </View>
+    <FormStep
+      t={t}
+      isRTL={isRTL}
+      row={row}
+      control={control}
+      errors={errors}
+      watchPassword={watchPassword}
+      isSubmitting={isSubmitting}
+      onSubmit={handleSubmit(onSubmit)}
+      onBack={() => {
+        Haptics.selectionAsync().catch(() => {});
+        setStep(1);
+      }}
+      selectedModules={selectedModules}
+    />
+  );
+}
 
-            <View className="flex-row flex-wrap gap-1.5 pt-1">
-              {selectedModuleNames.map((name) => (
-                <Badge key={name} variant="outline" className="bg-primary/10 border-primary/20">
-                  <View className="flex-row items-center gap-1">
-                    <Check size={12} color={resolvedTheme === 'dark' ? 'hsl(148, 48%, 38%)' : 'hsl(148, 60%, 20%)'} />
-                    <Text className="text-xs font-medium text-primary">{name}</Text>
-                  </View>
-                </Badge>
-              ))}
-            </View>
-          </CardHeader>
+function ModulePickerStep({ t, isRTL, row, ForwardArrow, selectedModules, onToggle, onNext }) {
+  const activeCount = selectedModules.length;
 
-          <CardContent className="gap-4">
-            <View className="flex-row gap-3">
-              <View className="flex-1 gap-2">
-                <Label>{t('auth.firstName')}</Label>
-                <Controller
-                  control={control}
-                  name="firstName"
-                  render={({ field: { onChange, onBlur, value } }) => (
-                    <Input value={value} onChangeText={onChange} onBlur={onBlur} autoComplete="given-name" />
-                  )}
-                />
-                {errors.firstName && (
-                  <Text className="text-xs text-destructive">{t(errors.firstName.message)}</Text>
-                )}
-              </View>
-              <View className="flex-1 gap-2">
-                <Label>{t('auth.lastName')}</Label>
-                <Controller
-                  control={control}
-                  name="lastName"
-                  render={({ field: { onChange, onBlur, value } }) => (
-                    <Input value={value} onChangeText={onChange} onBlur={onBlur} autoComplete="family-name" />
-                  )}
-                />
-                {errors.lastName && (
-                  <Text className="text-xs text-destructive">{t(errors.lastName.message)}</Text>
-                )}
-              </View>
-            </View>
+  const headerRight = (
+    <View style={{ flexDirection: row, alignItems: 'center', gap: 8 }}>
+      <CountChip count={activeCount} t={t} />
+      <AuthHeroToolbar />
+    </View>
+  );
 
-            <View className="gap-2">
-              <Label>{t('auth.companyName')}</Label>
-              <View className="relative">
-                <View className="absolute left-3 top-0 h-12 justify-center z-10">
-                  <Building2 size={16} color={mutedIconColor} />
-                </View>
-                <Controller
-                  control={control}
-                  name="companyName"
-                  render={({ field: { onChange, onBlur, value } }) => (
-                    <Input
-                      value={value}
-                      onChangeText={onChange}
-                      onBlur={onBlur}
-                      autoComplete="organization"
-                      className="pl-9"
-                    />
-                  )}
-                />
-              </View>
-            </View>
-
-            <View className="gap-2">
-              <Label>{t('auth.phone')}</Label>
-              <Controller
-                control={control}
-                name="phone"
-                render={({ field: { onChange, value } }) => (
-                  <PhoneInput value={value} onChange={onChange} />
-                )}
-              />
-            </View>
-
-            <View className="gap-2">
-              <Label>{t('auth.email')}</Label>
-              <Controller
-                control={control}
-                name="email"
-                render={({ field: { onChange, onBlur, value } }) => (
-                  <Input
-                    value={value}
-                    onChangeText={onChange}
-                    onBlur={onBlur}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoComplete="email"
-                    placeholder="name@example.com"
-                    textContentType="emailAddress"
-                  />
-                )}
-              />
-              {errors.email && (
-                <Text className="text-sm text-destructive">{t(errors.email.message)}</Text>
-              )}
-            </View>
-
-            <View className="gap-2">
-              <Label>{t('auth.password')}</Label>
-              <Controller
-                control={control}
-                name="password"
-                render={({ field: { onChange, onBlur, value } }) => (
-                  <PasswordInput
-                    value={value}
-                    onChangeText={onChange}
-                    onBlur={onBlur}
-                    autoComplete="new-password"
-                    textContentType="newPassword"
-                  />
-                )}
-              />
-              <PasswordStrength password={watchPassword} />
-              {errors.password && (
-                <Text className="text-sm text-destructive">{t(errors.password.message)}</Text>
-              )}
-            </View>
-
-            <View className="gap-2">
-              <Label>{t('auth.confirmPassword')}</Label>
-              <Controller
-                control={control}
-                name="confirmPassword"
-                render={({ field: { onChange, onBlur, value } }) => (
-                  <PasswordInput
-                    value={value}
-                    onChangeText={onChange}
-                    onBlur={onBlur}
-                    autoComplete="new-password"
-                    textContentType="newPassword"
-                  />
-                )}
-              />
-              {errors.confirmPassword && (
-                <Text className="text-sm text-destructive">{t(errors.confirmPassword.message)}</Text>
-              )}
-            </View>
-          </CardContent>
-
-          <CardFooter className="gap-4">
-            <Button
-              className="w-full"
-              onPress={handleSubmit(onSubmit)}
-              loading={isSubmitting}
-              disabled={isSubmitting}
-            >
-              {t('auth.register')}
-            </Button>
-
-            <View className="flex-row items-center justify-center gap-1">
-              <Text className="text-sm text-muted-foreground">{t('auth.hasAccount')}</Text>
-              <Pressable onPress={() => router.push('/(auth)/login')}>
-                <Text className="text-sm text-primary font-medium">{t('auth.login')}</Text>
-              </Pressable>
-            </View>
-          </CardFooter>
-        </Card>
+  return (
+    <HeroSheetScreen
+      title={t('auth.registerTitle', 'Get Started')}
+      subtitle={t('modules.subtitle', 'Choose which modules you need access to')}
+      showBack={false}
+      headerRight={headerRight}
+      heroExtra={
+        <Image
+          source={banner}
+          style={{ width: 220, height: 56 }}
+          resizeMode="contain"
+        />
+      }
+    >
+      <View style={{ marginHorizontal: 16, gap: 12 }}>
+        {AVAILABLE_MODULES.map((mod) => (
+          <ModuleCard
+            key={mod.slug}
+            mod={mod}
+            isRTL={isRTL}
+            isSelected={selectedModules.includes(mod.slug)}
+            onToggle={onToggle}
+            t={t}
+          />
+        ))}
       </View>
+
+      <View style={{ marginHorizontal: 16, gap: 14, marginTop: 20 }}>
+        <Button
+          onPress={onNext}
+          size="lg"
+          className="w-full rounded-2xl"
+          disabled={activeCount === 0}
+        >
+          <View style={{ flexDirection: row, alignItems: 'center', gap: 8 }}>
+            <Text
+              style={{
+                fontFamily: 'Poppins-SemiBold',
+                fontSize: 15,
+                color: '#f5f8f5',
+              }}
+            >
+              {t('common.next')}
+            </Text>
+            <ForwardArrow size={18} color="#f5f8f5" strokeWidth={2.5} />
+          </View>
+        </Button>
+
+        <SignInLink t={t} row={row} />
+      </View>
+    </HeroSheetScreen>
+  );
+}
+
+function CountChip({ count, t }) {
+  if (count === 0) return null;
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: 'rgba(255,255,255,0.18)',
+        borderRadius: 999,
+        paddingHorizontal: 11,
+        paddingVertical: 6,
+      }}
+    >
+      <Check size={12} color="#ffffff" strokeWidth={2.6} />
+      <Text
+        style={{
+          fontSize: 12,
+          fontFamily: 'Poppins-SemiBold',
+          color: '#ffffff',
+          letterSpacing: 0.2,
+        }}
+      >
+        {count === 1
+          ? t('auth.registerOneSelected', '1 selected')
+          : t('auth.registerManySelected', '{{count}} selected', { count })}
+      </Text>
+    </View>
+  );
+}
+
+/**
+ * Module selection card. Brutally simple, three states.
+ *
+ * Layout: a single absolute-positioned <Pressable> per card.
+ *   - Hard-coded `flexDirection: 'row'` (not template-string-interpolated, no
+ *     destructured prop) so there is zero possibility of falling back to
+ *     'column' if a prop is undefined.
+ *   - alignItems: 'flex-start' so the icon and trailing chip hug the top
+ *     instead of vertically-centering against a tall description.
+ *   - The trailing chip is a sibling flex child — it physically cannot
+ *     overlap the text that lives in the middle column.
+ */
+function ModuleCard({ mod, isRTL, isSelected, onToggle, t }) {
+  const { dark, accentColor, mutedColor, textColor } = useHeroSheetTokens();
+  const Icon = (MODULE_META[mod.slug] || {}).icon || Layers;
+  const isLocked = !mod.available;
+  const textAlign = isRTL ? 'right' : 'left';
+
+  // Three explicit visual recipes:
+  let cardBg;
+  let borderColor = 'transparent';
+  let borderWidth = 0;
+  let iconBg;
+  let iconStroke;
+  let titleColor;
+
+  if (isLocked) {
+    cardBg = dark ? 'hsl(150, 14%, 18%)' : 'hsl(148, 10%, 96%)';
+    iconBg = dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)';
+    iconStroke = mutedColor;
+    titleColor = mutedColor;
+  } else if (isSelected) {
+    cardBg = dark ? 'hsl(148, 35%, 22%)' : 'hsl(148, 35%, 92%)';
+    borderColor = accentColor;
+    borderWidth = 2;
+    iconBg = accentColor;
+    iconStroke = '#ffffff';
+    titleColor = dark ? '#ffffff' : 'hsl(148, 60%, 18%)';
+  } else {
+    cardBg = dark ? 'hsl(150, 16%, 16%)' : '#ffffff';
+    borderColor = dark ? 'hsl(150, 14%, 24%)' : 'hsl(148, 14%, 88%)';
+    borderWidth = 1;
+    iconBg = dark ? 'hsl(148, 30%, 18%)' : 'hsl(148, 30%, 95%)';
+    iconStroke = accentColor;
+    titleColor = textColor;
+  }
+
+  // NOTE: NativeWind's react-native-css-interop has historically dropped
+  // `flexDirection` / `borderWidth` from functional Pressable styles
+  // (`style={({ pressed }) => ({...})}`). To sidestep that, we put ALL layout
+  // styling on a regular inner View, and use Pressable purely as a touch
+  // wrapper with a static (object, not function) style.
+  return (
+    <Pressable
+      onPress={() => {
+        if (!isLocked) onToggle(mod.slug);
+      }}
+      disabled={isLocked}
+      style={[
+        styles.cardOuter,
+        {
+          backgroundColor: cardBg,
+          borderColor,
+          borderWidth,
+          ...(isSelected && !dark
+            ? {
+                shadowColor: accentColor,
+                shadowOffset: { width: 0, height: 3 },
+                shadowOpacity: 0.18,
+                shadowRadius: 10,
+                elevation: 3,
+              }
+            : {}),
+        },
+      ]}
+    >
+      <View
+        style={[
+          styles.cardRow,
+          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+        ]}
+      >
+        {/* Icon tile — fixed width, never shrinks */}
+        <View style={[styles.iconTile, { backgroundColor: iconBg }]}>
+          <Icon size={22} color={iconStroke} strokeWidth={2.2} />
+        </View>
+
+        {/* Title + description column */}
+        <View style={styles.textColumn}>
+          <Text
+            style={[styles.title, { color: titleColor, textAlign }]}
+            numberOfLines={1}
+          >
+            {t(mod.labelKey)}
+          </Text>
+          <Text
+            style={[styles.description, { color: mutedColor, textAlign }]}
+            numberOfLines={2}
+          >
+            {t(mod.descKey)}
+          </Text>
+        </View>
+
+        {/* Trailing affordance — fixed-width column */}
+        <View style={styles.trailingSlot}>
+          {isLocked ? (
+            <Lock size={16} color={mutedColor} strokeWidth={2.2} />
+          ) : isSelected ? (
+            <View style={[styles.selectedDisc, { backgroundColor: accentColor }]}>
+              <Check size={16} color="#ffffff" strokeWidth={3.2} />
+            </View>
+          ) : (
+            <View
+              style={[
+                styles.idleRing,
+                {
+                  borderColor: dark
+                    ? 'rgba(255,255,255,0.22)'
+                    : 'rgba(0,0,0,0.18)',
+                },
+              ]}
+            />
+          )}
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  cardOuter: {
+    borderRadius: 18,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+  },
+  cardRow: {
+    alignItems: 'center',
+  },
+  iconTile: {
+    width: 44,
+    height: 44,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  textColumn: {
+    flex: 1,
+    minWidth: 0,
+    paddingHorizontal: 12,
+  },
+  title: {
+    fontSize: 15,
+    fontFamily: 'Poppins-SemiBold',
+    letterSpacing: -0.1,
+  },
+  description: {
+    fontSize: 12,
+    fontFamily: 'Poppins-Regular',
+    lineHeight: 16,
+    marginTop: 2,
+  },
+  trailingSlot: {
+    width: 32,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectedDisc: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  idleRing: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1.5,
+  },
+});
+
+function FormStep({
+  t,
+  isRTL,
+  row,
+  control,
+  errors,
+  watchPassword,
+  isSubmitting,
+  onSubmit,
+  onBack,
+  selectedModules,
+}) {
+  const { mutedColor, textColor } = useHeroSheetTokens();
+
+  const heroExtra = (
+    <View style={{ flexDirection: row, alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+      {selectedModules.map((slug) => {
+        const meta = MODULE_META[slug] || {};
+        const Icon = meta.icon || Layers;
+        const labelKey = AVAILABLE_MODULES.find((m) => m.slug === slug)?.labelKey || slug;
+        return (
+          <View
+            key={slug}
+            style={{
+              flexDirection: row,
+              alignItems: 'center',
+              gap: 6,
+              backgroundColor: 'rgba(255,255,255,0.18)',
+              borderRadius: 999,
+              paddingHorizontal: 10,
+              paddingVertical: 5,
+            }}
+          >
+            <Icon size={12} color="#ffffff" strokeWidth={2.4} />
+            <Text
+              style={{
+                fontSize: 11,
+                fontFamily: 'Poppins-SemiBold',
+                color: '#ffffff',
+                letterSpacing: 0.2,
+              }}
+            >
+              {t(labelKey)}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+
+  return (
+    <HeroSheetScreen
+      title={t('auth.registerTitle', 'Get Started')}
+      subtitle={t('auth.registerSubtitle', 'Create your PoultryManager account')}
+      showBack
+      onBack={onBack}
+      headerRight={<AuthHeroToolbar />}
+      heroExtra={heroExtra}
+      keyboardAvoiding
+    >
+      <SheetSection title={t('auth.personalInfoSection', 'Personal Information')}>
+        <View style={{ flexDirection: row, gap: 10, marginBottom: 14 }}>
+          <View style={{ flex: 1 }}>
+            <Controller
+              control={control}
+              name="firstName"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <SheetInput
+                  label={t('auth.firstName')}
+                  value={value}
+                  onChangeText={onChange}
+                  onBlur={onBlur}
+                  autoComplete="given-name"
+                  textContentType="givenName"
+                  error={errors.firstName ? t(errors.firstName.message) : undefined}
+                />
+              )}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Controller
+              control={control}
+              name="lastName"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <SheetInput
+                  label={t('auth.lastName')}
+                  value={value}
+                  onChangeText={onChange}
+                  onBlur={onBlur}
+                  autoComplete="family-name"
+                  textContentType="familyName"
+                  error={errors.lastName ? t(errors.lastName.message) : undefined}
+                />
+              )}
+            />
+          </View>
+        </View>
+
+        <Controller
+          control={control}
+          name="companyName"
+          render={({ field: { onChange, onBlur, value } }) => (
+            <SheetInput
+              label={t('auth.companyName')}
+              icon={Building2}
+              value={value}
+              onChangeText={onChange}
+              onBlur={onBlur}
+              autoComplete="organization"
+              textContentType="organizationName"
+              containerStyle={{ marginBottom: 14 }}
+            />
+          )}
+        />
+
+        <View style={{ gap: 8, marginBottom: 14 }}>
+          <Text
+            style={{
+              fontSize: 13,
+              fontFamily: 'Poppins-Medium',
+              color: textColor,
+              marginHorizontal: 4,
+              textAlign: isRTL ? 'right' : 'left',
+            }}
+          >
+            {t('auth.phone')}
+          </Text>
+          <Controller
+            control={control}
+            name="phone"
+            render={({ field: { onChange, value } }) => (
+              <PhoneInput value={value} onChange={onChange} />
+            )}
+          />
+        </View>
+      </SheetSection>
+
+      <SheetSection title={t('auth.accountSection', 'Account')}>
+        <Controller
+          control={control}
+          name="email"
+          render={({ field: { onChange, onBlur, value } }) => (
+            <SheetInput
+              label={t('auth.email')}
+              icon={Mail}
+              value={value}
+              onChangeText={onChange}
+              onBlur={onBlur}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="email"
+              textContentType="emailAddress"
+              placeholder={t('auth.emailPlaceholder')}
+              error={errors.email ? t(errors.email.message) : undefined}
+              containerStyle={{ marginBottom: 14 }}
+            />
+          )}
+        />
+
+        <Controller
+          control={control}
+          name="password"
+          render={({ field: { onChange, onBlur, value } }) => (
+            <SheetPasswordInput
+              label={t('auth.password')}
+              value={value}
+              onChangeText={onChange}
+              onBlur={onBlur}
+              autoComplete="new-password"
+              textContentType="newPassword"
+              error={errors.password ? t(errors.password.message) : undefined}
+              containerStyle={{ marginBottom: 6 }}
+            />
+          )}
+        />
+        <PasswordStrength password={watchPassword} />
+
+        <Controller
+          control={control}
+          name="confirmPassword"
+          render={({ field: { onChange, onBlur, value } }) => (
+            <SheetPasswordInput
+              label={t('auth.confirmPassword')}
+              value={value}
+              onChangeText={onChange}
+              onBlur={onBlur}
+              autoComplete="new-password"
+              textContentType="newPassword"
+              error={errors.confirmPassword ? t(errors.confirmPassword.message) : undefined}
+              containerStyle={{ marginTop: 14 }}
+            />
+          )}
+        />
+      </SheetSection>
+
+      <View style={{ marginHorizontal: 16, gap: 14, marginTop: 4 }}>
+        <Button
+          onPress={onSubmit}
+          loading={isSubmitting}
+          disabled={isSubmitting}
+          size="lg"
+          className="w-full rounded-2xl"
+        >
+          <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 15, color: '#f5f8f5' }}>
+            {t('auth.register')}
+          </Text>
+        </Button>
+
+        <SignInLink t={t} row={row} />
+
+        <View
+          style={{
+            flexDirection: row,
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 4,
+            marginTop: 4,
+          }}
+        >
+          <Text style={{ fontSize: 11, fontFamily: 'Poppins-Regular', color: mutedColor }}>
+            {t('auth.terms', 'By creating an account you accept our Terms.')}
+          </Text>
+        </View>
+      </View>
+    </HeroSheetScreen>
+  );
+}
+
+function SignInLink({ t, row }) {
+  const { mutedColor, accentColor } = useHeroSheetTokens();
+  return (
+    <View
+      style={{
+        flexDirection: row,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 4,
+        flexWrap: 'wrap',
+      }}
+    >
+      <Text style={{ fontSize: 14, fontFamily: 'Poppins-Regular', color: mutedColor }}>
+        {t('auth.hasAccount')}
+      </Text>
+      <Pressable onPress={() => router.push('/(auth)/login')} hitSlop={10}>
+        <Text
+          style={{
+            fontSize: 14,
+            fontFamily: 'Poppins-SemiBold',
+            color: accentColor,
+          }}
+        >
+          {t('auth.login')}
+        </Text>
+      </Pressable>
+    </View>
   );
 }

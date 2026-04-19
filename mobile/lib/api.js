@@ -6,8 +6,13 @@ const API_BASE_URL = __DEV__
   ? 'http://localhost:5001/api'
   : 'https://api.poultrymanager.io/api';
 
+// 30s timeout: long enough for slow uplinks (rural farm wifi, tethered LTE),
+// short enough that the sync engine doesn't hang `isSyncing=true` forever
+// when the device drops off the network mid-request. Without a timeout, the
+// popover got stuck on "Syncing…" and the icon spinner spun indefinitely.
 const api = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 30_000,
 });
 
 api.interceptors.request.use(async (config) => {

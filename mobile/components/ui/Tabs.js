@@ -1,14 +1,31 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Pressable, ScrollView, Animated } from 'react-native';
+import { View, Text, Pressable, ScrollView, Animated, StyleSheet } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
+import { useIsRTL } from '@/stores/localeStore';
 
+/**
+ * Tabs strip — design-language tokenized.
+ *
+ * Drop-in replacement for the legacy NativeWind tabs. Same props, same
+ * `position` Animated.Value contract for PagerView-driven indicator slides.
+ *
+ * Visual:
+ *   - Strip background: sheetBg, hairline bottom border (borderColor)
+ *   - Inactive label: Poppins-Medium 14pt, mutedColor
+ *   - Active label: Poppins-SemiBold 14pt, accentColor
+ *   - Indicator: 2.5pt accent-colored bar, rounded ends, slides smoothly
+ */
 export default function Tabs({
   tabs,
   value,
   onChange,
   position,
-  className = '',
 }) {
+  const tokens = useHeroSheetTokens();
+  const { sheetBg, borderColor, mutedColor, accentColor } = tokens;
+  const isRTL = useIsRTL();
+
   const scrollRef = useRef(null);
   const [layouts, setLayouts] = useState({});
   const containerWidth = useRef(0);
@@ -73,17 +90,23 @@ export default function Tabs({
 
   return (
     <View
-      className={`border-b border-border bg-background ${className}`}
+      style={[
+        styles.shell,
+        {
+          backgroundColor: sheetBg,
+          borderBottomColor: borderColor,
+        },
+      ]}
       onLayout={(e) => { containerWidth.current = e.nativeEvent.layout.width; }}
     >
       <ScrollView
         ref={scrollRef}
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 8 }}
+        contentContainerStyle={styles.scrollContent}
       >
         <View>
-          <View className="flex-row">
+          <View style={[styles.row, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             {tabs.map((tab, i) => {
               const isActive = i === activeIndex;
               return (
@@ -98,17 +121,18 @@ export default function Tabs({
                       return { ...prev, [tab.key]: { x, width } };
                     });
                   }}
-                  className="px-3"
-                  style={{ minHeight: 44 }}
+                  style={styles.tab}
                   hitSlop={6}
                   accessibilityRole="tab"
                   accessibilityState={{ selected: isActive }}
                 >
-                  <View className="flex-1 justify-center" style={{ paddingBottom: 8 }}>
+                  <View style={styles.tabInner}>
                     <AnimatedTabLabel
                       progress={progress}
                       index={i}
                       label={tab.label}
+                      mutedColor={mutedColor}
+                      accentColor={accentColor}
                     />
                   </View>
                 </Pressable>
@@ -119,14 +143,9 @@ export default function Tabs({
           {indicatorStyle && (
             <Animated.View
               pointerEvents="none"
-              className="bg-primary rounded-full"
               style={[
-                {
-                  position: 'absolute',
-                  left: 0,
-                  bottom: 0,
-                  height: 2,
-                },
+                styles.indicator,
+                { backgroundColor: accentColor },
                 indicatorStyle,
               ]}
             />
@@ -137,7 +156,7 @@ export default function Tabs({
   );
 }
 
-function AnimatedTabLabel({ progress, index, label }) {
+function AnimatedTabLabel({ progress, index, label, mutedColor, accentColor }) {
   // Active text fades in around `index`, fully visible at `index`, fades out
   // toward neighbors. Inactive text does the inverse.
   const activeOpacity = progress.interpolate({
@@ -153,24 +172,83 @@ function AnimatedTabLabel({ progress, index, label }) {
 
   return (
     <View>
-      <Animated.Text
-        className="text-sm font-medium text-muted-foreground"
+      {/* Invisible spacer locks the width to the wider (semibold) label so
+          neither the active nor inactive text gets truncated. */}
+      <Text
+        style={[styles.label, styles.labelActive, { opacity: 0, color: accentColor }]}
         numberOfLines={1}
-        style={{ opacity: inactiveOpacity }}
+      >
+        {label}
+      </Text>
+      <Animated.Text
+        style={[
+          styles.label,
+          styles.labelInactive,
+          {
+            position: 'absolute',
+            top: 0, left: 0, right: 0,
+            opacity: inactiveOpacity,
+            color: mutedColor,
+          },
+        ]}
+        numberOfLines={1}
       >
         {label}
       </Animated.Text>
       <Animated.Text
-        className="text-sm font-semibold text-primary"
+        style={[
+          styles.label,
+          styles.labelActive,
+          {
+            position: 'absolute',
+            top: 0, left: 0, right: 0,
+            opacity: activeOpacity,
+            color: accentColor,
+          },
+        ]}
         numberOfLines={1}
-        style={{
-          position: 'absolute',
-          top: 0, left: 0, right: 0,
-          opacity: activeOpacity,
-        }}
       >
         {label}
       </Animated.Text>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  shell: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  scrollContent: {
+    paddingHorizontal: 8,
+  },
+  row: {
+    alignItems: 'flex-end',
+  },
+  tab: {
+    paddingHorizontal: 14,
+    minHeight: 44,
+  },
+  tabInner: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingBottom: 10,
+    paddingTop: 6,
+  },
+  label: {
+    fontSize: 14,
+    letterSpacing: 0.1,
+  },
+  labelInactive: {
+    fontFamily: 'Poppins-Medium',
+  },
+  labelActive: {
+    fontFamily: 'Poppins-SemiBold',
+  },
+  indicator: {
+    position: 'absolute',
+    left: 0,
+    bottom: 0,
+    height: 2.5,
+    borderRadius: 1.5,
+  },
+});

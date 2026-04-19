@@ -1,30 +1,26 @@
 import { useState } from 'react';
-import { View, Pressable } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLocalSearchParams, router } from 'expo-router';
-import { ArrowLeft } from 'lucide-react-native';
-import useThemeStore from '@/stores/themeStore';
+import { useLocalSearchParams } from 'expo-router';
 import useLocalRecord from '@/hooks/useLocalRecord';
 import SourceDetail from '@/modules/broiler/details/SourceDetail';
 import SourceSheet from '@/modules/broiler/sheets/SourceSheet';
 
+/**
+ * Source detail route. The new SourceDetail renders its own
+ * HeroSheetScreen (back button, view-invoice / edit / delete chrome,
+ * brand hero, sectioned sheet, CTAs) — this screen just owns the
+ * SourceSheet edit wiring.
+ */
 export default function SourceScreen() {
   const { id } = useLocalSearchParams();
-  const insets = useSafeAreaInsets();
-  const { resolvedTheme } = useThemeStore();
-  const iconColor = resolvedTheme === 'dark' ? '#e0e8e0' : '#1a2e1a';
   const [sheetData, setSheetData] = useState(null);
 
   const [source] = useLocalRecord('sources', id);
-  const batchId = source?.batch && typeof source.batch === 'object' ? source.batch._id : source?.batch;
+  const batchId = source?.batch && typeof source.batch === 'object'
+    ? source.batch._id
+    : source?.batch;
 
   return (
-    <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
-      <View className="px-4 pt-2 pb-1 flex-row items-center">
-        <Pressable onPress={() => router.back()} className="h-9 w-9 items-center justify-center rounded-md" hitSlop={8}>
-          <ArrowLeft size={20} color={iconColor} />
-        </Pressable>
-      </View>
+    <>
       <SourceDetail sourceId={id} onEdit={(s) => setSheetData(s)} />
       <SourceSheet
         open={!!sheetData}
@@ -32,6 +28,6 @@ export default function SourceScreen() {
         batchId={batchId}
         editData={sheetData}
       />
-    </View>
+    </>
   );
 }

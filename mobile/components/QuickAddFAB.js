@@ -1,5 +1,8 @@
 import { useState, useRef, useCallback } from 'react';
-import { View, Text, Pressable, Animated, StyleSheet, Easing } from 'react-native';
+import {
+  View, Text, Pressable, Animated, Modal, StyleSheet, Easing,
+  useWindowDimensions,
+} from 'react-native';
 import { Plus } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import useThemeStore from '@/stores/themeStore';
@@ -8,23 +11,46 @@ const FAB_SIZE = 56;
 const MENU_GAP = 10;
 const EASE_OUT = Easing.bezier(0.16, 1, 0.3, 1);
 
-export default function QuickAddFAB({ items, bottomInset = 0 }) {
+/**
+ * Floating action button. Two modes:
+ *
+ * - **Direct action** (`directAction` prop set) — single-tap fires `directAction`
+ *   immediately. The dim/menu modal is never shown. Used by BatchDetail's
+ *   non-quick-add tabs (Sources/Sales/etc.) where there's only one create flow.
+ *
+ * - **Menu** (`items` prop) — tapping the FAB opens a small card of choices.
+ *   The card and its dim backdrop render inside a native `<Modal>` so they
+ *   sit on their own native window above EVERYTHING (tab bars, status bars,
+ *   anything with `overflow: hidden` in the parent tree). This is the
+ *   §8.h.1 popout pattern — without the Modal the dim would be clipped by
+ *   the tab bar on tab-landing screens (Directory, BatchesList).
+ *
+ * The FAB pill stays visually still on open/close. The in-tree pill goes
+ * to `opacity: 0` while the menu modal is open, and an identical clone is
+ * rendered inside the Modal at the EXACT same screen coordinates (captured
+ * via `measureInWindow()`). This avoids the bug where `bottom: bottomInset
+ * + 16` resolves to different physical positions in the in-tree parent
+ * (which may be clipped by a tab bar) versus the Modal's full-screen
+ * native window.
+ */
+export default function QuickAddFAB({ items, bottomInset = 0, directAction = null }) {
   const { resolvedTheme } = useThemeStore();
   const dark = resolvedTheme === 'dark';
-  const primaryColor = dark ? 'hsl(148, 48%, 38%)' : 'hsl(148, 60%, 20%)';
+  const { height: windowHeight } = useWindowDimensions();
 
   const [open, setOpen] = useState(false);
+  const [anchor, setAnchor] = useState(null); // { x, y, width, height } in window coords
+  const triggerRef = useRef(null);
+
   const card = useRef(new Animated.Value(0)).current;
   const rowsRef = useRef(null);
-  if (!rowsRef.current) rowsRef.current = items.map(() => new Animated.Value(0));
+  if (!rowsRef.current) rowsRef.current = (items || []).map(() => new Animated.Value(0));
   const rows = rowsRef.current;
+  const primaryColor = dark ? 'hsl(148, 48%, 38%)' : 'hsl(148, 60%, 20%)';
 
-  const show = useCallback(() => {
-    setOpen(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  const startOpenAnimation = useCallback(() => {
     card.setValue(0);
     rows.forEach((r) => r.setValue(0));
-
     Animated.parallel([
       Animated.timing(card, {
         toValue: 1,
@@ -32,7 +58,6 @@ export default function QuickAddFAB({ items, bottomInset = 0 }) {
         easing: EASE_OUT,
         useNativeDriver: true,
       }),
-      // Bottom row first (closest to FAB), cascading upward
       Animated.stagger(
         35,
         [...rows].reverse().map((r) =>
@@ -47,6 +72,15 @@ export default function QuickAddFAB({ items, bottomInset = 0 }) {
     ]).start();
   }, [card, rows]);
 
+  const show = useCallback(() => {
+    triggerRef.current?.measureInWindow?.((x, y, width, height) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      setAnchor({ x, y, width, height });
+      setOpen(true);
+      requestAnimationFrame(startOpenAnimation);
+    });
+  }, [startOpenAnimation]);
+
   const hide = useCallback(() => {
     Animated.timing(card, {
       toValue: 0,
@@ -60,9 +94,14 @@ export default function QuickAddFAB({ items, bottomInset = 0 }) {
   }, [card, rows]);
 
   const toggle = useCallback(() => {
+    if (directAction) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      directAction();
+      return;
+    }
     if (open) hide();
     else show();
-  }, [open, show, hide]);
+  }, [open, show, hide, directAction]);
 
   const handleSelect = useCallback(
     (onPress) => {
@@ -72,13 +111,11 @@ export default function QuickAddFAB({ items, bottomInset = 0 }) {
     [hide],
   );
 
-  // FAB icon rotation
   const fabRotation = card.interpolate({
     inputRange: [0, 1],
     outputRange: ['0deg', '45deg'],
   });
 
-  // Card: scales up from bottom-right corner + slides up from behind FAB
   const cardScale = card.interpolate({
     inputRange: [0, 1],
     outputRange: [0.4, 1],
@@ -88,115 +125,196 @@ export default function QuickAddFAB({ items, bottomInset = 0 }) {
     outputRange: [40, 0],
   });
 
+  const fabBg = dark ? 'hsl(148, 48%, 38%)' : 'hsl(148, 60%, 20%)';
+
+  // Menu position derived purely from the FAB's window-anchor. Since the
+  // Modal's window IS the full screen, convert the FAB's window-y (top
+  // edge from window top) into a `bottom` offset from the window bottom,
+  // then add MENU_GAP to lift the card off the FAB. Using `bottom` lets
+  // the card grow upward naturally without needing its own height.
+  const menuBottom = anchor ? windowHeight - anchor.y + MENU_GAP : 0;
+
   return (
     <>
-      {open && (
-        <Animated.View
-          style={[
-            StyleSheet.absoluteFill,
-            { backgroundColor: 'rgba(0,0,0,0.3)', opacity: card },
-          ]}
-        >
-          <Pressable style={StyleSheet.absoluteFill} onPress={hide} />
-        </Animated.View>
-      )}
-
-      {open && (
-        <Animated.View
-          style={{
-            position: 'absolute',
-            right: 20,
-            bottom: bottomInset + 16 + FAB_SIZE + MENU_GAP,
-            opacity: card,
-            transform: [{ scale: cardScale }, { translateY: cardTranslateY }],
-            transformOrigin: 'bottom right',
-          }}
-        >
-          <View
-            className="bg-card border border-border overflow-hidden"
-            style={{
-              borderRadius: 16,
-              minWidth: 180,
-              elevation: 8,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.18,
-              shadowRadius: 12,
-            }}
-          >
-            {items.map((item, index) => {
-              const r = rows[index];
-              const rowTranslateX = r.interpolate({
-                inputRange: [0, 1],
-                outputRange: [24, 0],
-              });
-              const rowOpacity = r.interpolate({
-                inputRange: [0, 0.4, 1],
-                outputRange: [0, 0.6, 1],
-              });
-
-              const Icon = item.icon;
-              return (
-                <Animated.View
-                  key={item.key}
-                  style={{
-                    opacity: rowOpacity,
-                    transform: [{ translateX: rowTranslateX }],
-                  }}
-                >
-                  <Pressable
-                    onPress={() => handleSelect(item.onPress)}
-                    className="flex-row items-center active:bg-muted/50"
-                    style={{
-                      paddingHorizontal: 14,
-                      paddingVertical: 12,
-                      gap: 12,
-                      borderTopWidth: index > 0 ? StyleSheet.hairlineWidth : 0,
-                      borderTopColor: dark
-                        ? 'rgba(255,255,255,0.08)'
-                        : 'rgba(0,0,0,0.06)',
-                    }}
-                  >
-                    <View
-                      className="items-center justify-center rounded-lg"
-                      style={{
-                        width: 30,
-                        height: 30,
-                        backgroundColor: dark
-                          ? 'rgba(76,175,80,0.15)'
-                          : 'rgba(30,70,30,0.08)',
-                      }}
-                    >
-                      <Icon size={15} color={primaryColor} />
-                    </View>
-                    <Text className="text-[13px] font-semibold text-foreground">
-                      {item.label}
-                    </Text>
-                  </Pressable>
-                </Animated.View>
-              );
-            })}
-          </View>
-        </Animated.View>
-      )}
-
+      {/* In-tree FAB. Anchored to the bottom-right of its parent (which is
+          the page, not the modal). Goes invisible while the menu is open;
+          the modal renders an identical clone at the captured coords. */}
       <Pressable
+        ref={triggerRef}
         onPress={toggle}
-        className="absolute h-14 w-14 rounded-full bg-primary items-center justify-center"
-        style={{
-          right: 20,
-          bottom: bottomInset + 16,
-          elevation: 6,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 3 },
-          shadowOpacity: 0.25,
-          shadowRadius: 5,
-        }}
+        style={[
+          styles.fab,
+          {
+            backgroundColor: fabBg,
+            right: 20,
+            bottom: bottomInset + 16,
+            opacity: open ? 0 : 1,
+          },
+        ]}
       >
         <Animated.View style={{ transform: [{ rotate: fabRotation }] }}>
           <Plus size={24} color="#fff" />
         </Animated.View>
       </Pressable>
+
+      {!directAction && (
+        <Modal
+          transparent
+          visible={open}
+          statusBarTranslucent
+          animationType="none"
+          onRequestClose={hide}
+        >
+          {/* Dim backdrop — fills the Modal's native window which spans the
+              entire screen, including the tab bar. */}
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: 'rgba(0,0,0,0.45)', opacity: card },
+            ]}
+          >
+            <Pressable style={StyleSheet.absoluteFill} onPress={hide} />
+          </Animated.View>
+
+          {anchor && (
+            <>
+              {/* Menu — positioned via `bottom` so it grows upward from
+                  MENU_GAP above the FAB's top edge. */}
+              <Animated.View
+                style={{
+                  position: 'absolute',
+                  right: 20,
+                  bottom: menuBottom,
+                  opacity: card,
+                  transform: [{ scale: cardScale }, { translateY: cardTranslateY }],
+                  transformOrigin: 'bottom right',
+                }}
+              >
+                <View
+                  style={{
+                    backgroundColor: dark ? 'hsl(150, 16%, 16%)' : '#ffffff',
+                    borderColor: dark ? 'hsl(150, 12%, 28%)' : 'hsl(148, 14%, 90%)',
+                    borderWidth: dark ? 1 : 0,
+                    borderRadius: 16,
+                    minWidth: 200,
+                    overflow: 'hidden',
+                    elevation: 12,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 6 },
+                    shadowOpacity: 0.22,
+                    shadowRadius: 16,
+                  }}
+                >
+                  {items.map((item, index) => {
+                    const r = rows[index];
+                    const rowTranslateX = r.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [24, 0],
+                    });
+                    const rowOpacity = r.interpolate({
+                      inputRange: [0, 0.4, 1],
+                      outputRange: [0, 0.6, 1],
+                    });
+
+                    const Icon = item.icon;
+                    return (
+                      <Animated.View
+                        key={item.key}
+                        style={{
+                          opacity: rowOpacity,
+                          transform: [{ translateX: rowTranslateX }],
+                        }}
+                      >
+                        <Pressable
+                          onPress={() => handleSelect(item.onPress)}
+                          style={({ pressed }) => ({
+                            backgroundColor: pressed
+                              ? (dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)')
+                              : 'transparent',
+                          })}
+                        >
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              paddingHorizontal: 14,
+                              paddingVertical: 12,
+                              gap: 12,
+                              borderTopWidth: index > 0 ? StyleSheet.hairlineWidth : 0,
+                              borderTopColor: dark
+                                ? 'rgba(255,255,255,0.08)'
+                                : 'rgba(0,0,0,0.06)',
+                            }}
+                          >
+                            <View
+                              style={{
+                                width: 30,
+                                height: 30,
+                                borderRadius: 8,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                backgroundColor: dark
+                                  ? 'rgba(76,175,80,0.15)'
+                                  : 'rgba(30,70,30,0.08)',
+                              }}
+                            >
+                              <Icon size={15} color={primaryColor} />
+                            </View>
+                            <Text
+                              style={{
+                                fontSize: 13,
+                                fontFamily: 'Poppins-SemiBold',
+                                color: dark ? '#f0f5f0' : '#0f1f10',
+                              }}
+                            >
+                              {item.label}
+                            </Text>
+                          </View>
+                        </Pressable>
+                      </Animated.View>
+                    );
+                  })}
+                </View>
+              </Animated.View>
+
+              {/* FAB clone — pinned to the captured screen coordinates so
+                  it overlays the in-tree FAB pixel-perfect. Tappable while
+                  the dim backdrop is showing. */}
+              <Pressable
+                onPress={toggle}
+                style={[
+                  styles.fab,
+                  {
+                    backgroundColor: fabBg,
+                    left: anchor.x,
+                    top: anchor.y,
+                  },
+                ]}
+              >
+                <Animated.View style={{ transform: [{ rotate: fabRotation }] }}>
+                  <Plus size={24} color="#fff" />
+                </Animated.View>
+              </Pressable>
+            </>
+          )}
+        </Modal>
+      )}
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  fab: {
+    position: 'absolute',
+    width: FAB_SIZE,
+    height: FAB_SIZE,
+    borderRadius: FAB_SIZE / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+  },
+});

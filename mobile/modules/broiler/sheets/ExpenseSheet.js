@@ -1,27 +1,40 @@
-import { useState, useEffect, useMemo } from 'react';
-import { View, Text, Modal, Pressable, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { View, Text, Dimensions, Animated, Keyboard, Platform, StyleSheet, Pressable } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { X } from 'lucide-react-native';
-import { Input } from '@/components/ui/Input';
-import { Label } from '@/components/ui/Label';
-import { Button } from '@/components/ui/Button';
+import { Receipt, FileCheck2, Wallet } from 'lucide-react-native';
+import SheetInput from '@/components/SheetInput';
 import Select from '@/components/ui/Select';
 import EnumButtonSelect from '@/components/ui/EnumButtonSelect';
 import DatePicker from '@/components/ui/DatePicker';
-import Separator from '@/components/ui/Separator';
-import MultiFileUpload from '@/components/MultiFileUpload';
+import CollapsedAttachmentSection from '@/components/CollapsedAttachmentSection';
+import KeyboardToolbar, { KEYBOARD_TOOLBAR_ID } from '@/components/ui/KeyboardToolbar';
 import QuickAddBusinessSheet from '@/shared/sheets/QuickAddBusinessSheet';
+import FormSheet from '@/components/FormSheet';
+import {
+  FormSection, FormField, SummaryCard, SummaryRow, CardDivider,
+} from '@/components/FormSheetParts';
+import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
+import { useIsRTL } from '@/stores/localeStore';
 import useLocalQuery from '@/hooks/useLocalQuery';
 import useSettings from '@/hooks/useSettings';
 import useOfflineMutation from '@/hooks/useOfflineMutation';
+import useFormStepper from '@/hooks/useFormStepper';
 import { INVOICE_TYPES, INVOICE_TYPE_ICONS, EXPENSE_CATEGORIES, EXPENSE_CATEGORY_ICONS } from '@/lib/constants';
 import { useToast } from '@/components/ui/Toast';
 
 const parseNum = (v) => { const n = parseFloat(String(v).replace(/,/g, '')); return isNaN(n) ? 0 : n; };
+
+// Frontend semantics: entered amount is the TOTAL (incl. VAT) on Tax Invoice;
+// gross + VAT are back-derived. On non-tax invoices entered = gross = total.
+const computeAmounts = ({ entered, isTaxInvoice, vatRate }) => {
+  const enteredNum = parseNum(entered);
+  const gross = isTaxInvoice ? enteredNum / (1 + vatRate / 100) : enteredNum;
+  const vat = isTaxInvoice ? enteredNum - gross : 0;
+  return { gross, vat, total: enteredNum };
+};
 
 const expenseSchema = z.object({
   expenseDate: z.string().min(1, 'Expense date is required'),
@@ -56,18 +69,43 @@ const expenseSchema = z.object({
   }
 });
 
-function FieldError({ error }) {
-  if (!error) return null;
-  return <Text className="text-xs text-destructive mt-1">{error.message}</Text>;
-}
+/**
+ * StageBlock - wraps a stage section, tracks its layout y, and fires
+ * `onFirstLayout(y, height)` exactly once on its first measurement so the
+ * parent can scroll it into view at the moment the layout is actually known.
+ */
+function StageBlock({ stageKey, onLayoutY, onFirstLayout, children, animateIn }) {
+  const opacity = useRef(new Animated.Value(animateIn ? 0 : 1)).current;
+  const translateY = useRef(new Animated.Value(animateIn ? 8 : 0)).current;
+  const firstLayoutDone = useRef(false);
 
-function RequiredStar() {
-  return <Text className="text-destructive"> *</Text>;
+  useEffect(() => {
+    if (!animateIn) return;
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 240, useNativeDriver: true }),
+      Animated.timing(translateY, { toValue: 0, duration: 240, useNativeDriver: true }),
+    ]).start();
+  }, [animateIn, opacity, translateY]);
+
+  return (
+    <Animated.View
+      onLayout={(e) => {
+        const { y, height } = e.nativeEvent.layout;
+        onLayoutY?.(stageKey, y, height);
+        if (!firstLayoutDone.current && height > 0) {
+          firstLayoutDone.current = true;
+          onFirstLayout?.(stageKey, y, height);
+        }
+      }}
+      style={{ opacity, transform: [{ translateY }] }}
+    >
+      {children}
+    </Animated.View>
+  );
 }
 
 export default function ExpenseSheet({ open, onClose, batchId, editData }) {
   const { t } = useTranslation();
-  const { bottom: safeBottom } = useSafeAreaInsets();
   const { toast } = useToast();
   const accounting = useSettings('accounting');
   const [businesses] = useLocalQuery('businesses');
@@ -81,6 +119,32 @@ export default function ExpenseSheet({ open, onClose, batchId, editData }) {
 
   const currency = accounting?.currency || 'AED';
   const vatRate = accounting?.vatRate || 5;
+
+  const scrollRef = useRef(null);
+  const scrollViewHeightRef = useRef(0);
+  const [scrollViewHeight, setScrollViewHeight] = useState(0);
+  const stageLayouts = useRef({});
+  const seenStagesRef = useRef(new Set());
+  const keyboardHeightRef = useRef(0);
+  const windowHeight = Dimensions.get('window').height;
+
+  const invoiceIdRef = useRef(null);
+  const datePickerRef = useRef(null);
+  const tradingCompanyRef = useRef(null);
+  const descriptionRef = useRef(null);
+  const amountRef = useRef(null);
+
+  useEffect(() => {
+    const onShow = (e) => {
+      keyboardHeightRef.current = e?.endCoordinates?.height || 0;
+    };
+    const onHide = () => {
+      keyboardHeightRef.current = 0;
+    };
+    const showSub = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', onShow);
+    const hideSub = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', onHide);
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
 
   const { control, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm({
     resolver: zodResolver(expenseSchema),
@@ -99,6 +163,9 @@ export default function ExpenseSheet({ open, onClose, batchId, editData }) {
     if (editData) {
       setReceipts(editData.receipts || []);
       setExpTransferProofs(editData.transferProofs || []);
+      const editEntered = editData.invoiceType === 'TAX_INVOICE' && editData.totalAmount
+        ? Number(editData.totalAmount).toString()
+        : editData.grossAmount?.toString() || '';
       reset({
         expenseDate: editData.expenseDate?.slice(0, 10) || new Date().toISOString().slice(0, 10),
         invoiceType: editData.invoiceType || '',
@@ -106,7 +173,7 @@ export default function ExpenseSheet({ open, onClose, batchId, editData }) {
         category: editData.category || '',
         description: editData.description || '',
         tradingCompany: (typeof editData.tradingCompany === 'object' ? editData.tradingCompany?._id : editData.tradingCompany) || '',
-        grossAmount: editData.grossAmount?.toString() || '',
+        grossAmount: editEntered,
       });
     } else {
       setReceipts([]);
@@ -121,18 +188,126 @@ export default function ExpenseSheet({ open, onClose, batchId, editData }) {
         grossAmount: '',
       });
     }
+    seenStagesRef.current = new Set(editData
+      ? ['invoiceType', 'category', 'invoiceIdAndDate', 'tradingCompany', 'description', 'amount', 'attachments']
+      : ['invoiceType']);
   }, [editData, reset, open]);
 
   const watchInvoiceType = watch('invoiceType');
   const watchCategory = watch('category');
+  const watchInvoiceId = watch('invoiceId');
+  const watchTradingCompany = watch('tradingCompany');
+  const watchDescription = watch('description');
+  const watchDate = watch('expenseDate');
   const watchGross = watch('grossAmount');
   const isTaxInvoice = watchInvoiceType === 'TAX_INVOICE';
-  const grossNum = parseNum(watchGross);
-  const taxableAmount = isTaxInvoice ? grossNum * (vatRate / 100) : 0;
-  const totalAmount = grossNum + taxableAmount;
+  const requiresInvoiceId = isTaxInvoice;
+  const requiresTradingCompany = isTaxInvoice || watchInvoiceType === 'CASH_MEMO';
+  const showInvoiceIdField = !!watchInvoiceType && watchInvoiceType !== 'NO_INVOICE';
 
-  const showCategory = !!editData || !!watchInvoiceType;
-  const showRemainingFields = !!editData || !!watchCategory;
+  const { gross: grossNum, vat: taxableAmount, total: totalAmount } = useMemo(
+    () => computeAmounts({ entered: watchGross, isTaxInvoice, vatRate }),
+    [watchGross, isTaxInvoice, vatRate]
+  );
+
+  // Stage progression uses a "high-water-mark" - once a stage has been
+  // unlocked, it stays unlocked even if the user temporarily blanks the
+  // gating field.
+  const liveStage = useMemo(() => {
+    if (!watchInvoiceType) return 0;
+    if (!watchCategory) return 1;
+    const stage3Ok = requiresInvoiceId
+      ? (!!watchInvoiceId && !!watchDate)
+      : !!watchDate;
+    if (!stage3Ok) return 2;
+    if (requiresTradingCompany && !watchTradingCompany) return 3;
+    if (!watchDescription) return 4;
+    if (!(grossNum > 0)) return 5;
+    return 6;
+  }, [
+    watchInvoiceType, watchCategory, watchInvoiceId, watchDate,
+    watchTradingCompany, watchDescription, grossNum,
+    requiresInvoiceId, requiresTradingCompany,
+  ]);
+
+  const [maxStage, setMaxStage] = useState(0);
+  useEffect(() => {
+    if (liveStage > maxStage) setMaxStage(liveStage);
+  }, [liveStage, maxStage]);
+
+  useEffect(() => {
+    setMaxStage(editData ? 6 : 0);
+  }, [editData, open]);
+
+  const showStage = {
+    invoiceType: true,
+    category: maxStage >= 1,
+    invoiceIdAndDate: maxStage >= 2,
+    tradingCompany: maxStage >= 3,
+    description: maxStage >= 4,
+    amount: maxStage >= 5,
+    attachments: maxStage >= 6,
+  };
+
+  const handleStageLayout = useCallback((key, y, height) => {
+    stageLayouts.current[key] = { y, height };
+  }, []);
+
+  const visibleViewport = useCallback(() => {
+    const viewH = scrollViewHeightRef.current || windowHeight;
+    return Math.max(180, viewH - keyboardHeightRef.current);
+  }, [windowHeight]);
+
+  const scrollYIntoView = useCallback((y, { offsetRatio = 0.30 } = {}) => {
+    if (typeof y !== 'number' || !scrollRef.current) return;
+    const target = Math.max(0, y - visibleViewport() * offsetRatio);
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ y: target, animated: true });
+    });
+  }, [visibleViewport]);
+
+  const handleStageFirstLayout = useCallback((key, y) => {
+    if (seenStagesRef.current.has(key)) return;
+    seenStagesRef.current.add(key);
+    if (key === 'invoiceType') return;
+    scrollYIntoView(y, { offsetRatio: 0.22 });
+  }, [scrollYIntoView]);
+
+  const scrollStageAboveKeyboard = useCallback((stageKey) => {
+    const layout = stageLayouts.current[stageKey];
+    if (!layout) return;
+    const padding = 16;
+    const targetBottomY = layout.y + layout.height + padding;
+    const desiredTopY = targetBottomY - visibleViewport();
+    if (desiredTopY <= 0) return;
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ y: desiredTopY, animated: true });
+    });
+  }, [visibleViewport]);
+
+  const scrollStageIntoBand = useCallback((stageKey) => {
+    const layout = stageLayouts.current[stageKey];
+    if (!layout) return;
+    scrollYIntoView(layout.y, { offsetRatio: 0.22 });
+  }, [scrollYIntoView]);
+
+  const stepperSteps = useMemo(() => [
+    { key: 'invoiceType', available: showStage.invoiceType, onActivate: () => { Keyboard.dismiss(); scrollStageIntoBand('invoiceType'); } },
+    { key: 'category', available: showStage.category, onActivate: () => { Keyboard.dismiss(); scrollStageIntoBand('category'); } },
+    { key: 'invoiceId', available: showStage.invoiceIdAndDate && showInvoiceIdField, onActivate: () => { invoiceIdRef.current?.focus(); } },
+    { key: 'expenseDate', available: showStage.invoiceIdAndDate, onActivate: () => { datePickerRef.current?.open(); } },
+    { key: 'tradingCompany', available: showStage.tradingCompany, onActivate: () => { tradingCompanyRef.current?.open(); } },
+    { key: 'description', available: showStage.description, onActivate: () => { descriptionRef.current?.focus(); } },
+    { key: 'amount', available: showStage.amount, onActivate: () => { amountRef.current?.focus(); } },
+    { key: 'attachments', available: showStage.attachments, onActivate: () => { Keyboard.dismiss(); scrollStageIntoBand('attachments'); } },
+  ], [showStage, showInvoiceIdField, scrollStageIntoBand]);
+
+  const stepper = useFormStepper(stepperSteps);
+
+  useEffect(() => {
+    if (open) stepper.setCurrentKey(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const businessOptions = useMemo(() => {
     const opts = businesses.map((b) => ({ value: b._id, label: b.companyName }));
@@ -142,12 +317,23 @@ export default function ExpenseSheet({ open, onClose, batchId, editData }) {
     return opts;
   }, [businesses, pendingBiz]);
 
-  const invoiceTypeOptions = INVOICE_TYPES.map((v) => ({ value: v, label: t(`batches.invoiceTypes.${v}`), icon: INVOICE_TYPE_ICONS[v] }));
-  const categoryOptions = EXPENSE_CATEGORIES.map((v) => ({ value: v, label: t(`batches.expenseCategories.${v}`), icon: EXPENSE_CATEGORY_ICONS[v] }));
+  const invoiceTypeOptions = useMemo(
+    () => INVOICE_TYPES.map((v) => ({ value: v, label: t(`batches.invoiceTypes.${v}`), icon: INVOICE_TYPE_ICONS[v] })),
+    [t]
+  );
+  const categoryOptions = useMemo(
+    () => EXPENSE_CATEGORIES.map((v) => ({ value: v, label: t(`batches.expenseCategories.${v}`), icon: EXPENSE_CATEGORY_ICONS[v] })),
+    [t]
+  );
 
   const onSubmit = async (formData) => {
     setSaving(true);
     try {
+      const { gross, vat, total } = computeAmounts({
+        entered: formData.grossAmount,
+        isTaxInvoice: formData.invoiceType === 'TAX_INVOICE',
+        vatRate,
+      });
       const payload = {
         batch: batchId,
         expenseDate: formData.expenseDate,
@@ -156,9 +342,9 @@ export default function ExpenseSheet({ open, onClose, batchId, editData }) {
         category: formData.category || 'OTHERS',
         description: formData.description || '',
         tradingCompany: formData.tradingCompany || null,
-        grossAmount: grossNum,
-        taxableAmount,
-        totalAmount,
+        grossAmount: gross,
+        taxableAmount: vat,
+        totalAmount: total,
         receipts: receipts.map((m) => m._id),
         transferProofs: expTransferProofs.map((m) => m._id),
       };
@@ -179,150 +365,244 @@ export default function ExpenseSheet({ open, onClose, batchId, editData }) {
     }
   };
 
-  if (!open) return null;
+  const formatMoney = (n) => `${currency} ${(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  const summaryHasContent = totalAmount > 0;
+  const categoryLabel = watchCategory ? t(`batches.expenseCategories.${watchCategory}`) : '';
 
   return (
-    <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1 bg-background">
-        <View className="flex-row items-center justify-between px-4 pt-4 pb-2">
-          <Text className="text-lg font-bold text-foreground">
-            {editData ? t('batches.editExpense') : t('batches.addExpense')}
-          </Text>
-          <Pressable onPress={onClose} hitSlop={8}>
-            <X size={20} color="hsl(150, 10%, 45%)" />
-          </Pressable>
-        </View>
-        <Separator />
-        <ScrollView className="flex-1 px-4" contentContainerClassName="py-4 gap-4" keyboardShouldPersistTaps="handled">
-          {/* Step 1: Invoice Type (always visible) */}
-          <View className="gap-2">
-            <Label>{t('batches.invoiceType')}<RequiredStar /></Label>
-            <Controller
-              control={control}
-              name="invoiceType"
-              render={({ field: { value, onChange } }) => (
-                <EnumButtonSelect value={value} onChange={onChange} options={invoiceTypeOptions} columns={3} />
-              )}
+    <>
+      <FormSheet
+        open={open}
+        onClose={onClose}
+        title={editData ? t('batches.editExpense') : t('batches.addExpense')}
+        subtitle={categoryLabel || t('batches.expenseSubtitle', 'Track a new expense')}
+        icon={Wallet}
+        onSubmit={handleSubmit(onSubmit)}
+        submitLabel={editData ? t('common.save') : t('common.create')}
+        loading={saving}
+        scrollViewProps={{
+          ref: scrollRef,
+          onLayout: (e) => {
+            const h = e.nativeEvent.layout.height;
+            scrollViewHeightRef.current = h;
+            setScrollViewHeight(h);
+          },
+        }}
+        scrollContentStyle={{
+          paddingBottom: Math.max((scrollViewHeight || windowHeight) * 0.55, 220),
+        }}
+        footerExtra={
+          summaryHasContent ? (
+            <ExpenseStickySummary
+              currency={currency}
+              isTaxInvoice={isTaxInvoice}
+              categoryLabel={categoryLabel}
+              date={watchDate}
+              grossNum={grossNum}
+              taxableAmount={taxableAmount}
+              totalAmount={totalAmount}
+              onPress={() => {
+                const layout = stageLayouts.current.amount;
+                if (layout) scrollYIntoView(layout.y, { offsetRatio: 0.18 });
+              }}
+              t={t}
             />
-            <FieldError error={errors.invoiceType} />
-          </View>
-
-          {/* Step 2: Category (visible after invoice type selected) */}
-          {showCategory && (
-            <View className="gap-2">
-              <Label>{t('batches.expenseCategory')}<RequiredStar /></Label>
+          ) : null
+        }
+      >
+        {/* Stage 1 - Invoice Type */}
+        <StageBlock stageKey="invoiceType" onLayoutY={handleStageLayout} onFirstLayout={handleStageFirstLayout}>
+          <FormSection title={t('batches.invoiceType')}>
+            <FormField label={t('batches.invoiceType')} required error={errors.invoiceType?.message}>
               <Controller
                 control={control}
-                name="category"
+                name="invoiceType"
                 render={({ field: { value, onChange } }) => (
-                  <EnumButtonSelect value={value} onChange={onChange} options={categoryOptions} columns={3} compact />
+                  <EnumButtonSelect
+                    value={value}
+                    onChange={(v) => { onChange(v); stepper.setCurrentKey('invoiceType'); requestAnimationFrame(() => stepper.next()); }}
+                    options={invoiceTypeOptions}
+                    columns={3}
+                  />
                 )}
               />
-              <FieldError error={errors.category} />
-            </View>
-          )}
+            </FormField>
+          </FormSection>
+        </StageBlock>
 
-          {/* Step 3: Remaining fields (visible after category selected) */}
-          {showRemainingFields && (
-            <>
-              {watchInvoiceType && watchInvoiceType !== 'NO_INVOICE' && (
-                <View className="gap-2">
-                  <Label>
-                    {t('batches.invoiceIdLabel')}
-                    {watchInvoiceType === 'TAX_INVOICE' && <RequiredStar />}
-                  </Label>
-                  <Controller
-                    control={control}
-                    name="invoiceId"
-                    render={({ field: { value, onChange } }) => (
-                      <Input value={value} onChangeText={onChange} placeholder={t('batches.invoiceIdPlaceholder')} />
-                    )}
-                  />
-                  <FieldError error={errors.invoiceId} />
-                </View>
-              )}
+        {/* Stage 2 - Category */}
+        {showStage.category ? (
+          <StageBlock stageKey="category" onLayoutY={handleStageLayout} onFirstLayout={handleStageFirstLayout} animateIn>
+            <FormSection title={t('batches.expenseCategory')}>
+              <FormField label={t('batches.expenseCategory')} required error={errors.category?.message}>
+                <Controller
+                  control={control}
+                  name="category"
+                  render={({ field: { value, onChange } }) => (
+                    <EnumButtonSelect
+                      value={value}
+                      onChange={(v) => { onChange(v); stepper.setCurrentKey('category'); requestAnimationFrame(() => stepper.next()); }}
+                      options={categoryOptions}
+                      columns={3}
+                      compact
+                    />
+                  )}
+                />
+              </FormField>
+            </FormSection>
+          </StageBlock>
+        ) : null}
 
-              <View className="gap-2">
-                <Label>{t('batches.expenseDate')}<RequiredStar /></Label>
+        {/* Stage 3 - Invoice ID + Date */}
+        {showStage.invoiceIdAndDate ? (
+          <StageBlock stageKey="invoiceIdAndDate" onLayoutY={handleStageLayout} onFirstLayout={handleStageFirstLayout} animateIn>
+            <FormSection title={t('batches.invoiceDetails', 'Invoice Details')}>
+              {showInvoiceIdField ? (
+                <Controller
+                  control={control}
+                  name="invoiceId"
+                  render={({ field: { value, onChange } }) => (
+                    <SheetInput
+                      ref={invoiceIdRef}
+                      label={`${t('batches.invoiceIdLabel')}${requiresInvoiceId ? ' *' : ''}`}
+                      value={value}
+                      onChangeText={onChange}
+                      onFocus={() => { stepper.setCurrentKey('invoiceId'); scrollStageAboveKeyboard('invoiceIdAndDate'); }}
+                      placeholder={t('batches.invoiceIdPlaceholder')}
+                      inputAccessoryViewID={KEYBOARD_TOOLBAR_ID}
+                      returnKeyType="next"
+                      onSubmitEditing={() => stepper.next()}
+                      blurOnSubmit={false}
+                      error={errors.invoiceId?.message}
+                    />
+                  )}
+                />
+              ) : null}
+              <FormField label={t('batches.expenseDate')} required error={errors.expenseDate?.message}>
                 <Controller
                   control={control}
                   name="expenseDate"
                   render={({ field: { value, onChange } }) => (
-                    <DatePicker value={value} onChange={onChange} label={t('batches.expenseDate')} />
+                    <DatePicker
+                      ref={datePickerRef}
+                      value={value}
+                      onChange={(v) => { onChange(v); requestAnimationFrame(() => stepper.next()); }}
+                      onOpen={() => { stepper.setCurrentKey('expenseDate'); scrollStageIntoBand('invoiceIdAndDate'); }}
+                      label={t('batches.expenseDate')}
+                    />
                   )}
                 />
-                <FieldError error={errors.expenseDate} />
-              </View>
+              </FormField>
+            </FormSection>
+          </StageBlock>
+        ) : null}
 
-              <View className="gap-2">
-                <Label>{t('batches.expenseDescription')}<RequiredStar /></Label>
-                <Controller
-                  control={control}
-                  name="description"
-                  render={({ field: { value, onChange } }) => (
-                    <Input value={value} onChangeText={onChange} placeholder={t('batches.expenseDescriptionPlaceholder')} />
-                  )}
-                />
-                <FieldError error={errors.description} />
-              </View>
-
-              <View className="gap-2">
-                <Label>
-                  {t('batches.tradingCompany')}
-                  {(watchInvoiceType === 'TAX_INVOICE' || watchInvoiceType === 'CASH_MEMO') && <RequiredStar />}
-                </Label>
+        {/* Stage 4 - Trading Company */}
+        {showStage.tradingCompany ? (
+          <StageBlock stageKey="tradingCompany" onLayoutY={handleStageLayout} onFirstLayout={handleStageFirstLayout} animateIn>
+            <FormSection title={t('batches.tradingCompany')}>
+              <FormField
+                label={`${t('batches.tradingCompany')}${requiresTradingCompany ? ' *' : ''}`}
+                error={errors.tradingCompany?.message}
+              >
                 <Controller
                   control={control}
                   name="tradingCompany"
                   render={({ field: { value, onChange } }) => (
                     <Select
+                      ref={tradingCompanyRef}
                       value={value}
-                      onValueChange={onChange}
+                      onValueChange={(v) => {
+                        onChange(v ?? '');
+                        if (v) requestAnimationFrame(() => stepper.next());
+                      }}
+                      onOpen={() => { stepper.setCurrentKey('tradingCompany'); scrollStageIntoBand('tradingCompany'); }}
                       options={businessOptions}
                       placeholder={t('batches.selectCompany')}
                       label={t('batches.tradingCompany')}
                       onCreateNew={(searchText) => { setBizInitialName(searchText || ''); setQuickAddBiz(true); }}
                       createNewLabel={t('businesses.addBusiness', 'Add Business')}
+                      clearable
                     />
                   )}
                 />
-                <FieldError error={errors.tradingCompany} />
-              </View>
+              </FormField>
+            </FormSection>
+          </StageBlock>
+        ) : null}
 
-              <Separator />
+        {/* Stage 5 - Description */}
+        {showStage.description ? (
+          <StageBlock stageKey="description" onLayoutY={handleStageLayout} onFirstLayout={handleStageFirstLayout} animateIn>
+            <FormSection title={t('batches.expenseDescription')}>
+              <Controller
+                control={control}
+                name="description"
+                render={({ field: { value, onChange } }) => (
+                  <SheetInput
+                    ref={descriptionRef}
+                    label={`${t('batches.expenseDescription')} *`}
+                    value={value}
+                    onChangeText={onChange}
+                    onFocus={() => { stepper.setCurrentKey('description'); scrollStageAboveKeyboard('description'); }}
+                    placeholder={t('batches.expenseDescriptionPlaceholder')}
+                    inputAccessoryViewID={KEYBOARD_TOOLBAR_ID}
+                    returnKeyType="next"
+                    onSubmitEditing={() => stepper.next()}
+                    blurOnSubmit={false}
+                    error={errors.description?.message}
+                  />
+                )}
+              />
+            </FormSection>
+          </StageBlock>
+        ) : null}
 
-              <View className="gap-2">
-                <Label>{isTaxInvoice ? t('batches.totalAmount') : t('batches.grossAmount')}<RequiredStar /></Label>
-                <Controller
-                  control={control}
-                  name="grossAmount"
-                  render={({ field: { value, onChange } }) => (
-                    <Input value={value} onChangeText={onChange} keyboardType="decimal-pad" placeholder="0.00" />
-                  )}
-                />
-                <FieldError error={errors.grossAmount} />
-              </View>
+        {/* Stage 6 - Amount + breakdown */}
+        {showStage.amount ? (
+          <StageBlock stageKey="amount" onLayoutY={handleStageLayout} onFirstLayout={handleStageFirstLayout} animateIn>
+            <FormSection title={isTaxInvoice ? t('batches.totalAmount') : t('batches.grossAmount')}>
+              <Controller
+                control={control}
+                name="grossAmount"
+                render={({ field: { value, onChange } }) => (
+                  <SheetInput
+                    ref={amountRef}
+                    label={`${isTaxInvoice ? t('batches.totalAmount') : t('batches.grossAmount')} *`}
+                    value={value}
+                    onChangeText={onChange}
+                    onFocus={() => { stepper.setCurrentKey('amount'); scrollStageAboveKeyboard('amount'); }}
+                    keyboardType="decimal-pad"
+                    placeholder="0.00"
+                    inputAccessoryViewID={KEYBOARD_TOOLBAR_ID}
+                    returnKeyType="done"
+                    onSubmitEditing={() => { Keyboard.dismiss(); stepper.next(); }}
+                    blurOnSubmit
+                    suffix={<CurrencyTag label={currency} />}
+                    error={errors.grossAmount?.message}
+                  />
+                )}
+              />
+              {totalAmount > 0 ? (
+                <SummaryCard>
+                  <SummaryRow label={t('batches.grossAmount', 'Net')} value={formatMoney(grossNum)} />
+                  {isTaxInvoice ? (
+                    <SummaryRow label={`${t('batches.vat', 'VAT')} (${vatRate}%)`} value={formatMoney(taxableAmount)} />
+                  ) : null}
+                  <CardDivider marginVertical={2} />
+                  <SummaryRow label={t('batches.totalAmount', 'Total')} value={formatMoney(totalAmount)} emphasis />
+                </SummaryCard>
+              ) : null}
+            </FormSection>
+          </StageBlock>
+        ) : null}
 
-              {isTaxInvoice && taxableAmount > 0 && (
-                <View className="rounded-lg border border-border bg-muted/30 px-3 py-2 gap-0.5">
-                  <View className="flex-row justify-between">
-                    <Text className="text-xs text-muted-foreground">{t('batches.taxableAmount')}</Text>
-                    <Text className="text-sm text-foreground" style={{ fontVariant: ['tabular-nums'] }}>
-                      {currency} {taxableAmount.toFixed(2)}
-                    </Text>
-                  </View>
-                  <View className="flex-row justify-between">
-                    <Text className="text-xs font-semibold text-foreground">{t('batches.totalAmount')}</Text>
-                    <Text className="text-sm font-bold text-foreground" style={{ fontVariant: ['tabular-nums'] }}>
-                      {currency} {totalAmount.toFixed(2)}
-                    </Text>
-                  </View>
-                </View>
-              )}
-
-              <Separator />
-
-              <MultiFileUpload
+        {/* Stage 7 - Attachments */}
+        {showStage.attachments ? (
+          <StageBlock stageKey="attachments" onLayoutY={handleStageLayout} onFirstLayout={handleStageFirstLayout} animateIn>
+            <FormSection title={t('batches.attachments', 'Attachments')}>
+              <CollapsedAttachmentSection
                 label={t('batches.receipt', 'Receipts')}
                 files={receipts}
                 onAdd={(media) => setReceipts((prev) => [...prev, media])}
@@ -330,9 +610,9 @@ export default function ExpenseSheet({ open, onClose, batchId, editData }) {
                 entityType="expense"
                 entityId={editData?._id}
                 category="expenses"
+                icon={Receipt}
               />
-
-              <MultiFileUpload
+              <CollapsedAttachmentSection
                 label={t('batches.transferProofs', 'Transfer Proofs')}
                 files={expTransferProofs}
                 onAdd={(media) => setExpTransferProofs((prev) => [...prev, media])}
@@ -340,17 +620,12 @@ export default function ExpenseSheet({ open, onClose, batchId, editData }) {
                 entityType="expense"
                 entityId={editData?._id}
                 category="expenses"
+                icon={FileCheck2}
               />
-            </>
-          )}
-        </ScrollView>
-
-        <View className="px-4 pt-4 border-t border-border" style={{ paddingBottom: Math.max(safeBottom, 16) }}>
-          <Button onPress={handleSubmit(onSubmit)} loading={saving} disabled={saving}>
-            {editData ? t('common.save') : t('common.create')}
-          </Button>
-        </View>
-      </KeyboardAvoidingView>
+            </FormSection>
+          </StageBlock>
+        ) : null}
+      </FormSheet>
 
       <QuickAddBusinessSheet
         open={quickAddBiz}
@@ -362,6 +637,124 @@ export default function ExpenseSheet({ open, onClose, batchId, editData }) {
           toast({ title: `${biz.companyName} ${t('common.created', 'created')}` });
         }}
       />
-    </Modal>
+
+      <KeyboardToolbar
+        onPrev={() => stepper.prev()}
+        onNext={() => stepper.next()}
+        canGoPrev={stepper.canGoPrev}
+        canGoNext={stepper.canGoNext}
+      />
+    </>
+  );
+}
+
+function ExpenseStickySummary({ currency, isTaxInvoice, categoryLabel, date, grossNum, taxableAmount, totalAmount, onPress, t }) {
+  const tokens = useHeroSheetTokens();
+  const isRTL = useIsRTL();
+  const { dark, sheetBg, borderColor, textColor, mutedColor } = tokens;
+
+  const fmt = (n) => `${currency} ${(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const eyebrow = [categoryLabel || t('batches.expenseSummary', 'Summary'), date || ''].filter(Boolean).join(' . ');
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[
+        stickyStyles.bar,
+        {
+          backgroundColor: sheetBg,
+          borderTopColor: borderColor,
+          flexDirection: isRTL ? 'row-reverse' : 'row',
+        },
+      ]}
+    >
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text
+          style={{
+            fontSize: 10,
+            fontFamily: 'Poppins-SemiBold',
+            color: mutedColor,
+            letterSpacing: 1.2,
+            textTransform: 'uppercase',
+            textAlign: isRTL ? 'right' : 'left',
+          }}
+          numberOfLines={1}
+        >
+          {eyebrow}
+        </Text>
+        {isTaxInvoice ? (
+          <Text
+            style={{
+              fontSize: 12,
+              fontFamily: 'Poppins-Regular',
+              color: mutedColor,
+              marginTop: 2,
+              textAlign: isRTL ? 'right' : 'left',
+            }}
+            numberOfLines={1}
+          >
+            {`${t('batches.grossAmount', 'Net')} ${fmt(grossNum)} . ${t('batches.vat', 'VAT')} ${fmt(taxableAmount)}`}
+          </Text>
+        ) : null}
+      </View>
+      <View style={{ alignItems: isRTL ? 'flex-start' : 'flex-end' }}>
+        <Text
+          style={{
+            fontSize: 10,
+            fontFamily: 'Poppins-SemiBold',
+            color: mutedColor,
+            letterSpacing: 1.2,
+            textTransform: 'uppercase',
+          }}
+        >
+          {t('batches.totalAmount', 'Total')}
+        </Text>
+        <Text
+          style={{
+            fontSize: 16,
+            fontFamily: 'Poppins-Bold',
+            color: textColor,
+            fontVariant: ['tabular-nums'],
+          }}
+        >
+          {fmt(totalAmount)}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
+const stickyStyles = StyleSheet.create({
+  bar: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    gap: 12,
+  },
+});
+
+function CurrencyTag({ label }) {
+  const { mutedColor, dark } = useHeroSheetTokens();
+  return (
+    <View
+      style={{
+        backgroundColor: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+        borderRadius: 8,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+      }}
+    >
+      <Text
+        style={{
+          fontSize: 11,
+          fontFamily: 'Poppins-SemiBold',
+          color: mutedColor,
+          letterSpacing: 0.4,
+        }}
+      >
+        {label}
+      </Text>
+    </View>
   );
 }

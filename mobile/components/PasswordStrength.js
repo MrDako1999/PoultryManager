@@ -3,6 +3,7 @@ import { View, Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Check, X } from 'lucide-react-native';
 import { cn } from '@/lib/utils';
+import { useIsRTL } from '@/stores/localeStore';
 
 const RULES = [
   { key: 'length', test: (pw) => pw.length >= 8, labelKey: 'auth.pwRuleLength' },
@@ -21,6 +22,8 @@ const STRENGTH_CONFIG = [
 
 export default function PasswordStrength({ password }) {
   const { t } = useTranslation();
+  const isRTL = useIsRTL();
+  const row = isRTL ? 'flex-row-reverse' : 'flex-row';
 
   const { passed, score } = useMemo(() => {
     if (!password) return { passed: [], score: 0 };
@@ -34,8 +37,8 @@ export default function PasswordStrength({ password }) {
 
   return (
     <View className="gap-2.5 pt-1">
-      <View className="flex-row items-center gap-2">
-        <View className="flex-1 flex-row gap-1">
+      <View className={cn(row, 'items-center gap-2')}>
+        <View className={cn(row, 'flex-1 gap-1')}>
           {[0, 1, 2, 3].map((i) => (
             <View
               key={i}
@@ -58,11 +61,11 @@ export default function PasswordStrength({ password }) {
           {t(config.label)}
         </Text>
       </View>
-      <View className="flex-row flex-wrap gap-y-1">
+      <View className={cn(row, 'flex-wrap gap-y-1')}>
         {RULES.map((rule) => {
           const ok = passed.includes(rule.key);
           return (
-            <View key={rule.key} className="w-1/2 flex-row items-center gap-1.5">
+            <View key={rule.key} className={cn(row, 'w-1/2 items-center gap-1.5')}>
               {ok ? (
                 <Check size={12} color="#16a34a" />
               ) : (

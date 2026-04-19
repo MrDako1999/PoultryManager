@@ -1,7 +1,22 @@
-import { View, Text, Pressable } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import useThemeStore from '@/stores/themeStore';
+import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
+import { useIsRTL } from '@/stores/localeStore';
 
+/**
+ * Grid of enum-value buttons with optional icon.
+ * Restyled on design-language tokens (HeroSheet) - accent border + tint when
+ * active, soft input-fill when idle. Layout lives in StyleSheet to avoid the
+ * NativeWind functional-style trap (DESIGN_LANGUAGE.md §9).
+ *
+ * @param {object} props
+ * @param {Array<{value: string, label: string, icon?: Component}>} props.options
+ * @param {string} props.value
+ * @param {(v: string) => void} props.onChange
+ * @param {number} [props.columns]
+ * @param {boolean} [props.compact] - 40pt row, icon left of label
+ * @param {boolean} [props.disabled]
+ */
 export default function EnumButtonSelect({
   options = [],
   value,
@@ -10,48 +25,75 @@ export default function EnumButtonSelect({
   compact,
   disabled,
 }) {
-  const cols = columns || options.length;
-  const { resolvedTheme } = useThemeStore();
-  const primaryColor = resolvedTheme === 'dark' ? 'hsl(148, 48%, 38%)' : 'hsl(148, 60%, 20%)';
-  const mutedColor = 'hsl(150, 10%, 45%)';
+  const { accentColor, mutedColor, textColor, inputBg, inputBorderIdle, dark } = useHeroSheetTokens();
+  const isRTL = useIsRTL();
 
+  const cols = columns || options.length || 1;
   const gap = 8;
   const itemWidth = `${(100 / cols).toFixed(4)}%`;
 
+  const activeBg = dark ? 'rgba(148,210,165,0.16)' : 'hsl(148, 35%, 93%)';
+  const activeBorder = accentColor;
+  const idleBg = inputBg;
+  const idleBorder = inputBorderIdle;
+
   const handlePress = (val) => {
     if (disabled) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     onChange?.(val);
   };
 
   return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -(gap / 2) }}>
+    <View
+      style={[
+        styles.grid,
+        { flexDirection: isRTL ? 'row-reverse' : 'row', marginHorizontal: -(gap / 2) },
+      ]}
+    >
       {options.map(({ value: optVal, label, icon: Icon }) => {
         const selected = value === optVal;
+        const baseTileStyle = compact ? styles.tileCompact : styles.tileTall;
+        const iconColor = selected ? accentColor : mutedColor;
         return (
-          <View key={optVal} style={{ width: itemWidth, paddingHorizontal: gap / 2, marginBottom: gap }}>
+          <View
+            key={optVal}
+            style={{
+              width: itemWidth,
+              paddingHorizontal: gap / 2,
+              marginBottom: gap,
+            }}
+          >
             <Pressable
               onPress={() => handlePress(optVal)}
               disabled={disabled}
-              className={`items-center justify-center rounded-lg border ${
-                selected
-                  ? 'border-primary bg-primary/10'
-                  : 'border-border bg-background'
-              } ${disabled ? 'opacity-50' : ''}`}
-              style={compact
-                ? { flexDirection: 'row', height: 40, paddingHorizontal: 8, gap: 6 }
-                : { flexDirection: 'column', minHeight: 72, paddingVertical: 10, paddingHorizontal: 8, gap: 4 }
-              }
+              style={[
+                baseTileStyle,
+                {
+                  flexDirection: compact
+                    ? (isRTL ? 'row-reverse' : 'row')
+                    : 'column',
+                  backgroundColor: selected ? activeBg : idleBg,
+                  borderColor: selected ? activeBorder : idleBorder,
+                  opacity: disabled ? 0.5 : 1,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
             >
-              {Icon && (
+              {Icon ? (
                 <Icon
                   size={compact ? 14 : 20}
-                  color={selected ? primaryColor : mutedColor}
+                  color={iconColor}
+                  strokeWidth={selected ? 2.4 : 2}
                 />
-              )}
+              ) : null}
               <Text
-                className={`font-medium ${selected ? 'text-primary' : 'text-foreground'}`}
-                style={{ fontSize: compact ? 11 : 12, textAlign: 'center' }}
+                style={{
+                  fontSize: compact ? 12 : 12.5,
+                  fontFamily: selected ? 'Poppins-SemiBold' : 'Poppins-Medium',
+                  color: selected ? accentColor : textColor,
+                  textAlign: 'center',
+                }}
                 numberOfLines={compact ? 1 : 2}
               >
                 {label}
@@ -63,3 +105,28 @@ export default function EnumButtonSelect({
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  grid: {
+    flexWrap: 'wrap',
+  },
+  tileCompact: {
+    height: 42,
+    paddingHorizontal: 10,
+    borderWidth: 1.5,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  tileTall: {
+    minHeight: 76,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderWidth: 1.5,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+});

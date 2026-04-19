@@ -1,39 +1,64 @@
 import { useState, useEffect, useMemo } from 'react';
-import { View, Text, Modal, Pressable, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
-import { X, XCircle } from 'lucide-react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import useThemeStore from '@/stores/themeStore';
+import { Building2, XCircle } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 import useOfflineMutation from '@/hooks/useOfflineMutation';
 import useLocalQuery from '@/hooks/useLocalQuery';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Label } from '@/components/ui/Label';
+import SheetInput from '@/components/SheetInput';
 import Select from '@/components/ui/Select';
-import Separator from '@/components/ui/Separator';
+import EnumButtonSelect from '@/components/ui/EnumButtonSelect';
 import LogoUpload from '@/components/LogoUpload';
 import FileUpload from '@/components/FileUpload';
 import MultiFileUpload from '@/components/MultiFileUpload';
+import FarmLocationPicker from '@/components/FarmLocationPicker';
+import FormSheet from '@/components/FormSheet';
+import { FormSection, FormField } from '@/components/FormSheetParts';
+import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
+import { useIsRTL } from '@/stores/localeStore';
+import { useToast } from '@/components/ui/Toast';
 
-const EMPTY_ADDRESS = { street: '', city: '', state: '', postalCode: '', country: '' };
+const BUSINESS_TYPES = ['TRADER', 'SUPPLIER'];
+
+const EMPTY_ADDRESS = {
+  street: '', city: '', state: '', postalCode: '', country: '',
+  formattedAddress: '', placeId: '', lat: null, lng: null,
+};
 
 const schema = z.object({
   companyName: z.string().min(1, 'Company name is required'),
+  businessType: z.enum(BUSINESS_TYPES).default('TRADER'),
   tradeLicenseNumber: z.string().optional(),
   trnNumber: z.string().optional(),
 });
 
-export default function QuickAddBusinessSheet({ open, onClose, onCreated, initialName = '' }) {
+const defaultValues = {
+  companyName: '',
+  businessType: 'TRADER',
+  tradeLicenseNumber: '',
+  trnNumber: '',
+};
+
+export default function QuickAddBusinessSheet({
+  open,
+  onClose,
+  onCreated,
+  initialName = '',
+  editData = null,
+  onDelete,
+  canDelete = false,
+}) {
   const { t } = useTranslation();
-  const { bottom: safeBottom } = useSafeAreaInsets();
-  const { resolvedTheme } = useThemeStore();
-  const iconColor = resolvedTheme === 'dark' ? '#e0e8e0' : '#1a2e1a';
-  const mutedColor = resolvedTheme === 'dark' ? 'hsl(148, 10%, 55%)' : 'hsl(150, 10%, 45%)';
+  const isRTL = useIsRTL();
+  const tokens = useHeroSheetTokens();
+  const { accentColor, mutedColor, dark } = tokens;
+  const { toast } = useToast();
   const [saving, setSaving] = useState(false);
-  const { create } = useOfflineMutation('businesses');
+  const { create, update } = useOfflineMutation('businesses');
+  const isEditing = !!editData?._id;
 
   const [logoMedia, setLogoMedia] = useState(null);
   const [address, setAddress] = useState(EMPTY_ADDRESS);
@@ -53,14 +78,44 @@ export default function QuickAddBusinessSheet({ open, onClose, onCreated, initia
     [contacts]
   );
 
-  const { control, handleSubmit, reset, formState: { errors } } = useForm({
+  const businessTypeOptions = useMemo(
+    () => BUSINESS_TYPES.map((value) => ({
+      value,
+      label: t(`businesses.${value.toLowerCase()}`, value),
+    })),
+    [t]
+  );
+
+  const {
+    control, handleSubmit, reset, watch, formState: { errors },
+  } = useForm({
     resolver: zodResolver(schema),
-    defaultValues: { companyName: '', tradeLicenseNumber: '', trnNumber: '' },
+    defaultValues,
   });
 
+  const watchedName = watch('companyName');
+
   useEffect(() => {
-    if (open) {
-      reset({ companyName: initialName || '', tradeLicenseNumber: '', trnNumber: '' });
+    if (!open) return;
+    if (editData) {
+      reset({
+        companyName: editData.companyName || '',
+        businessType: BUSINESS_TYPES.includes(editData.businessType) ? editData.businessType : 'TRADER',
+        tradeLicenseNumber: editData.tradeLicenseNumber || '',
+        trnNumber: editData.trnNumber || '',
+      });
+      setLogoMedia(editData.logo && typeof editData.logo === 'object' ? editData.logo : null);
+      setAddress(editData.address || EMPTY_ADDRESS);
+      setTrnCertMedia(editData.trnCertificate && typeof editData.trnCertificate === 'object' ? editData.trnCertificate : null);
+      setTradeLicenseMedia(editData.tradeLicense && typeof editData.tradeLicense === 'object' ? editData.tradeLicense : null);
+      setSelectedContacts(
+        Array.isArray(editData.contacts)
+          ? editData.contacts.map((c) => (typeof c === 'object' ? c._id : c)).filter(Boolean)
+          : []
+      );
+      setOtherDocs(Array.isArray(editData.otherDocs) ? editData.otherDocs : []);
+    } else {
+      reset({ ...defaultValues, companyName: initialName || '' });
       setLogoMedia(null);
       setAddress(EMPTY_ADDRESS);
       setTrnCertMedia(null);
@@ -68,7 +123,7 @@ export default function QuickAddBusinessSheet({ open, onClose, onCreated, initia
       setSelectedContacts([]);
       setOtherDocs([]);
     }
-  }, [open, initialName, reset]);
+  }, [open, initialName, editData, reset]);
 
   const handleAddressChange = (field, value) => {
     setAddress((prev) => ({ ...prev, [field]: value }));
@@ -81,15 +136,16 @@ export default function QuickAddBusinessSheet({ open, onClose, onCreated, initia
   };
 
   const removeContact = (contactId) => {
+    Haptics.selectionAsync().catch(() => {});
     setSelectedContacts((prev) => prev.filter((id) => id !== contactId));
   };
 
   const onSubmit = async (data) => {
     setSaving(true);
     try {
-      const tempId = `temp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       const payload = {
         companyName: data.companyName,
+        businessType: data.businessType,
         tradeLicenseNumber: data.tradeLicenseNumber || '',
         trnNumber: data.trnNumber || '',
         logo: logoMedia?._id || null,
@@ -99,163 +155,225 @@ export default function QuickAddBusinessSheet({ open, onClose, onCreated, initia
         tradeLicense: tradeLicenseMedia?._id || null,
         otherDocs,
       };
-      await create(tempId, payload, ['logo', 'trnCertificate', 'tradeLicense']);
-      const createdBiz = { _id: tempId, ...payload };
-      onCreated?.(createdBiz);
-      resetFormState();
+      if (isEditing) {
+        await update(editData._id, payload);
+        onCreated?.({ _id: editData._id, ...payload });
+        toast({ title: t('businesses.businessUpdated', 'Business updated') });
+      } else {
+        const tempId = `temp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        await create(tempId, payload, ['logo', 'trnCertificate', 'tradeLicense']);
+        onCreated?.({ _id: tempId, ...payload });
+        toast({ title: t('businesses.businessCreated', 'Business created') });
+      }
       onClose();
     } catch (err) {
-      Alert.alert('Error', err.message || 'Failed to create business');
+      console.error('[QuickAddBusinessSheet] save failed', err);
+      toast({
+        variant: 'destructive',
+        title: isEditing
+          ? t('businesses.updateError', 'Failed to update business')
+          : t('businesses.createError', 'Failed to create business'),
+      });
     } finally {
       setSaving(false);
     }
   };
 
-  const resetFormState = () => {
-    reset({ companyName: '', tradeLicenseNumber: '', trnNumber: '' });
-    setLogoMedia(null);
-    setAddress(EMPTY_ADDRESS);
-    setTrnCertMedia(null);
-    setTradeLicenseMedia(null);
-    setSelectedContacts([]);
-    setOtherDocs([]);
-  };
-
-  const handleClose = () => {
-    resetFormState();
-    onClose();
-  };
-
   return (
-    <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1 bg-background">
-        <View className="flex-row items-center justify-between px-4 pt-4 pb-2">
-          <Text className="text-lg font-bold text-foreground">{t('businesses.addBusiness', 'Add Business')}</Text>
-          <Pressable onPress={handleClose} className="h-9 w-9 items-center justify-center rounded-md" hitSlop={8}>
-            <X size={20} color={iconColor} />
-          </Pressable>
+    <FormSheet
+      open={open}
+      onClose={onClose}
+      title={isEditing
+        ? t('businesses.editBusiness', 'Edit Business')
+        : t('businesses.addBusiness', 'Add Business')
+      }
+      subtitle={isEditing
+        ? t('businesses.editBusinessDesc', 'Update this business\'s details')
+        : t('businesses.addBusinessDesc', 'Register a supplier or trader')
+      }
+      icon={Building2}
+      onSubmit={handleSubmit(onSubmit)}
+      submitLabel={isEditing ? t('common.save', 'Save') : t('common.create', 'Create')}
+      loading={saving}
+      disabled={saving}
+      deleteLabel={isEditing && canDelete && onDelete ? t('businesses.deleteBusiness', 'Delete Business') : undefined}
+      onDelete={isEditing && canDelete && onDelete
+        ? () => { onClose(); onDelete(); }
+        : undefined
+      }
+    >
+      <FormSection title={t('businesses.identitySection', 'Identity')}>
+        <FormField label={t('businesses.logo', 'Brand / Logo')}>
+          <LogoUpload
+            value={logoMedia}
+            onUpload={setLogoMedia}
+            onRemove={() => setLogoMedia(null)}
+            entityType="business"
+            category="businesses"
+          />
+        </FormField>
+
+        <FormField label={t('businesses.companyName', 'Company Name')} required error={errors.companyName?.message}>
+          <Controller
+            control={control}
+            name="companyName"
+            render={({ field: { value, onChange, onBlur } }) => (
+              <SheetInput
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                placeholder={t('businesses.companyName', 'Company Name')}
+                autoCapitalize="words"
+              />
+            )}
+          />
+        </FormField>
+
+        <FormField label={t('businesses.businessType', 'Business Type')} required error={errors.businessType?.message}>
+          <Controller
+            control={control}
+            name="businessType"
+            render={({ field: { value, onChange } }) => (
+              <EnumButtonSelect
+                value={value}
+                onChange={onChange}
+                options={businessTypeOptions}
+                columns={2}
+                compact
+              />
+            )}
+          />
+        </FormField>
+
+        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10 }}>
+          <View style={{ flex: 1 }}>
+            <FormField label={t('businesses.tradeLicenseNumber', 'Trade License Number')}>
+              <Controller
+                control={control}
+                name="tradeLicenseNumber"
+                render={({ field: { value, onChange, onBlur } }) => (
+                  <SheetInput
+                    value={value}
+                    onChangeText={onChange}
+                    onBlur={onBlur}
+                    placeholder="—"
+                    dense
+                  />
+                )}
+              />
+            </FormField>
+          </View>
+          <View style={{ flex: 1 }}>
+            <FormField label={t('businesses.trnNumber', 'TRN Number')}>
+              <Controller
+                control={control}
+                name="trnNumber"
+                render={({ field: { value, onChange, onBlur } }) => (
+                  <SheetInput
+                    value={value}
+                    onChangeText={onChange}
+                    onBlur={onBlur}
+                    placeholder="—"
+                    dense
+                  />
+                )}
+              />
+            </FormField>
+          </View>
         </View>
-        <Separator />
+      </FormSection>
 
-        <ScrollView className="flex-1 px-4" contentContainerClassName="py-4 gap-4" keyboardShouldPersistTaps="handled">
-          {/* Company Name */}
-          <View className="gap-1.5">
-            <Label>{t('businesses.companyName', 'Company Name')} <Text className="text-destructive">*</Text></Label>
-            <Controller
-              control={control}
-              name="companyName"
-              render={({ field: { value, onChange, onBlur } }) => (
-                <Input value={value} onChangeText={onChange} onBlur={onBlur} placeholder={t('businesses.companyName', 'Company Name')} autoFocus />
-              )}
-            />
-            {errors.companyName && <Text className="text-xs text-destructive">{errors.companyName.message}</Text>}
-          </View>
+      <FormSection
+        title={t('businesses.addressSection', 'Business Address')}
+        description={t('businesses.addressLookupHint', 'Search for an address or drag the marker to auto-fill the fields below.')}
+      >
+        <View style={{ borderRadius: 12, overflow: 'hidden' }}>
+          <FarmLocationPicker
+            value={{ lat: address.lat, lng: address.lng, placeName: address.formattedAddress || '' }}
+            onChange={(loc) => {
+              setAddress((prev) => ({
+                ...prev,
+                lat: loc.lat,
+                lng: loc.lng,
+                formattedAddress: loc.placeName || prev.formattedAddress,
+              }));
+            }}
+            onAddressResolved={(resolved) => {
+              setAddress((prev) => ({
+                ...prev,
+                street: resolved.street || prev.street,
+                city: resolved.city || prev.city,
+                state: resolved.state || prev.state,
+                postalCode: resolved.postalCode || prev.postalCode,
+                country: resolved.country || prev.country,
+                formattedAddress: resolved.formattedAddress || prev.formattedAddress,
+                placeId: resolved.placeId || prev.placeId,
+                lat: resolved.lat ?? prev.lat,
+                lng: resolved.lng ?? prev.lng,
+              }));
+            }}
+            markerLabel={watchedName || ''}
+          />
+        </View>
 
-          {/* Logo */}
-          <View className="gap-1.5">
-            <Label>{t('businesses.logo', 'Brand / Logo')}</Label>
-            <LogoUpload
-              value={logoMedia}
-              onUpload={setLogoMedia}
-              onRemove={() => setLogoMedia(null)}
-              entityType="business"
-              category="businesses"
-            />
-          </View>
+        <FormField label={t('businesses.street', 'Street Address')}>
+          <SheetInput
+            value={address.street || ''}
+            onChangeText={(val) => handleAddressChange('street', val)}
+            placeholder={t('businesses.streetPlaceholder', 'e.g. 123 Main St')}
+          />
+        </FormField>
 
-          {/* Trade License Number + TRN Number */}
-          <View className="gap-1.5">
-            <Label>{t('businesses.tradeLicenseNumber', 'Trade License Number')}</Label>
-            <Controller
-              control={control}
-              name="tradeLicenseNumber"
-              render={({ field: { value, onChange, onBlur } }) => (
-                <Input value={value} onChangeText={onChange} onBlur={onBlur} placeholder={t('businesses.tradeLicenseNumber', 'Trade License Number')} />
-              )}
-            />
-          </View>
-
-          <View className="gap-1.5">
-            <Label>{t('businesses.trnNumber', 'TRN Number')}</Label>
-            <Controller
-              control={control}
-              name="trnNumber"
-              render={({ field: { value, onChange, onBlur } }) => (
-                <Input value={value} onChangeText={onChange} onBlur={onBlur} placeholder={t('businesses.trnNumber', 'TRN Number')} />
-              )}
-            />
-          </View>
-
-          <Separator />
-
-          {/* Address Section */}
-          <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-            {t('businesses.addressSection', 'Business Address')}
-          </Text>
-
-          <View className="gap-2">
-            <Label>{t('businesses.street', 'Street Address')}</Label>
-            <Input
-              value={address.street || ''}
-              onChangeText={(val) => handleAddressChange('street', val)}
-              placeholder={t('businesses.streetPlaceholder', 'e.g. 123 Main St')}
-            />
-          </View>
-
-          <View className="flex-row gap-3">
-            <View className="flex-1 gap-2">
-              <Label>{t('businesses.city', 'City')}</Label>
-              <Input
+        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10 }}>
+          <View style={{ flex: 1 }}>
+            <FormField label={t('businesses.city', 'City')}>
+              <SheetInput
                 value={address.city || ''}
                 onChangeText={(val) => handleAddressChange('city', val)}
                 placeholder={t('businesses.cityPlaceholder', 'City')}
+                dense
               />
-            </View>
-            <View className="flex-1 gap-2">
-              <Label>{t('businesses.state', 'State / Emirate')}</Label>
-              <Input
+            </FormField>
+          </View>
+          <View style={{ flex: 1 }}>
+            <FormField label={t('businesses.state', 'State / Emirate')}>
+              <SheetInput
                 value={address.state || ''}
                 onChangeText={(val) => handleAddressChange('state', val)}
                 placeholder={t('businesses.statePlaceholder', 'State')}
+                dense
               />
-            </View>
+            </FormField>
           </View>
+        </View>
 
-          <View className="flex-row gap-3">
-            <View className="flex-1 gap-2">
-              <Label>{t('businesses.postalCode', 'Postal / PO Box')}</Label>
-              <Input
+        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10 }}>
+          <View style={{ flex: 1 }}>
+            <FormField label={t('businesses.postalCode', 'Postal / PO Box')}>
+              <SheetInput
                 value={address.postalCode || ''}
                 onChangeText={(val) => handleAddressChange('postalCode', val)}
                 placeholder={t('businesses.postalCodePlaceholder', 'Postal Code')}
+                dense
               />
-            </View>
-            <View className="flex-1 gap-2">
-              <Label>{t('businesses.country', 'Country')}</Label>
-              <Input
+            </FormField>
+          </View>
+          <View style={{ flex: 1 }}>
+            <FormField label={t('businesses.country', 'Country')}>
+              <SheetInput
                 value={address.country || ''}
                 onChangeText={(val) => handleAddressChange('country', val)}
                 placeholder={t('businesses.countryPlaceholder', 'Country')}
+                dense
               />
-            </View>
+            </FormField>
           </View>
+        </View>
+      </FormSection>
 
-          <Separator />
-
-          {/* TRN Certificate */}
+      <FormSection title={t('businesses.documentsSection', 'Documents')}>
+        <FormField label={t('businesses.tradeLicense', 'Trade License')}>
           <FileUpload
-            label={t('businesses.trnCertificate', 'TRN Certificate')}
-            value={trnCertMedia}
-            onUpload={setTrnCertMedia}
-            onRemove={() => setTrnCertMedia(null)}
-            entityType="business"
-            category="businesses"
-            mediaType="document"
-          />
-
-          {/* Trade License Document */}
-          <FileUpload
-            label={t('businesses.tradeLicense', 'Trade License')}
             value={tradeLicenseMedia}
             onUpload={setTradeLicenseMedia}
             onRemove={() => setTradeLicenseMedia(null)}
@@ -263,61 +381,96 @@ export default function QuickAddBusinessSheet({ open, onClose, onCreated, initia
             category="businesses"
             mediaType="document"
           />
+        </FormField>
 
-          <Separator />
+        <FormField label={t('businesses.trnCertificate', 'TRN Certificate')}>
+          <FileUpload
+            value={trnCertMedia}
+            onUpload={setTrnCertMedia}
+            onRemove={() => setTrnCertMedia(null)}
+            entityType="business"
+            category="businesses"
+            mediaType="document"
+          />
+        </FormField>
 
-          {/* Associated Contacts */}
-          <View className="gap-2">
-            <Label>{t('businesses.associatedContacts', 'Associated Contacts')}</Label>
-
-            {selectedContacts.length > 0 && (
-              <View className="flex-row flex-wrap gap-2 mb-1">
-                {selectedContacts.map((id) => {
-                  const contact = contactOptions.find((c) => c.value === id);
-                  return (
-                    <View key={id} className="flex-row items-center gap-1 bg-primary/10 rounded-full px-3 py-1.5">
-                      <Text className="text-xs font-medium text-primary" numberOfLines={1}>
-                        {contact?.label || 'Contact'}
-                      </Text>
-                      <Pressable onPress={() => removeContact(id)} hitSlop={6}>
-                        <XCircle size={14} color={mutedColor} />
-                      </Pressable>
-                    </View>
-                  );
-                })}
-              </View>
-            )}
-
-            <Select
-              value=""
-              onValueChange={(contactId) => { if (contactId) toggleContact(contactId); }}
-              options={contactOptions.filter((c) => !selectedContacts.includes(c.value))}
-              placeholder={t('businesses.selectContacts', 'Select contacts...')}
-              label={t('businesses.associatedContacts', 'Associated Contacts')}
-            />
-          </View>
-
-          <Separator />
-
-          {/* Other Documents */}
+        <FormField label={t('businesses.otherDocs', 'Other Documents')}>
           <MultiFileUpload
-            label={t('businesses.otherDocs', 'Other Documents')}
             files={otherDocs}
             onAdd={(media) => setOtherDocs((prev) => [...prev, media])}
             onRemove={(index) => setOtherDocs((prev) => prev.filter((_, i) => i !== index))}
             entityType="business"
             category="businesses"
           />
-        </ScrollView>
+        </FormField>
+      </FormSection>
 
-        <View className="px-4 pt-4 border-t border-border" style={{ paddingBottom: Math.max(safeBottom, 16) }}>
-          <Button onPress={handleSubmit(onSubmit)} disabled={saving}>
-            <Text className="text-sm font-medium text-primary-foreground">
-              {saving ? t('common.saving', 'Saving...') : t('common.create', 'Create')}
-            </Text>
-          </Button>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
+      <FormSection title={t('businesses.associatedContacts', 'Associated Contacts')}>
+        {selectedContacts.length > 0 ? (
+          <View
+            style={[
+              styles.chipRow,
+              { flexDirection: isRTL ? 'row-reverse' : 'row' },
+            ]}
+          >
+            {selectedContacts.map((id) => {
+              const contact = contactOptions.find((c) => c.value === id);
+              return (
+                <View
+                  key={id}
+                  style={[
+                    styles.chip,
+                    {
+                      flexDirection: isRTL ? 'row-reverse' : 'row',
+                      backgroundColor: dark ? 'rgba(148,210,165,0.16)' : 'hsl(148, 35%, 92%)',
+                      borderColor: dark ? 'rgba(148,210,165,0.30)' : 'hsl(148, 35%, 80%)',
+                    },
+                  ]}
+                >
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontFamily: 'Poppins-Medium',
+                      color: accentColor,
+                      maxWidth: 140,
+                    }}
+                    numberOfLines={1}
+                  >
+                    {contact?.label || 'Contact'}
+                  </Text>
+                  <Pressable onPress={() => removeContact(id)} hitSlop={6}>
+                    <XCircle size={14} color={mutedColor} />
+                  </Pressable>
+                </View>
+              );
+            })}
+          </View>
+        ) : null}
+
+        <Select
+          value=""
+          onValueChange={(contactId) => { if (contactId) toggleContact(contactId); }}
+          options={contactOptions.filter((c) => !selectedContacts.includes(c.value))}
+          placeholder={t('businesses.selectContacts', 'Select contacts...')}
+          label={t('businesses.associatedContacts', 'Associated Contacts')}
+        />
+      </FormSection>
+    </FormSheet>
   );
 }
+
+const styles = StyleSheet.create({
+  chipRow: {
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 4,
+  },
+  chip: {
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+});

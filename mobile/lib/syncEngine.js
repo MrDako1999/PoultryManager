@@ -262,11 +262,45 @@ export async function deltaSync() {
     store.setLastSyncAt(serverTime);
   } catch (err) {
     console.error('Delta sync failed:', err);
-    store.addSyncError({ type: 'deltaSync', message: err.message, at: new Date().toISOString() });
+    const transient = isTransientError(err);
+    store.addSyncError({
+      type: 'deltaSync',
+      transient,
+      message: err.message,
+      at: new Date().toISOString(),
+    });
+    // Don't touch isOnline here. Mirroring the desktop, the OS link-layer
+    // signal (NetInfo `state.isConnected`, surfaced via `useNetwork`) is
+    // the single source of truth for connectivity. A single failed sync
+    // round could be a server flap or a one-off timeout — the user is
+    // not necessarily offline.
   } finally {
     store.setSyncing(false);
     await store.refreshCounts();
   }
+}
+
+/**
+ * True when an axios error is a "the server didn't talk to us" error
+ * (no network, DNS, SSL, timeout, server 5xx). These are NOT user
+ * errors — the mutation should remain `pending` and be retried on the
+ * next periodic sync (every 60s) or when connectivity returns.
+ *
+ * Permanent errors (4xx validation, 401 auth, 403 permission, 409
+ * conflict) should mark the entry `failed` so the user sees a counter
+ * and can retry/discard from the popover. Auto-retrying a 422 on the
+ * same payload would just burn forever.
+ */
+function isTransientError(err) {
+  if (!err) return false;
+  if (err.code === 'ECONNABORTED') return true;       // axios timeout
+  if (err.code === 'ERR_NETWORK') return true;        // no network
+  if (err.message === 'Network Error') return true;   // axios pre-flight network failure
+  if (!err.response) return true;                     // no response at all → transport failure
+  const status = err.response.status;
+  if (status >= 500 && status < 600) return true;     // server-side errors retry
+  if (status === 408 || status === 429) return true;  // request timeout / rate limit
+  return false;
 }
 
 export async function processQueue() {
@@ -300,6 +334,10 @@ export async function processQueue() {
       });
 
     for (const entry of sorted) {
+      // If the user dropped network mid-loop, abort immediately. We don't
+      // want to burn through 50 mutations each timing out for 30s.
+      if (!useSyncStore.getState().isOnline) break;
+
       const fresh = await db.getFirstAsync(`SELECT status FROM mutation_queue WHERE id = ?`, [entry.id]);
       if (!fresh || fresh.status !== 'pending') continue;
 
@@ -342,18 +380,44 @@ export async function processQueue() {
 
         await db.runAsync(`UPDATE mutation_queue SET status = 'synced' WHERE id = ?`, [entry.id]);
       } catch (err) {
-        console.error(`Mutation failed [${entry.entityType}/${entry.action}]:`, err);
-        await db.runAsync(
-          `UPDATE mutation_queue SET status = 'failed', error = ? WHERE id = ?`,
-          [err.response?.data?.message || err.message, entry.id]
+        const transient = isTransientError(err);
+        console.error(
+          `Mutation ${transient ? 'pending (transient error)' : 'failed'} ` +
+            `[${entry.entityType}/${entry.action}]:`,
+          err.message
         );
-        store.addSyncError({
-          type: 'mutation',
-          entityType: entry.entityType,
-          action: entry.action,
-          message: err.response?.data?.message || err.message,
-          at: new Date().toISOString(),
-        });
+
+        if (transient) {
+          // Leave status='pending'. The next periodic sync (60s) or the
+          // next NetInfo reconnect will re-attempt. Surface a transient
+          // error in the store so devs/QA can see it but don't escalate.
+          store.addSyncError({
+            type: 'mutation',
+            transient: true,
+            entityType: entry.entityType,
+            action: entry.action,
+            message: err.message,
+            at: new Date().toISOString(),
+          });
+          // If this was a transport-level failure (no response from the
+          // server) the rest of the queue is going to hit the same wall
+          // — bail to avoid burning through 30s timeouts. We do NOT
+          // touch `isOnline` here; the OS link-layer signal owns
+          // connectivity, mirroring the desktop's `navigator.onLine`.
+          if (!err.response) break;
+        } else {
+          await db.runAsync(
+            `UPDATE mutation_queue SET status = 'failed', error = ? WHERE id = ?`,
+            [err.response?.data?.message || err.message, entry.id]
+          );
+          store.addSyncError({
+            type: 'mutation',
+            entityType: entry.entityType,
+            action: entry.action,
+            message: err.response?.data?.message || err.message,
+            at: new Date().toISOString(),
+          });
+        }
       }
     }
 

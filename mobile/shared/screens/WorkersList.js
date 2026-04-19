@@ -1,26 +1,77 @@
-import { useState } from 'react';
-import { View, Text, ScrollView, Pressable, RefreshControl } from 'react-native';
+import { useState, useMemo, useRef } from 'react';
+import {
+  View, Text, ScrollView, RefreshControl, Pressable, StyleSheet,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
 import { router } from 'expo-router';
-import { Users, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
+import Swipeable from 'react-native-gesture-handler/Swipeable';
+import {
+  Search, ChevronLeft, ChevronRight, Users, HardHat, Pencil, Trash2,
+  X, Phone, Layers,
+} from 'lucide-react-native';
 import useLocalQuery from '@/hooks/useLocalQuery';
-import useThemeStore from '@/stores/themeStore';
-import SearchInput from '@/components/ui/SearchInput';
+import useOfflineMutation from '@/hooks/useOfflineMutation';
+import useCapabilities from '@/hooks/useCapabilities';
+import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
+import SheetSection from '@/components/SheetSection';
+import SheetInput from '@/components/SheetInput';
 import EmptyState from '@/components/ui/EmptyState';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import SyncIconButton from '@/components/SyncIconButton';
+import QuickAddFAB from '@/components/QuickAddFAB';
 import { SkeletonRow } from '@/components/skeletons';
+import { useToast } from '@/components/ui/Toast';
+import { useIsRTL } from '@/stores/localeStore';
 import { deltaSync } from '@/lib/syncEngine';
+import WorkerSheet from '@/shared/sheets/WorkerSheet';
+
+const NUMERIC_LOCALE = 'en-US';
+const SWIPE_ACTION_WIDTH = 76;
 
 export default function WorkersListScreen() {
-  const { t } = useTranslation();
-  const { resolvedTheme } = useThemeStore();
+  const { t, i18n } = useTranslation();
   const insets = useSafeAreaInsets();
+  const isRTL = useIsRTL();
+  const tokens = useHeroSheetTokens();
+  const {
+    accentColor, dark, mutedColor, borderColor, sectionBorder, screenBg, heroGradient,
+  } = tokens;
+
+  const { toast } = useToast();
+  const { can } = useCapabilities();
+  const canCreate = can('worker:create');
+  const canUpdate = can('worker:update');
+  const canDelete = can('worker:delete');
+
+  const { remove } = useOfflineMutation('workers');
+
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [workerSheet, setWorkerSheet] = useState({ open: false, data: null });
+  const [workerToDelete, setWorkerToDelete] = useState(null);
 
   const [workers, workersLoading] = useLocalQuery('workers');
-  const primaryColor = resolvedTheme === 'dark' ? 'hsl(148, 48%, 38%)' : 'hsl(148, 60%, 20%)';
-  const mutedColor = 'hsl(150, 10%, 45%)';
+
+  const filteredWorkers = useMemo(() => {
+    let list = workers;
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
+      list = list.filter((w) => {
+        const fullName = `${w.firstName || ''} ${w.lastName || ''}`.toLowerCase();
+        return fullName.includes(q)
+          || (w.phone || '').toLowerCase().includes(q)
+          || (w.role || '').toLowerCase().includes(q);
+      });
+    }
+    return [...list].sort((a, b) => {
+      const aName = `${a.firstName || ''} ${a.lastName || ''}`.trim();
+      const bName = `${b.firstName || ''} ${b.lastName || ''}`.trim();
+      return aName.localeCompare(bName, i18n.language || NUMERIC_LOCALE);
+    });
+  }, [workers, searchQuery, i18n.language]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -28,58 +79,546 @@ export default function WorkersListScreen() {
     setRefreshing(false);
   };
 
-  const q = searchQuery.toLowerCase();
-  const filtered = q ? workers.filter((w) => `${w.firstName} ${w.lastName}`.toLowerCase().includes(q)) : workers;
+  const openCreate = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setWorkerSheet({ open: true, data: null });
+  };
+
+  const openEdit = (worker) => setWorkerSheet({ open: true, data: worker });
+  const requestDelete = (worker) => setWorkerToDelete(worker);
+
+  const confirmDelete = async () => {
+    if (!workerToDelete) return;
+    try {
+      await remove(workerToDelete._id);
+      toast({ title: t('workers.workerDeleted', 'Worker removed') });
+    } catch (e) {
+      console.error(e);
+      toast({
+        title: t('workers.deleteError', 'Failed to remove worker'),
+        variant: 'destructive',
+      });
+    } finally {
+      setWorkerToDelete(null);
+    }
+  };
+
+  const isInitialLoading = workersLoading && workers.length === 0;
+  const isEmptyClean = !isInitialLoading && workers.length === 0;
+  const isFilteredEmpty = !isInitialLoading && workers.length > 0 && filteredWorkers.length === 0;
+
+  const fabBottomInset = insets.bottom + 16;
 
   return (
-    <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
-      <View className="flex-row items-center px-2 pt-2 pb-3">
-        <Pressable onPress={() => router.back()} className="p-2 -ml-1 active:opacity-60">
-          <ChevronLeft size={24} color={primaryColor} />
-        </Pressable>
-        <Text className="text-xl font-bold text-foreground flex-1">
-          {t('nav.workers', 'Workers')}
-        </Text>
-        <Text className="text-sm text-muted-foreground mr-2">{workers.length}</Text>
-      </View>
-
-      <View className="px-4 pb-3">
-        <SearchInput value={searchQuery} onChangeText={setSearchQuery} placeholder={t('common.search', 'Search...')} />
-      </View>
+    <View style={{ flex: 1, backgroundColor: screenBg }}>
+      <BrandHeader
+        title={t('nav.workers', 'Workers')}
+        subtitle={t('workers.subtitle', 'Manage your workforce')}
+        gradient={heroGradient}
+        topInset={insets.top}
+        isRTL={isRTL}
+      />
 
       <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={primaryColor} />}
-      >
-        {workersLoading && workers.length === 0 ? (
-          <View>{[1,2,3,4,5,6].map(i => <SkeletonRow key={i} />)}</View>
-        ) : filtered.length === 0 ? (
-          <EmptyState
-            title={searchQuery ? t('common.noResults', 'No results') : t('workers.noWorkers', 'No workers')}
-            description={!searchQuery ? t('workers.noWorkersDesc', 'Sync your data to see workers here.') : undefined}
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        stickyHeaderIndices={[0]}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={accentColor}
+            colors={[accentColor]}
+            progressBackgroundColor={dark ? 'hsl(150, 18%, 14%)' : '#ffffff'}
           />
-        ) : (
-          filtered.map((worker) => (
-            <Pressable
-              key={worker._id}
-              onPress={() => router.push(`/(app)/worker/${worker._id}`)}
-              className="flex-row items-center px-4 py-3 border-b border-border active:bg-accent/50"
+        }
+      >
+        <View
+          style={{
+            backgroundColor: screenBg,
+            paddingHorizontal: 16,
+            paddingTop: 16,
+            paddingBottom: 14,
+            borderBottomWidth: StyleSheet.hairlineWidth,
+            borderBottomColor: borderColor,
+          }}
+        >
+          <SheetInput
+            icon={Search}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder={t('workers.searchPlaceholder', 'Search workers...')}
+            autoCapitalize="none"
+            autoCorrect={false}
+            dense
+            suffix={
+              searchQuery ? (
+                <Pressable
+                  onPress={() => setSearchQuery('')}
+                  hitSlop={10}
+                  style={styles.clearBtn}
+                >
+                  <X size={14} color={mutedColor} />
+                </Pressable>
+              ) : null
+            }
+          />
+        </View>
+
+        <View style={{ paddingTop: 18 }}>
+          {isInitialLoading ? (
+            <View style={{ paddingHorizontal: 16, gap: 10 }}>
+              {[1, 2, 3, 4, 5].map((i) => <SkeletonRow key={i} />)}
+            </View>
+          ) : isEmptyClean ? (
+            <EmptyState
+              icon={Users}
+              title={t('workers.noWorkers', 'No workers yet')}
+              description={t('workers.noWorkersDesc', 'Add your first worker to start managing your workforce.')}
+              actionLabel={canCreate ? t('workers.addFirstWorker', 'Add Your First Worker') : undefined}
+              onAction={canCreate ? openCreate : undefined}
+            />
+          ) : isFilteredEmpty ? (
+            <View
+              style={{
+                marginHorizontal: 16,
+                marginTop: 16,
+                alignItems: 'center',
+                paddingVertical: 24,
+              }}
             >
-              <View className="h-10 w-10 rounded-full bg-muted items-center justify-center mr-3">
-                <Users size={18} color={mutedColor} />
-              </View>
-              <View className="flex-1 min-w-0">
-                <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
-                  {worker.firstName} {worker.lastName}
-                </Text>
-                {worker.role && <Text className="text-xs text-muted-foreground mt-0.5">{worker.role}</Text>}
-              </View>
-              <ChevronRight size={16} color={mutedColor} />
-            </Pressable>
-          ))
-        )}
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontFamily: 'Poppins-Regular',
+                  color: mutedColor,
+                  textAlign: 'center',
+                }}
+              >
+                {t('common.noResults', 'No results found')}
+              </Text>
+            </View>
+          ) : (
+            <SheetSection padded={false}>
+              {filteredWorkers.map((worker, idx) => (
+                <View
+                  key={worker._id}
+                  style={idx > 0 ? {
+                    borderTopWidth: 1,
+                    borderTopColor: sectionBorder,
+                  } : null}
+                >
+                  <WorkerRow
+                    worker={worker}
+                    tokens={tokens}
+                    isRTL={isRTL}
+                    t={t}
+                    onPress={() => router.push(`/(app)/worker/${worker._id}`)}
+                    onEdit={canUpdate ? () => openEdit(worker) : undefined}
+                    onDelete={canDelete ? () => requestDelete(worker) : undefined}
+                  />
+                </View>
+              ))}
+            </SheetSection>
+          )}
+        </View>
       </ScrollView>
+
+      {!workerSheet.open && canCreate && (
+        <QuickAddFAB
+          items={[]}
+          directAction={openCreate}
+          bottomInset={fabBottomInset}
+        />
+      )}
+
+      <WorkerSheet
+        open={workerSheet.open}
+        onClose={() => setWorkerSheet({ open: false, data: null })}
+        editData={workerSheet.data}
+        canDelete={canDelete}
+        onDelete={workerSheet.data ? () => requestDelete(workerSheet.data) : undefined}
+      />
+
+      <ConfirmDialog
+        open={!!workerToDelete}
+        onOpenChange={(o) => { if (!o) setWorkerToDelete(null); }}
+        title={t('workers.deleteWorkerTitle', 'Delete Worker')}
+        description={t(
+          'workers.deleteWorkerWarning',
+          'This will permanently delete this worker and cannot be undone.'
+        )}
+        confirmLabel={t('common.delete', 'Delete')}
+        cancelLabel={t('common.cancel', 'Cancel')}
+        onConfirm={confirmDelete}
+      />
     </View>
   );
 }
+
+function BrandHeader({ title, subtitle, gradient, topInset, isRTL }) {
+  const BackIcon = isRTL ? ChevronRight : ChevronLeft;
+  const handleBack = () => {
+    Haptics.selectionAsync().catch(() => {});
+    router.back();
+  };
+  return (
+    <LinearGradient
+      colors={gradient}
+      start={isRTL ? { x: 1, y: 0 } : { x: 0, y: 0 }}
+      end={isRTL ? { x: 0, y: 1 } : { x: 1, y: 1 }}
+      style={{
+        paddingTop: topInset + 14,
+        paddingBottom: 22,
+        paddingHorizontal: 20,
+      }}
+    >
+      <View
+        style={[
+          headerStyles.row,
+          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+        ]}
+      >
+        <Pressable
+          onPress={handleBack}
+          hitSlop={10}
+          style={headerStyles.backBtn}
+          accessibilityRole="button"
+        >
+          <BackIcon size={20} color="#ffffff" strokeWidth={2.4} />
+        </Pressable>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text
+            style={{
+              fontSize: 24,
+              fontFamily: 'Poppins-Bold',
+              color: '#ffffff',
+              letterSpacing: -0.4,
+              lineHeight: 30,
+              textAlign: isRTL ? 'right' : 'left',
+              writingDirection: isRTL ? 'rtl' : 'ltr',
+            }}
+            numberOfLines={1}
+          >
+            {title}
+          </Text>
+          {subtitle ? (
+            <Text
+              style={{
+                fontSize: 12,
+                fontFamily: 'Poppins-Regular',
+                color: 'rgba(255,255,255,0.78)',
+                marginTop: 4,
+                textAlign: isRTL ? 'right' : 'left',
+                writingDirection: isRTL ? 'rtl' : 'ltr',
+              }}
+              numberOfLines={1}
+            >
+              {subtitle}
+            </Text>
+          ) : null}
+        </View>
+        <SyncIconButton />
+      </View>
+    </LinearGradient>
+  );
+}
+
+function WorkerRow({
+  worker, tokens, isRTL, t,
+  onPress, onEdit, onDelete,
+}) {
+  const { mutedColor, textColor, accentColor, dark, sectionBg } = tokens;
+  const swipeRef = useRef(null);
+  // Flat row inside a SheetSection — DL §9. Press feedback is just a
+  // background tint; row separation comes from the parent's sectionBorder
+  // line. Padding lives on a plain inner View so NativeWind's css-interop
+  // can't strip it.
+  const pressedBg = dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)';
+
+  const initials = `${worker.firstName?.[0] || ''}${worker.lastName?.[0] || ''}`.toUpperCase();
+  const fullName = `${worker.firstName || ''} ${worker.lastName || ''}`.trim() || t('common.unnamed', 'Unnamed');
+  const role = worker.role || 'labourer';
+  const housesCount = (worker.houseAssignments || []).length;
+
+  const handleEdit = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    swipeRef.current?.close?.();
+    setTimeout(() => onEdit?.(), 150);
+  };
+
+  const handleDelete = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    swipeRef.current?.close?.();
+    setTimeout(() => onDelete?.(), 150);
+  };
+
+  const renderRightActions = () => (
+    <View style={{ flexDirection: 'row' }}>
+      {onEdit ? (
+        <Pressable
+          onPress={handleEdit}
+          style={({ pressed }) => [
+            cardStyles.swipeAction,
+            { backgroundColor: '#f59e0b', opacity: pressed ? 0.8 : 1 },
+          ]}
+        >
+          <Pencil size={20} color="#ffffff" strokeWidth={2.2} />
+          <Text style={cardStyles.swipeActionLabel}>
+            {t('common.edit', 'Edit')}
+          </Text>
+        </Pressable>
+      ) : null}
+      {onDelete ? (
+        <Pressable
+          onPress={handleDelete}
+          style={({ pressed }) => [
+            cardStyles.swipeAction,
+            { backgroundColor: '#dc2626', opacity: pressed ? 0.8 : 1 },
+          ]}
+        >
+          <Trash2 size={20} color="#ffffff" strokeWidth={2.2} />
+          <Text style={cardStyles.swipeActionLabel}>
+            {t('common.delete', 'Delete')}
+          </Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+
+  const swipeEnabled = !!(onEdit || onDelete);
+
+  return (
+    <Swipeable
+      ref={swipeRef}
+      friction={2}
+      rightThreshold={40}
+      overshootRight={false}
+      enabled={swipeEnabled}
+      renderRightActions={swipeEnabled ? renderRightActions : undefined}
+      containerStyle={{ backgroundColor: sectionBg }}
+    >
+      <Pressable
+        onPressIn={() => Haptics.selectionAsync().catch(() => {})}
+        onPress={onPress}
+        android_ripple={{
+          color: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+          borderless: false,
+        }}
+        style={({ pressed }) => ({
+          backgroundColor: pressed ? pressedBg : 'transparent',
+        })}
+      >
+        <View style={cardStyles.rowInner}>
+          <View
+            style={[
+              cardStyles.row,
+              { flexDirection: isRTL ? 'row-reverse' : 'row' },
+            ]}
+          >
+          <View
+            style={[
+              cardStyles.avatar,
+              {
+                backgroundColor: dark ? 'rgba(148,210,165,0.18)' : 'hsl(148, 35%, 92%)',
+              },
+            ]}
+          >
+            {initials ? (
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontFamily: 'Poppins-Bold',
+                  color: accentColor,
+                }}
+              >
+                {initials}
+              </Text>
+            ) : (
+              <HardHat size={18} color={accentColor} strokeWidth={2} />
+            )}
+          </View>
+
+          <View style={cardStyles.textCol}>
+            <Text
+              style={{
+                fontSize: 15,
+                fontFamily: 'Poppins-SemiBold',
+                color: textColor,
+                letterSpacing: -0.1,
+                textAlign: isRTL ? 'right' : 'left',
+              }}
+              numberOfLines={1}
+            >
+              {fullName}
+            </Text>
+            <View
+              style={[
+                cardStyles.metaRow,
+                { flexDirection: isRTL ? 'row-reverse' : 'row' },
+              ]}
+            >
+              <View
+                style={[
+                  cardStyles.rolePill,
+                  {
+                    backgroundColor: dark ? 'rgba(255,255,255,0.06)' : 'hsl(148, 18%, 96%)',
+                    borderColor: dark ? 'rgba(255,255,255,0.10)' : 'hsl(148, 14%, 88%)',
+                  },
+                ]}
+              >
+                <Text
+                  style={{
+                    fontSize: 10,
+                    fontFamily: 'Poppins-SemiBold',
+                    color: mutedColor,
+                    letterSpacing: 0.6,
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  {t(`workers.workerRoles.${role}`, role)}
+                </Text>
+              </View>
+              {worker.phone ? (
+                <View
+                  style={[
+                    cardStyles.metaPiece,
+                    { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                  ]}
+                >
+                  <Phone size={11} color={mutedColor} strokeWidth={2.2} />
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontFamily: 'Poppins-Regular',
+                      color: mutedColor,
+                      maxWidth: 130,
+                    }}
+                    numberOfLines={1}
+                  >
+                    {worker.phone}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          </View>
+
+          {housesCount > 0 ? (
+            <View
+              style={[
+                cardStyles.housesBadge,
+                {
+                  backgroundColor: dark ? 'rgba(255,255,255,0.06)' : 'hsl(148, 18%, 96%)',
+                  borderColor: dark ? 'rgba(255,255,255,0.10)' : 'hsl(148, 14%, 88%)',
+                  flexDirection: isRTL ? 'row-reverse' : 'row',
+                },
+              ]}
+            >
+              <Layers size={11} color={mutedColor} strokeWidth={2.2} />
+              <Text
+                style={{
+                  fontSize: 11,
+                  fontFamily: 'Poppins-SemiBold',
+                  color: textColor,
+                  fontVariant: ['tabular-nums'],
+                }}
+              >
+                {housesCount}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+        </View>
+      </Pressable>
+    </Swipeable>
+  );
+}
+
+const headerStyles = StyleSheet.create({
+  row: {
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
+});
+
+const styles = StyleSheet.create({
+  clearBtn: {
+    width: 22,
+    height: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 11,
+  },
+});
+
+const cardStyles = StyleSheet.create({
+  // Padding lives here on a plain View, NOT on the Pressable. NativeWind's
+  // css-interop strips layout-bearing styles from a Pressable's functional
+  // `style` form (DL §9 trap rule).
+  rowInner: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  row: {
+    alignItems: 'center',
+    gap: 14,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  textCol: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  metaRow: {
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 2,
+  },
+  metaPiece: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  rolePill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  housesBadge: {
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  swipeAction: {
+    width: SWIPE_ACTION_WIDTH,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  swipeActionLabel: {
+    fontSize: 11,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#ffffff',
+    marginTop: 4,
+  },
+});

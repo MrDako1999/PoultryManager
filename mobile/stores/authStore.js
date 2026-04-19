@@ -4,6 +4,20 @@ import { getToken, setToken, clearToken } from '@/lib/storage';
 import { fullSync, deltaSync, clearAll, startPeriodicSync, stopPeriodicSync } from '@/lib/syncEngine';
 import { getSyncMetaCount } from '@/lib/db';
 import useModuleStore from '@/stores/moduleStore';
+import useSyncStore from '@/stores/syncStore';
+
+async function runInitialSync() {
+  const syncStore = useSyncStore.getState();
+  syncStore.setInitialSyncing(true);
+  try {
+    await fullSync({ reportProgress: true });
+  } catch (err) {
+    console.error('Initial sync failed:', err);
+  } finally {
+    useSyncStore.getState().setInitialSyncing(false);
+    useSyncStore.getState().clearSyncProgress();
+  }
+}
 
 // Lazy-load the registry to break the require cycle:
 // authStore -> syncEngine -> registry -> broiler/index -> WorkerHome -> authStore.
@@ -42,7 +56,7 @@ const useAuthStore = create((set) => ({
       if (hasMeta) {
         deltaSync().catch(console.error);
       } else {
-        fullSync().catch(console.error);
+        runInitialSync();
       }
       startPeriodicSync();
     } catch {
@@ -58,7 +72,7 @@ const useAuthStore = create((set) => ({
     set({ user: data.user });
     await syncModuleStoreFromUser(data.user);
     await clearAll();
-    fullSync().catch(console.error);
+    runInitialSync();
     startPeriodicSync();
     return data;
   },
@@ -69,7 +83,7 @@ const useAuthStore = create((set) => ({
     set({ user: data.user });
     await syncModuleStoreFromUser(data.user);
     await clearAll();
-    fullSync().catch(console.error);
+    runInitialSync();
     startPeriodicSync();
     return data;
   },

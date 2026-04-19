@@ -1,18 +1,21 @@
-import { useState, useCallback, useMemo, useRef } from 'react';
-import {
-  View, Text, Pressable, Modal, FlatList, TextInput,
-  Dimensions, PanResponder, Animated, Keyboard,
-} from 'react-native';
-import { ChevronDown, Check, X, Search, Plus } from 'lucide-react-native';
-import { cn } from '@/lib/utils';
-import useThemeStore from '@/stores/themeStore';
+import { useState, useCallback, useRef, forwardRef, useImperativeHandle } from 'react';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { ChevronDown, X, Plus } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
+import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
+import { useIsRTL } from '@/stores/localeStore';
+import BottomPickerSheet from '@/components/BottomPickerSheet';
 
-const SCREEN_HEIGHT = Dimensions.get('window').height;
-const SHEET_HEIGHT = SCREEN_HEIGHT * 0.65;
-const DISMISS_THRESHOLD = 80;
-
-export default function Select({
+/**
+ * Form-grade Select. Thin wrapper over `BottomPickerSheet` that adds:
+ *   - The default form-style trigger Pressable (border + chevron + label)
+ *   - `onCreateNew` "Add New" header pill + empty-state CTA
+ *   - `clearable` Clear pill (header) + inline clear X (trigger)
+ *   - `renderTrigger` escape hatch for callers that paint their own trigger
+ *
+ * 100% backward-compatible with the previous Select API.
+ */
+function Select({
   value,
   onValueChange,
   options = [],
@@ -21,215 +24,285 @@ export default function Select({
   onCreateNew,
   createNewLabel,
   searchable = true,
-}) {
-  const [open, setOpen] = useState(false);
+  onOpen,
+  clearable = false,
+  renderTrigger,
+  sheetHeightFraction = 0.65,
+  forceSearchable = false,
+  renderItem,
+  searchPlaceholder,
+}, ref) {
+  const sheetRef = useRef(null);
   const [search, setSearch] = useState('');
-  const { resolvedTheme } = useThemeStore();
+  const tokens = useHeroSheetTokens();
+  const {
+    dark, accentColor, textColor, mutedColor, iconColor,
+    inputBg, inputBorderIdle,
+  } = tokens;
+  const isRTL = useIsRTL();
   const selected = options.find((o) => o.value === value);
-  const mutedColor = 'hsl(150, 10%, 45%)';
-  const primaryColor = resolvedTheme === 'dark' ? 'hsl(148, 48%, 38%)' : 'hsl(148, 60%, 20%)';
-
-  const slideAnim = useRef(new Animated.Value(SHEET_HEIGHT)).current;
-  const backdropAnim = useRef(new Animated.Value(0)).current;
-
-  const panResponder = useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: (_, g) => g.dy > 4,
-    onPanResponderMove: (_, g) => {
-      if (g.dy > 0) slideAnim.setValue(g.dy);
-    },
-    onPanResponderRelease: (_, g) => {
-      if (g.dy > DISMISS_THRESHOLD || g.vy > 0.5) {
-        slideOut();
-      } else {
-        Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 100, friction: 10 }).start();
-      }
-    },
-  }), []);
-
-  const slideIn = useCallback(() => {
-    slideAnim.setValue(SHEET_HEIGHT);
-    backdropAnim.setValue(0);
-    Animated.parallel([
-      Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 65, friction: 11 }),
-      Animated.timing(backdropAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
-    ]).start();
-  }, [slideAnim, backdropAnim]);
-
-  const slideOut = useCallback(() => {
-    Keyboard.dismiss();
-    Animated.parallel([
-      Animated.timing(slideAnim, { toValue: SHEET_HEIGHT, duration: 200, useNativeDriver: true }),
-      Animated.timing(backdropAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
-    ]).start(() => {
-      setOpen(false);
-      setSearch('');
-    });
-  }, [slideAnim, backdropAnim]);
 
   const openSheet = useCallback(() => {
-    setSearch('');
-    setOpen(true);
-    requestAnimationFrame(() => slideIn());
-  }, [slideIn]);
+    sheetRef.current?.open();
+  }, []);
 
-  const handleSelect = useCallback((val) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onValueChange(val);
-    slideOut();
-  }, [onValueChange, slideOut]);
+  const closeSheet = useCallback(() => {
+    sheetRef.current?.close();
+  }, []);
 
-  const filtered = useMemo(() => {
-    if (!search.trim()) return options;
-    const q = search.toLowerCase();
-    return options.filter((o) =>
-      o.label?.toLowerCase().includes(q) || o.description?.toLowerCase().includes(q)
-    );
-  }, [options, search]);
+  useImperativeHandle(ref, () => ({ open: openSheet, close: closeSheet }), [openSheet, closeSheet]);
 
-  const showEmpty = search.trim().length > 0 && filtered.length === 0;
-  const showSearch = searchable && options.length > 5;
+  const handleClear = useCallback(() => {
+    Haptics.selectionAsync().catch(() => {});
+    onValueChange(null);
+  }, [onValueChange]);
+
+  const showInlineClear = clearable && !!selected;
+
+  // Compact form-grade trigger. Layout (flexDirection, border, height) lives
+  // in StyleSheet + on a plain inner <View>; the Pressable's style is a
+  // STATIC array so NativeWind's css-interop can't strip layout from it.
+  // See DESIGN_LANGUAGE.md §9 "NativeWind / Pressable functional-style trap".
+  const trigger = renderTrigger === null
+    ? null
+    : renderTrigger
+      ? renderTrigger({ open: openSheet, selected, placeholder })
+      : (
+        <Pressable
+          onPress={openSheet}
+          android_ripple={{
+            color: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+            borderless: false,
+          }}
+          style={[
+            triggerStyles.outer,
+            { backgroundColor: inputBg, borderColor: inputBorderIdle },
+          ]}
+        >
+          <View
+            style={[
+              triggerStyles.row,
+              { flexDirection: isRTL ? 'row-reverse' : 'row' },
+            ]}
+          >
+            <Text
+              style={{
+                flex: 1,
+                fontSize: 14,
+                fontFamily: 'Poppins-Regular',
+                color: selected ? textColor : mutedColor,
+                textAlign: isRTL ? 'right' : 'left',
+                writingDirection: isRTL ? 'rtl' : 'ltr',
+              }}
+              numberOfLines={1}
+            >
+              {selected?.label || placeholder}
+            </Text>
+            {showInlineClear ? (
+              <Pressable
+                onPress={handleClear}
+                hitSlop={10}
+                style={triggerStyles.inlineClear}
+              >
+                <X size={14} color={mutedColor} strokeWidth={2.4} />
+              </Pressable>
+            ) : (
+              <ChevronDown size={16} color={iconColor} strokeWidth={2.2} />
+            )}
+          </View>
+        </Pressable>
+      );
+
+  // Header-right pills carried over from the legacy header (Clear + Add New).
+  const headerRight = (clearable && selected) || onCreateNew ? (
+    <>
+      {clearable && selected ? (
+        <Pressable
+          onPress={() => { handleClear(); closeSheet(); }}
+          hitSlop={8}
+          style={({ pressed }) => [
+            triggerStyles.headerPill,
+            {
+              backgroundColor: pressed
+                ? (dark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.08)')
+                : (dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'),
+            },
+          ]}
+        >
+          <Text
+            style={{
+              fontSize: 12.5,
+              fontFamily: 'Poppins-SemiBold',
+              color: mutedColor,
+              letterSpacing: 0.1,
+            }}
+          >
+            Clear
+          </Text>
+        </Pressable>
+      ) : null}
+      {onCreateNew ? (
+        <Pressable
+          onPress={() => {
+            const s = search;
+            closeSheet();
+            setTimeout(() => onCreateNew(s), 250);
+          }}
+          hitSlop={8}
+          style={({ pressed }) => [
+            triggerStyles.headerPillIcon,
+            {
+              flexDirection: isRTL ? 'row-reverse' : 'row',
+              backgroundColor: pressed
+                ? (dark ? 'rgba(148,210,165,0.22)' : 'hsl(148, 35%, 88%)')
+                : (dark ? 'rgba(148,210,165,0.14)' : 'hsl(148, 35%, 94%)'),
+            },
+          ]}
+        >
+          <Plus size={14} color={accentColor} strokeWidth={2.4} />
+          <Text
+            style={{
+              fontSize: 12.5,
+              fontFamily: 'Poppins-SemiBold',
+              color: accentColor,
+              letterSpacing: 0.1,
+            }}
+          >
+            {createNewLabel || 'Add New'}
+          </Text>
+        </Pressable>
+      ) : null}
+    </>
+  ) : null;
+
+  // Custom empty state — preserves the legacy "Create …" CTA.
+  const emptyState = onCreateNew && search.trim() ? (
+    <View
+      style={{
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 20,
+        gap: 12,
+      }}
+    >
+      <Text
+        style={{
+          fontSize: 14,
+          fontFamily: 'Poppins-Regular',
+          color: mutedColor,
+          textAlign: 'center',
+        }}
+      >
+        No results for &ldquo;{search}&rdquo;
+      </Text>
+      <Pressable
+        onPress={() => {
+          const s = search;
+          closeSheet();
+          setTimeout(() => onCreateNew(s), 250);
+        }}
+        style={({ pressed }) => [
+          triggerStyles.createCta,
+          {
+            flexDirection: isRTL ? 'row-reverse' : 'row',
+            borderColor: accentColor,
+            backgroundColor: pressed
+              ? (dark ? 'rgba(148,210,165,0.18)' : 'hsl(148, 35%, 92%)')
+              : (dark ? 'rgba(148,210,165,0.10)' : 'hsl(148, 35%, 96%)'),
+          },
+        ]}
+      >
+        <Plus size={15} color={accentColor} strokeWidth={2.4} />
+        <Text
+          style={{
+            fontSize: 14,
+            fontFamily: 'Poppins-SemiBold',
+            color: accentColor,
+            letterSpacing: 0.1,
+          }}
+        >
+          Create &ldquo;{search}&rdquo;
+        </Text>
+      </Pressable>
+    </View>
+  ) : undefined;
 
   return (
     <>
-      <Pressable
-        onPress={openSheet}
-        className="flex-row items-center justify-between border border-border rounded-md bg-background px-3 h-12"
-      >
-        <Text
-          className={cn('text-sm flex-1', selected ? 'text-foreground' : 'text-muted-foreground')}
-          numberOfLines={1}
-        >
-          {selected?.label || placeholder}
-        </Text>
-        <ChevronDown size={16} color={mutedColor} />
-      </Pressable>
+      {trigger}
 
-      <Modal transparent visible={open} animationType="none" onRequestClose={slideOut}>
-        <View className="flex-1">
-          <Animated.View
-            style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', opacity: backdropAnim }}
-          >
-            <Pressable style={{ flex: 1 }} onPress={slideOut} />
-          </Animated.View>
-
-          <Animated.View
-            style={[{ height: SHEET_HEIGHT, transform: [{ translateY: slideAnim }] }]}
-            className="absolute bottom-0 left-0 right-0 bg-card rounded-t-2xl"
-          >
-            {/* Drag zone — generous 44pt touch target */}
-            <View
-              {...panResponder.panHandlers}
-              className="items-center justify-center"
-              style={{ height: 44 }}
-            >
-              <View className="w-10 h-1 rounded-full bg-border" />
-            </View>
-
-            {/* Header */}
-            <View className="flex-row items-center justify-between px-4 pb-3">
-              <Text className="text-base font-semibold text-foreground flex-1" numberOfLines={1}>
-                {label || placeholder}
-              </Text>
-              <View className="flex-row items-center gap-2">
-                {onCreateNew && (
-                  <Pressable
-                    onPress={() => { const s = search; slideOut(); setTimeout(() => onCreateNew(s), 250); }}
-                    className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10"
-                    hitSlop={8}
-                  >
-                    <Plus size={14} color={primaryColor} />
-                    <Text className="text-xs font-semibold text-primary">
-                      {createNewLabel || 'Add New'}
-                    </Text>
-                  </Pressable>
-                )}
-                <Pressable onPress={slideOut} className="h-8 w-8 items-center justify-center rounded-full bg-muted" hitSlop={8}>
-                  <X size={16} color={mutedColor} />
-                </Pressable>
-              </View>
-            </View>
-
-            {/* Search */}
-            {showSearch && (
-              <View className="px-4 pb-3">
-                <View className="flex-row items-center gap-2.5 bg-muted/50 border border-border rounded-lg px-3 h-10">
-                  <Search size={15} color={mutedColor} />
-                  <TextInput
-                    value={search}
-                    onChangeText={setSearch}
-                    placeholder={`Search ${(label || placeholder).toLowerCase()}...`}
-                    placeholderTextColor={mutedColor}
-                    className="flex-1 text-sm text-foreground"
-                    autoCorrect={false}
-                    autoCapitalize="none"
-                    returnKeyType="done"
-                  />
-                  {search.length > 0 && (
-                    <Pressable onPress={() => setSearch('')} hitSlop={8}>
-                      <X size={14} color={mutedColor} />
-                    </Pressable>
-                  )}
-                </View>
-              </View>
-            )}
-
-            {/* Divider */}
-            <View className="h-px bg-border" />
-
-            {/* Options list — fills remaining space */}
-            <FlatList
-              data={filtered}
-              keyExtractor={(item) => String(item.value)}
-              keyboardShouldPersistTaps="handled"
-              className="flex-1"
-              contentContainerStyle={filtered.length === 0 ? { flex: 1 } : undefined}
-              renderItem={({ item }) => {
-                const isSelected = value === item.value;
-                return (
-                  <Pressable
-                    onPress={() => handleSelect(item.value)}
-                    className={cn(
-                      'flex-row items-center px-4 py-3.5',
-                      isSelected && 'bg-primary/5'
-                    )}
-                  >
-                    <View className="flex-1">
-                      <Text className={cn('text-sm', isSelected ? 'text-primary font-semibold' : 'text-foreground')}>
-                        {item.label}
-                      </Text>
-                      {item.description && (
-                        <Text className="text-xs text-muted-foreground mt-0.5">{item.description}</Text>
-                      )}
-                    </View>
-                    {isSelected && <Check size={18} color={primaryColor} strokeWidth={2.5} />}
-                  </Pressable>
-                );
-              }}
-              ItemSeparatorComponent={() => <View className="h-px bg-border mx-4" />}
-              ListEmptyComponent={showEmpty ? (
-                <View className="flex-1 items-center justify-center px-4 gap-3">
-                  <Text className="text-sm text-muted-foreground">No results for &quot;{search}&quot;</Text>
-                  {onCreateNew && (
-                    <Pressable
-                      onPress={() => { const s = search; slideOut(); setTimeout(() => onCreateNew(s), 250); }}
-                      className="flex-row items-center gap-1.5 px-4 py-2.5 rounded-lg border border-primary bg-primary/5"
-                    >
-                      <Plus size={15} color={primaryColor} />
-                      <Text className="text-sm font-medium text-primary">
-                        Create &quot;{search}&quot;
-                      </Text>
-                    </Pressable>
-                  )}
-                </View>
-              ) : null}
-            />
-
-            {/* Bottom safe area */}
-            <View className="h-8" />
-          </Animated.View>
-        </View>
-      </Modal>
+      <BottomPickerSheet
+        ref={sheetRef}
+        title={label || placeholder}
+        searchable={searchable}
+        forceSearchable={forceSearchable}
+        searchPlaceholder={searchPlaceholder}
+        sheetHeightFraction={sheetHeightFraction}
+        options={options}
+        value={value}
+        onValueChange={onValueChange}
+        renderItem={renderItem}
+        onOpen={() => {
+          setSearch('');
+          onOpen?.();
+        }}
+        // Track the live search value so onCreateNew + emptyState can use it.
+        // We do this by overriding renderItem-on-empty via the emptyState prop;
+        // for the search value itself we read it from the sheet via a small
+        // mirror handler exposed through onSearchChange (added below).
+        onSearchChange={setSearch}
+        headerRight={headerRight}
+        emptyState={emptyState}
+      />
     </>
   );
 }
+
+export default forwardRef(Select);
+
+// Layout / borders / height live in StyleSheet because NativeWind's
+// css-interop silently strips them out of Pressable's functional
+// `style={({ pressed }) => ({...})}` form. Theme colours go on a static
+// style array on top. See DESIGN_LANGUAGE.md §9.
+const triggerStyles = StyleSheet.create({
+  outer: {
+    height: 48,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  row: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  inlineClear: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+  },
+  headerPillIcon: {
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+  },
+  createCta: {
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1.5,
+  },
+});

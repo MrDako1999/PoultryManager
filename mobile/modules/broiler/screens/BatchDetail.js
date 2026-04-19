@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Animated } from 'react-native';
+import { View, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -17,7 +17,8 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import Tabs from '@/components/ui/Tabs';
 import { SkeletonBatchDetail } from '@/components/skeletons';
 import QuickAddFAB from '@/components/QuickAddFAB';
-import BatchHeader from '@/modules/broiler/components/BatchHeader';
+import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
+import BatchDetailHeader from '@/modules/broiler/components/BatchDetailHeader';
 import BatchSheet from '@/modules/broiler/sheets/BatchSheet';
 import SourceSheet from '@/modules/broiler/sheets/SourceSheet';
 import FeedOrderSheet from '@/modules/broiler/sheets/FeedOrderSheet';
@@ -38,15 +39,22 @@ export default function BatchDetailScreen() {
   const { can } = useCapabilities();
   const { toast } = useToast();
   const { remove } = useOfflineMutation('batches');
+  const { screenBg } = useHeroSheetTokens();
 
   const pagerRef = useRef(null);
   const pagerProgress = useRef(new Animated.Value(0)).current;
+  // Tracks the page index the pager itself most recently reported. Used to
+  // suppress programmatic `setPage` calls in response to state updates that
+  // originated from the pager (which would otherwise create a feedback loop
+  // of selections and produce the runaway swipe seen on fast gestures).
+  const pagerIndexRef = useRef(0);
   const handlePageScroll = (e) => {
     const { position, offset } = e.nativeEvent;
     pagerProgress.setValue(position + offset);
   };
   const handlePageSelected = (e) => {
     const idx = e.nativeEvent.position;
+    pagerIndexRef.current = idx;
     pagerProgress.setValue(idx);
   };
 
@@ -89,6 +97,15 @@ export default function BatchDetailScreen() {
 
   const [activeKey, setActiveKey] = useState(initialKey);
 
+  // Seed the pager-index ref and progress with the initial page on mount so
+  // the sync effect below doesn't issue a redundant `setPage` after mount.
+  useEffect(() => {
+    const idx = Math.max(0, visibleTabs.findIndex((t) => t.key === initialKey));
+    pagerIndexRef.current = idx;
+    pagerProgress.setValue(idx);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     if (!visibleTabs.find((t) => t.key === activeKey)) {
       setActiveKey(visibleTabs[0]?.key || 'overview');
@@ -97,16 +114,13 @@ export default function BatchDetailScreen() {
 
   useEffect(() => {
     const idx = visibleTabs.findIndex((t) => t.key === activeKey);
-    if (idx >= 0 && pagerRef.current) {
-      pagerRef.current.setPage(idx);
-    }
+    if (idx < 0 || !pagerRef.current) return;
+    // Only drive the pager when state diverges from where the pager already
+    // is. This prevents echoing a swipe-driven selection back into the pager.
+    if (idx === pagerIndexRef.current) return;
+    pagerIndexRef.current = idx;
+    pagerRef.current.setPage(idx);
   }, [activeKey, visibleTabs]);
-
-  useEffect(() => {
-    if (typeof initialPage === 'number' && Number.isFinite(initialPage)) {
-      pagerProgress.setValue(initialPage);
-    }
-  }, [initialPage, pagerProgress]);
 
   const farmName = useMemo(() => {
     if (!batch) return '';
@@ -147,7 +161,7 @@ export default function BatchDetailScreen() {
 
   if (!batch) {
     return (
-      <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
+      <View style={{ flex: 1, backgroundColor: screenBg, paddingTop: insets.top }}>
         <EmptyState
           icon={Layers}
           title={t('batches.notFound', 'Batch not found')}
@@ -195,16 +209,26 @@ export default function BatchDetailScreen() {
     },
   ].filter(Boolean);
 
+  // On non-overview tabs the FAB becomes a single-action button that opens
+  // the create sheet for the currently visible content.
+  const tabDirectAction = {
+    sources: can('source:create') ? () => setSourceSheet(true) : null,
+    feedOrders: can('feedOrder:create') ? () => setFeedOrderSheet(true) : null,
+    expenses: can('expense:create') ? () => setExpenseSheet(true) : null,
+    sales: can('saleOrder:create') ? () => setSaleSheet(true) : null,
+    performance: can('dailyLog:create') ? () => setDailyLogSheet(true) : null,
+  }[activeKey] || null;
+  const showDirectFab = activeKey !== 'overview' && Boolean(tabDirectAction);
+  const showMenuFab = activeKey === 'overview' && quickAddItems.length > 0;
+
   return (
-    <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
-      <BatchHeader
+    <View style={{ flex: 1, backgroundColor: screenBg }}>
+      <BatchDetailHeader
         batch={batch}
         farmName={farmName}
         lastSaleDate={lastSaleDate}
         onEdit={() => setEditOpen(true)}
-        onDelete={() => setConfirmDeleteOpen(true)}
         canEdit={canEdit}
-        canDelete={canDelete}
       />
 
       <Tabs
@@ -250,14 +274,23 @@ export default function BatchDetailScreen() {
         ))}
       </PagerView>
 
-      {quickAddItems.length > 0 && (
+      {showMenuFab && (
         <QuickAddFAB items={quickAddItems} bottomInset={insets.bottom} />
+      )}
+      {showDirectFab && (
+        <QuickAddFAB
+          items={[]}
+          directAction={tabDirectAction}
+          bottomInset={insets.bottom}
+        />
       )}
 
       <BatchSheet
         open={editOpen}
         onClose={() => setEditOpen(false)}
         editData={batch}
+        onDelete={() => setConfirmDeleteOpen(true)}
+        canDelete={canDelete}
       />
 
       <SourceSheet

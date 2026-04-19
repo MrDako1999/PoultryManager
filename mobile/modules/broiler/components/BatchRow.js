@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { View, Text, Pressable } from 'react-native';
-import { Swipeable } from 'react-native-gesture-handler';
+import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { ChevronRight, Pencil, Trash2 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import BatchAvatar from './BatchAvatar';
@@ -28,6 +28,7 @@ export default function BatchRow({
   batchNum,
   displayName,
   daySubline,
+  cycleProgress,
   onPress,
   onEdit,
   onDelete,
@@ -97,11 +98,28 @@ export default function BatchRow({
           >
             {displayName}
           </Text>
-          {daySubline && (
+          {cycleProgress ? (
+            <View className="mt-1.5">
+              <View className="flex-row items-center justify-between mb-0.5">
+                <Text className="text-[10px] text-muted-foreground tabular-nums">
+                  {cycleProgress.label}
+                </Text>
+                <Text className="text-[10px] font-medium text-muted-foreground tabular-nums">
+                  {Math.round(cycleProgress.pct)}%
+                </Text>
+              </View>
+              <View className="h-1 rounded-full bg-muted overflow-hidden">
+                <View
+                  className="h-full rounded-full bg-primary"
+                  style={{ width: `${cycleProgress.pct}%` }}
+                />
+              </View>
+            </View>
+          ) : daySubline ? (
             <Text className="text-[12px] text-muted-foreground tabular-nums mt-0.5">
               {daySubline}
             </Text>
-          )}
+          ) : null}
         </View>
         <ChevronRight size={18} color={MUTED} />
       </Pressable>

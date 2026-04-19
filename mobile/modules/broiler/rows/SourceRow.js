@@ -1,29 +1,144 @@
-import { View, Text, Pressable } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import * as Haptics from 'expo-haptics';
 import { Calendar } from 'lucide-react-native';
+import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
+import { useIsRTL } from '@/stores/localeStore';
+
+const NUMERIC_LOCALE = 'en-US';
 
 const fmt = (val) =>
-  Number(val || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  Number(val || 0).toLocaleString(NUMERIC_LOCALE, {
+    minimumFractionDigits: 2, maximumFractionDigits: 2,
+  });
 
+const fmtInt = (val) => Number(val || 0).toLocaleString(NUMERIC_LOCALE);
+
+/**
+ * Source row used inside SourcesListView. Token-driven, RTL-safe; padding
+ * on a plain inner View per DL §9.
+ */
 export default function SourceRow({ source, onClick }) {
+  const { t } = useTranslation();
+  const isRTL = useIsRTL();
+  const { textColor, mutedColor, dark } = useHeroSheetTokens();
+
+  const dateLabel = source.deliveryDate
+    ? new Date(source.deliveryDate).toLocaleDateString(NUMERIC_LOCALE, {
+        day: '2-digit', month: 'short', year: 'numeric',
+      })
+    : null;
+
   return (
-    <Pressable onPress={onClick} className="flex-row items-center px-3 py-2.5 border-b border-border active:bg-accent/50">
-      <View className="flex-1 min-w-0">
-        <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
-          {source.sourceFrom?.companyName || 'Unknown Supplier'}
-        </Text>
-        <View className="flex-row items-center gap-2">
-          <View className="flex-row items-center gap-1">
-            <Calendar size={11} color="hsl(150, 10%, 45%)" />
-            <Text className="text-xs text-muted-foreground">
-              {source.deliveryDate ? new Date(source.deliveryDate).toLocaleDateString() : '—'}
+    <Pressable
+      onPressIn={() => Haptics.selectionAsync().catch(() => {})}
+      onPress={onClick}
+      android_ripple={{
+        color: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+        borderless: false,
+      }}
+      style={({ pressed }) => ({
+        backgroundColor: pressed
+          ? (dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)')
+          : 'transparent',
+      })}
+    >
+      <View style={styles.rowInner}>
+        <View
+          style={[
+            styles.row,
+            { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          ]}
+        >
+          <View style={styles.textCol}>
+            <Text
+              style={{
+                fontSize: 14,
+                fontFamily: 'Poppins-SemiBold',
+                color: textColor,
+                letterSpacing: -0.1,
+                textAlign: isRTL ? 'right' : 'left',
+              }}
+              numberOfLines={1}
+            >
+              {source.sourceFrom?.companyName || t('common.unknown', 'Unknown')}
             </Text>
+            <View
+              style={[
+                styles.metaRow,
+                { flexDirection: isRTL ? 'row-reverse' : 'row' },
+              ]}
+            >
+              {dateLabel ? (
+                <View
+                  style={[
+                    styles.metaPiece,
+                    { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                  ]}
+                >
+                  <Calendar size={11} color={mutedColor} strokeWidth={2.2} />
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontFamily: 'Poppins-Regular',
+                      color: mutedColor,
+                    }}
+                  >
+                    {dateLabel}
+                  </Text>
+                </View>
+              ) : null}
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontFamily: 'Poppins-Regular',
+                  color: mutedColor,
+                  fontVariant: ['tabular-nums'],
+                }}
+              >
+                {`${fmtInt(source.totalChicks)} ${t('farms.chicks', 'chicks').toLowerCase()}`}
+              </Text>
+            </View>
           </View>
-          <Text className="text-xs text-muted-foreground">
-            {(source.totalChicks || 0).toLocaleString()} chicks
+
+          <Text
+            style={{
+              fontSize: 14,
+              fontFamily: 'Poppins-SemiBold',
+              color: textColor,
+              fontVariant: ['tabular-nums'],
+            }}
+            numberOfLines={1}
+          >
+            {fmt(source.grandTotal)}
           </Text>
         </View>
       </View>
-      <Text className="text-sm font-medium text-foreground ml-2">{fmt(source.grandTotal)}</Text>
     </Pressable>
   );
 }
+
+const styles = StyleSheet.create({
+  rowInner: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  row: {
+    alignItems: 'center',
+    gap: 12,
+  },
+  textCol: {
+    flex: 1,
+    minWidth: 0,
+    gap: 4,
+  },
+  metaRow: {
+    alignItems: 'center',
+    gap: 10,
+    flexWrap: 'wrap',
+  },
+  metaPiece: {
+    alignItems: 'center',
+    gap: 4,
+  },
+});

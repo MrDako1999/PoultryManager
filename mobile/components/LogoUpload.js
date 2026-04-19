@@ -5,6 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useTranslation } from 'react-i18next';
 import useThemeStore from '@/stores/themeStore';
 import api from '@/lib/api';
+import { uploadMedia, getUploadErrorMessage } from '@/lib/uploadMedia';
 
 export default function LogoUpload({ value, onUpload, onRemove, entityType, entityId, category }) {
   const { t } = useTranslation();
@@ -44,24 +45,17 @@ export default function LogoUpload({ value, onUpload, onRemove, entityType, enti
     const asset = result.assets[0];
     setUploading(true);
     try {
-      const uri = asset.uri;
-      const filename = uri.split('/').pop() || 'logo.jpg';
-      const match = /\.(\w+)$/.exec(filename);
-      const type = match ? `image/${match[1]}` : 'image/jpeg';
-
-      const formData = new FormData();
-      formData.append('file', { uri, name: filename, type });
-      if (entityType) formData.append('entityType', entityType);
-      if (entityId) formData.append('entityId', entityId);
-      if (category) formData.append('category', category);
-      formData.append('mediaType', 'image');
-
-      const { data } = await api.post('/media/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+      const data = await uploadMedia({
+        uri: asset.uri,
+        name: asset.uri.split('/').pop() || 'logo.jpg',
+        entityType,
+        entityId,
+        category,
+        mediaType: 'image',
       });
       onUpload?.(data);
     } catch (err) {
-      setError(err.response?.data?.message || t('documents.uploadError', 'Upload failed'));
+      setError(getUploadErrorMessage(err, t('documents.uploadError', 'Upload failed')));
     } finally {
       setUploading(false);
     }

@@ -1,26 +1,22 @@
 import { View, Text, Pressable } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { router } from 'expo-router';
-import { ArrowLeft, Pencil, Trash2, Warehouse, Calendar } from 'lucide-react-native';
+import { ArrowLeft, Pencil } from 'lucide-react-native';
 import useThemeStore from '@/stores/themeStore';
 import BatchAvatar from './BatchAvatar';
 import { getStatusConfig } from '@/modules/broiler/lib/batchStatusConfig';
 
-const MUTED = 'hsl(150, 10%, 45%)';
+const CYCLE_TARGET_DAYS = 35;
 
 export default function BatchHeader({
   batch,
   farmName = '',
-  lastSaleDate = null,
   onEdit,
-  onDelete,
   canEdit = true,
-  canDelete = true,
 }) {
   const { t } = useTranslation();
   const { resolvedTheme } = useThemeStore();
   const iconColor = resolvedTheme === 'dark' ? '#e0e8e0' : '#1a2e1a';
-  const dangerColor = '#dc2626';
 
   if (!batch) return null;
 
@@ -29,16 +25,15 @@ export default function BatchHeader({
     batch.farm?.nickname || batch.farm?.farmName || farmName || batch.batchName || '?'
   )[0].toUpperCase();
   const batchNum = batch.sequenceNumber ?? '';
-  const resolvedFarmName = batch.farm?.farmName || batch.farm?.nickname || farmName;
 
-  let dayLabel = '';
-  if (batch.startDate) {
+  let cycleProgress = null;
+  if (batch.startDate && batch.status === 'IN_PROGRESS') {
     const start = new Date(batch.startDate);
-    const end = batch.status === 'COMPLETE'
-      ? (lastSaleDate ? new Date(lastSaleDate) : start)
-      : new Date();
-    const days = Math.max(0, Math.floor((end - start) / 86400000));
-    dayLabel = batch.status === 'COMPLETE' ? `${days} days` : `Day ${days}`;
+    const days = Math.max(0, Math.floor((new Date() - start) / 86400000));
+    cycleProgress = {
+      days,
+      pct: Math.min(100, (days / CYCLE_TARGET_DAYS) * 100),
+    };
   }
 
   return (
@@ -69,52 +64,41 @@ export default function BatchHeader({
           >
             {batch.batchName || `${avatarLetter}${batchNum}`}
           </Text>
-          <View className="flex-row items-center gap-3 mt-0.5">
-            {!!resolvedFarmName && (
-              <View className="flex-row items-center gap-1 flex-shrink min-w-0">
-                <Warehouse size={11} color={MUTED} />
-                <Text className="text-[11px] text-muted-foreground" numberOfLines={1}>
-                  {resolvedFarmName}
+          {cycleProgress && (
+            <View className="mt-1.5">
+              <View className="flex-row items-center justify-between mb-0.5">
+                <Text className="text-[10px] text-muted-foreground tabular-nums">
+                  {t('dashboard.dayOfTarget', 'Day {{day}} of {{target}}', {
+                    day: cycleProgress.days,
+                    target: CYCLE_TARGET_DAYS,
+                  })}
+                </Text>
+                <Text className="text-[10px] font-medium text-muted-foreground tabular-nums">
+                  {Math.round(cycleProgress.pct)}%
                 </Text>
               </View>
-            )}
-            {!!dayLabel && (
-              <View className="flex-row items-center gap-1">
-                <Calendar size={11} color={MUTED} />
-                <Text className="text-[11px] text-muted-foreground tabular-nums">
-                  {dayLabel}
-                </Text>
+              <View className="h-1 rounded-full bg-muted overflow-hidden">
+                <View
+                  className="h-full rounded-full bg-primary"
+                  style={{ width: `${cycleProgress.pct}%` }}
+                />
               </View>
-            )}
-          </View>
+            </View>
+          )}
         </View>
 
-        <View className="flex-row items-center">
-          {canEdit && (
-            <Pressable
-              onPress={onEdit}
-              className="items-center justify-center rounded-md active:bg-muted/50"
-              style={{ width: 44, height: 44 }}
-              hitSlop={6}
-              accessibilityRole="button"
-              accessibilityLabel={t('common.edit', 'Edit')}
-            >
-              <Pencil size={20} color={iconColor} />
-            </Pressable>
-          )}
-          {canDelete && (
-            <Pressable
-              onPress={onDelete}
-              className="items-center justify-center rounded-md active:bg-red-500/10"
-              style={{ width: 44, height: 44 }}
-              hitSlop={6}
-              accessibilityRole="button"
-              accessibilityLabel={t('common.delete', 'Delete')}
-            >
-              <Trash2 size={20} color={dangerColor} />
-            </Pressable>
-          )}
-        </View>
+        {canEdit && (
+          <Pressable
+            onPress={onEdit}
+            className="items-center justify-center rounded-md active:bg-muted/50"
+            style={{ width: 44, height: 44 }}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.edit', 'Edit')}
+          >
+            <Pencil size={20} color={iconColor} />
+          </Pressable>
+        )}
       </View>
     </View>
   );
