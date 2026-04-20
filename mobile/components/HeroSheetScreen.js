@@ -85,6 +85,7 @@ const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
  * @param {boolean} [props.keyboardAvoiding=false] - Wrap in KeyboardAvoidingView for forms
  * @param {object} [props.contentStyle] - Style overrides for the sheet content padding
  * @param {ReactNode} [props.refreshControl] - RefreshControl element passed to the inner ScrollView (only used when scrollable)
+ * @param {'default'|'relaxed'} [props.heroComfort='default'] - `relaxed` adds air in the green hero (auth screens). Tab dashboards stay `default`.
  */
 export default function HeroSheetScreen({
   title,
@@ -97,6 +98,7 @@ export default function HeroSheetScreen({
   scrollable = true,
   scrollableHero = false,
   keyboardAvoiding = false,
+  heroComfort = 'default',
   contentStyle,
   refreshControl,
   children,
@@ -123,7 +125,25 @@ export default function HeroSheetScreen({
     }
   };
 
-  const heroPaddingTop = insets.top + (showBack || headerRight ? 8 : 28);
+  const relaxedHero = heroComfort === 'relaxed';
+
+  // Dashboard-style hero: no back button but `heroExtra` + `headerRight` share
+  // one row so the sync / module controls align with the icon tile. Tighter
+  // top inset pulls the cluster up under the status bar slightly (`default`).
+  // Auth flows pass `heroComfort="relaxed"` for more breathing room.
+  const heroExtraHeaderMerged = !showBack && !!headerRight && !!heroExtra;
+  const heroPaddingTop = insets.top + (
+    heroExtraHeaderMerged
+      ? (relaxedHero ? 18 : 4)
+      : (showBack || headerRight ? (relaxedHero ? 16 : 8) : (relaxedHero ? 32 : 28))
+  );
+  const heroGradientPaddingBottom = relaxedHero ? 68 : 56;
+  // Auth: extra air below the logo/toolbar row before the headline; headline
+  // + subtitle stay a tight pair via `heroTitleBlockGap`.
+  const mergedToolbarMarginBottom = relaxedHero ? 40 : 12;
+  const classicToolbarMarginBottom = relaxedHero ? 22 : 18;
+  const heroExtraMarginBottom = relaxedHero ? 30 : 14;
+  const heroTitleBlockGap = relaxedHero ? 4 : 6;
   const BackIcon = isRTL ? ChevronRight : ChevronLeft;
 
   // The hero rendered as a content block — used both as the fixed hero (default)
@@ -135,49 +155,81 @@ export default function HeroSheetScreen({
       end={isRTL ? { x: 0, y: 1 } : { x: 1, y: 1 }}
       style={{
         paddingTop: heroPaddingTop,
-        paddingBottom: 56,
+        paddingBottom: heroGradientPaddingBottom,
         paddingHorizontal: 20,
       }}
     >
-      {(showBack || headerRight) && (
+      {heroExtraHeaderMerged ? (
         <View
           style={{
             flexDirection: isRTL ? 'row-reverse' : 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
-            marginBottom: 18,
-            minHeight: 36,
+            marginBottom: mergedToolbarMarginBottom,
+            gap: 12,
           }}
         >
-          {showBack ? (
-            <Pressable
-              onPress={handleBack}
-              hitSlop={10}
+          <View style={{ alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
+            {heroExtra}
+          </View>
+          <View
+            style={{
+              flexDirection: isRTL ? 'row-reverse' : 'row',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
+            {headerRight}
+          </View>
+        </View>
+      ) : (
+        <>
+          {(showBack || headerRight) && (
+            <View
               style={{
-                height: 36,
-                width: 36,
-                borderRadius: 18,
-                backgroundColor: 'rgba(255,255,255,0.18)',
+                flexDirection: isRTL ? 'row-reverse' : 'row',
                 alignItems: 'center',
-                justifyContent: 'center',
+                justifyContent: 'space-between',
+                marginBottom: classicToolbarMarginBottom,
+                minHeight: 36,
               }}
             >
-              <BackIcon size={22} color="#ffffff" strokeWidth={2.4} />
-            </Pressable>
-          ) : (
-            <View style={{ width: 36 }} />
+              {showBack ? (
+                <Pressable
+                  onPress={handleBack}
+                  hitSlop={10}
+                  style={{
+                    height: 36,
+                    width: 36,
+                    borderRadius: 18,
+                    backgroundColor: 'rgba(255,255,255,0.18)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <BackIcon size={22} color="#ffffff" strokeWidth={2.4} />
+                </Pressable>
+              ) : (
+                <View style={{ width: 36 }} />
+              )}
+              {headerRight ? <View>{headerRight}</View> : <View />}
+            </View>
           )}
-          {headerRight ? <View>{headerRight}</View> : <View />}
-        </View>
+
+          {heroExtra ? (
+            <View
+              style={{
+                marginBottom: heroExtraMarginBottom,
+                alignItems: isRTL ? 'flex-end' : 'flex-start',
+              }}
+            >
+              {heroExtra}
+            </View>
+          ) : null}
+        </>
       )}
 
-      {heroExtra && (
-        <View style={{ marginBottom: 14, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
-          {heroExtra}
-        </View>
-      )}
-
-      <View style={{ gap: 6 }}>
+      <View style={{ gap: heroTitleBlockGap }}>
         <Text
           style={{
             fontSize: 28,
@@ -235,12 +287,12 @@ export default function HeroSheetScreen({
     paddingBottom: insets.bottom + 24,
   };
 
+  const compactBarContentHeight = 36;
+
   // SCROLLABLE-HERO MODE: hero scrolls inside the same ScrollView as the
   // sheet, and a compact pinned toolbar fades in once the user scrolls past
   // the gradient. Used by the dashboard and detail screens.
   if (scrollableHero) {
-    // The compact toolbar height (status bar + 8pt + 36pt content + 8pt).
-    const compactBarContentHeight = 36;
     const compactBarHeight = insets.top + 8 + compactBarContentHeight + 8;
 
     // Distance the user must scroll before the compact bar fully fades in.

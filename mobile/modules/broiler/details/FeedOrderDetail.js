@@ -6,10 +6,11 @@ import { useTranslation } from 'react-i18next';
 import { router } from 'expo-router';
 import {
   Receipt, Pencil, Trash2, ChevronRight, ChevronLeft,
-  FileText, Building2, Wheat, Package, Link2,
+  FileText, Building2, Link2,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import HeroSheetScreen, { useHeroSheetTokens } from '@/components/HeroSheetScreen';
+import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
+import DetailCompactScreen from '@/components/DetailCompactScreen';
 import SheetSection from '@/components/SheetSection';
 import FileViewer from '@/components/FileViewer';
 import DocCard from '@/components/DocCard';
@@ -40,16 +41,6 @@ const fmtDate = (d) => {
   });
 };
 
-// Compact "12.4K" formatter for hero pulse pills so currency-prefixed
-// values don't blow out at narrow widths.
-const fmtCompact = (val) => {
-  const n = Number(val || 0);
-  const abs = Math.abs(n);
-  if (abs >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (abs >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return fmt(n);
-};
-
 export default function FeedOrderDetail({ feedOrderId, onEdit }) {
   const { t } = useTranslation();
   const isRTL = useIsRTL();
@@ -71,22 +62,14 @@ export default function FeedOrderDetail({ feedOrderId, onEdit }) {
 
   if (orderLoading || !order) {
     return (
-      <HeroSheetScreen
-        title={t('common.loading', 'Loading...')}
-        heroExtra={(
-          <View style={heroStyles.iconTile}>
-            <Wheat size={26} color="#ffffff" strokeWidth={2.2} />
-          </View>
-        )}
-      >
+      <DetailCompactScreen title={t('common.loading', 'Loading...')} headerRight={null}>
         <SkeletonDetailPage />
-      </HeroSheetScreen>
+      </DetailCompactScreen>
     );
   }
 
   const currency = accounting?.currency || 'AED';
   const items = order.items || [];
-  const totalBags = items.reduce((sum, li) => sum + (li.bags || 0), 0);
   const hasVat = (order.vatAmount || 0) > 0;
   const hasDelivery = (order.deliveryCharge || 0) > 0;
   const grandTotal = order.grandTotal || 0;
@@ -108,15 +91,6 @@ export default function FeedOrderDetail({ feedOrderId, onEdit }) {
 
   const canEdit = can('feedOrder:update');
   const canDelete = can('feedOrder:delete');
-
-  // Hero title — supplier first, then a localised "Unknown Supplier" so
-  // the hero never renders blank.
-  const heroTitle = companyName
-    || t('batches.unknownSupplier', 'Unknown Supplier');
-  const heroSubtitleParts = [];
-  if (order.taxInvoiceId) heroSubtitleParts.push(order.taxInvoiceId);
-  if (order.orderDate) heroSubtitleParts.push(fmtDate(order.orderDate));
-  const heroSubtitle = heroSubtitleParts.join(' · ');
 
   const openEdit = () => {
     Haptics.selectionAsync().catch(() => {});
@@ -194,44 +168,11 @@ export default function FeedOrderDetail({ feedOrderId, onEdit }) {
     </View>
   ) : null;
 
-  // Hero icon tile — Wheat for "feed order" identity at a glance.
-  const heroExtra = (
-    <View style={heroStyles.iconTile}>
-      <Wheat size={26} color="#ffffff" strokeWidth={2.2} />
-    </View>
-  );
-
-  // Hero "data pulse" — single bag count pill + 2 KPI pills.
-  const heroBelow = (
-    <View style={{ gap: 14 }}>
-      <View style={[heroStyles.pillsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-        <HeroBadge label={`${fmtInt(totalBags)} ${t('batches.bags', 'BAGS').toUpperCase()}`} />
-      </View>
-      <View style={[heroStyles.pulseRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-        <PulsePill
-          icon={Package}
-          label={t('batches.feedOrderDetail.totalBagsShort', 'Bags')}
-          value={fmtInt(totalBags)}
-        />
-        <PulsePill
-          icon={Receipt}
-          label={t('batches.feedOrderDetail.grandTotalShort', 'Total')}
-          value={`${currency} ${fmtCompact(grandTotal)}`}
-        />
-      </View>
-    </View>
-  );
+  const compactTitle = t('batches.feedOrderDetail.feedOrder', 'Feed Order');
 
   return (
     <>
-      <HeroSheetScreen
-        scrollableHero
-        title={heroTitle}
-        subtitle={heroSubtitle}
-        heroExtra={heroExtra}
-        headerRight={headerRight}
-        heroBelow={heroBelow}
-      >
+      <DetailCompactScreen title={compactTitle} headerRight={headerRight}>
         {/* ─── FEED COMPANY ─── */}
         {companyName ? (
           <SheetSection
@@ -422,7 +363,7 @@ export default function FeedOrderDetail({ feedOrderId, onEdit }) {
             </View>
           </View>
         ) : null}
-      </HeroSheetScreen>
+      </DetailCompactScreen>
 
       {/* Doc preview */}
       <FileViewer
@@ -452,34 +393,6 @@ export default function FeedOrderDetail({ feedOrderId, onEdit }) {
 }
 
 /* ───────────────────── Sub-components ───────────────────── */
-
-// Translucent white pill in the hero (DL §7 hero toolbar / status pills).
-function HeroBadge({ label }) {
-  return (
-    <View style={heroStyles.badge}>
-      <Text style={heroStyles.badgeText} numberOfLines={1}>
-        {label}
-      </Text>
-    </View>
-  );
-}
-
-// Translucent KPI pill in the hero "data pulse" strip (DL §7.d).
-function PulsePill({ icon: Icon, label, value }) {
-  return (
-    <View style={heroStyles.pulsePill}>
-      <View style={heroStyles.pulseTopRow}>
-        {Icon ? <Icon size={13} color="#ffffff" strokeWidth={2.4} /> : null}
-        <Text style={heroStyles.pulseValue} numberOfLines={1}>
-          {value}
-        </Text>
-      </View>
-      <Text style={heroStyles.pulseLabel} numberOfLines={1}>
-        {label}
-      </Text>
-    </View>
-  );
-}
 
 // Tappable party row (Feed Company). Layout in StyleSheet per DL §9 —
 // inner View carries flexDirection, never the Pressable.
@@ -959,14 +872,6 @@ function CtaButton({ variant, icon: Icon, label, onPress, isRTL, tokens }) {
 /* ───────────────────── StyleSheets ───────────────────── */
 
 const heroStyles = StyleSheet.create({
-  iconTile: {
-    width: 56,
-    height: 56,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   actionsRow: {
     alignItems: 'center',
     gap: 8,
@@ -978,53 +883,6 @@ const heroStyles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.18)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  pillsRow: {
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  badge: {
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  badgeText: {
-    fontSize: 11,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#ffffff',
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-  },
-  pulseRow: {
-    gap: 8,
-  },
-  pulsePill: {
-    flex: 1,
-    minWidth: 0,
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    borderRadius: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    gap: 2,
-  },
-  pulseTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  pulseValue: {
-    flex: 1,
-    fontSize: 14,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#ffffff',
-    fontVariant: ['tabular-nums'],
-  },
-  pulseLabel: {
-    fontSize: 10.5,
-    fontFamily: 'Poppins-Medium',
-    color: 'rgba(255,255,255,0.78)',
-    letterSpacing: 0.4,
   },
 });
 

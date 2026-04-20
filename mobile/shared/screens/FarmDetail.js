@@ -226,6 +226,7 @@ export default function FarmDetailScreen() {
                 houses={houses}
                 farmBatches={farmBatches}
                 allDailyLogs={allDailyLogs}
+                allSaleOrders={allSaleOrders}
                 dailyLogsLoading={dailyLogsLoading}
               />
             )}

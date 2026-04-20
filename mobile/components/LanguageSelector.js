@@ -48,6 +48,12 @@ export const LanguagePickerSheet = forwardRef(function LanguagePickerSheet(_prop
 
   const onValueChange = async (code) => {
     if (!code || code === language) return;
+    // Dismiss the picker's Modal in one frame (no slide-down) so the
+    // LanguageChangeOverlay can take over the screen instantly. Without
+    // this, iOS would have to wait for the picker's slide-down animation
+    // (~200ms) AND its Modal to dismiss before our overlay's Modal could
+    // be presented — see PICKER_CLOSE_HOLD_MS comment in localeStore.
+    sheetRef.current?.dismissImmediate();
     await setLanguage(code);
   };
 

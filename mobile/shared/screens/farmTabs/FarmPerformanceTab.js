@@ -8,7 +8,7 @@ import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
   Skull, Wheat, Droplets, Activity, BarChart3, Heart, ClipboardList,
-  TrendingDown, Home, Layers,
+  TrendingDown, Home, Layers, Bird, Calendar,
 } from 'lucide-react-native';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
@@ -16,14 +16,19 @@ import { deltaSync } from '@/lib/syncEngine';
 import EmptyState from '@/components/ui/EmptyState';
 import SheetSection from '@/components/SheetSection';
 import ChartCard from '@/components/ChartCard';
+import SlidingSegmentedControl from '@/components/SlidingSegmentedControl';
 import MortalityChart from '@/modules/broiler/charts/MortalityChart';
 import ConsumptionChart from '@/modules/broiler/charts/ConsumptionChart';
 import { SkeletonFarmPerformanceTab } from '@/components/skeletons';
+import BatchAvatar from '@/modules/broiler/components/BatchAvatar';
+import { getStatusConfig } from '@/modules/broiler/lib/batchStatusConfig';
 import BatchKpiCard, {
   mortalityToneColor,
 } from '@/modules/broiler/components/BatchKpiCard';
 
 const NUMERIC_LOCALE = 'en-US';
+const CYCLE_TARGET_DAYS = 35;
+const SCOPES = ['active', 'allTime', 'thisYear'];
 
 const fmt = (val, digits = 0) =>
   Number(val || 0).toLocaleString(NUMERIC_LOCALE, {
@@ -63,6 +68,7 @@ export default function FarmPerformanceTab({
   houses,
   farmBatches,
   allDailyLogs,
+  allSaleOrders = [],
   dailyLogsLoading,
 }) {
   const { t } = useTranslation();
@@ -74,22 +80,53 @@ export default function FarmPerformanceTab({
   } = tokens;
 
   const [refreshing, setRefreshing] = useState(false);
+  const [scope, setScope] = useState('active');
   const [mortView, setMortView] = useState('cumulative');
   const [consMetric, setConsMetric] = useState('feed');
   const [consView, setConsView] = useState('cumulative');
 
-  // Build a unified house list across the farm. Daily logs reference houses
-  // by `house._id || house`; we need a stable, ordered list of distinct
-  // houses that appear across this farm's batches. Same recipe as the
-  // pre-rework version — preserved verbatim because it powers MortalityChart
-  // and ConsumptionChart.
+  const yearStart = useMemo(() => {
+    const d = new Date();
+    d.setMonth(0, 1);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
+
+  // Apply the scope toggle to the farm's batches. Mortality / consumption
+  // KPIs, the trend charts, and the per-cycle list all derive from this
+  // scoped slice — same pattern the dashboard uses to filter its hero.
+  const scopedBatches = useMemo(() => {
+    if (scope === 'active') return farmBatches.filter((b) => b.status === 'IN_PROGRESS');
+    if (scope === 'thisYear') {
+      return farmBatches.filter((b) => b.startDate && new Date(b.startDate) >= yearStart);
+    }
+    return farmBatches;
+  }, [farmBatches, scope, yearStart]);
+
+  const scopedBatchIds = useMemo(
+    () => new Set(scopedBatches.map((b) => b._id)),
+    [scopedBatches]
+  );
+
+  const scopedDailyLogs = useMemo(
+    () => allDailyLogs.filter((log) => {
+      if (log.deletedAt || log.logType !== 'DAILY') return false;
+      const batchId = typeof log.batch === 'object' ? log.batch?._id : log.batch;
+      return scopedBatchIds.has(batchId);
+    }),
+    [allDailyLogs, scopedBatchIds]
+  );
+
+  // Build a unified house list across the scoped batches. Daily logs
+  // reference houses by `house._id || house`; we need a stable, ordered
+  // list of distinct houses for the chart legends + averaging step.
   const farmHouses = useMemo(() => {
     const map = new Map();
     houses.forEach((h) => {
       if (!h._id) return;
       map.set(h._id, { house: { _id: h._id, name: h.name } });
     });
-    farmBatches.forEach((b) => {
+    scopedBatches.forEach((b) => {
       (b.houses || []).forEach((bh) => {
         const id = (typeof bh.house === 'object' ? bh.house?._id : bh.house) || bh._id;
         if (!id) return;
@@ -100,36 +137,23 @@ export default function FarmPerformanceTab({
       });
     });
     return Array.from(map.values());
-  }, [houses, farmBatches]);
-
-  const farmBatchIds = useMemo(
-    () => new Set(farmBatches.map((b) => b._id)),
-    [farmBatches]
-  );
-
-  const farmDailyLogs = useMemo(
-    () => allDailyLogs.filter((log) => {
-      if (log.deletedAt || log.logType !== 'DAILY') return false;
-      const batchId = typeof log.batch === 'object' ? log.batch?._id : log.batch;
-      return farmBatchIds.has(batchId);
-    }),
-    [allDailyLogs, farmBatchIds]
-  );
+  }, [houses, scopedBatches]);
 
   const startDateById = useMemo(() => {
     const map = {};
-    farmBatches.forEach((b) => { map[b._id] = b.startDate; });
+    scopedBatches.forEach((b) => { map[b._id] = b.startDate; });
     return map;
-  }, [farmBatches]);
+  }, [scopedBatches]);
 
-  // Average across batches per (house, cycleDay), separately for deaths/feed/water.
-  // Each (house, day) accumulates contributions from each batch that had a log
-  // on that day for that house. Multiple logs from the same batch on the same
-  // day get summed first (e.g. weight + daily); then divided by the number of
-  // contributing batches.
+  // Average across batches per (house, cycleDay), separately for deaths /
+  // feed / water. Each (house, day) accumulates contributions from each
+  // batch that had a log on that day for that house. Multiple logs from
+  // the same batch on the same day get summed first, then divided by the
+  // number of contributing batches so the chart shows a representative
+  // per-house curve regardless of how many cycles fall in scope.
   function buildAveragedLogs(field) {
     const perBatch = {};
-    farmDailyLogs.forEach((log) => {
+    scopedDailyLogs.forEach((log) => {
       if (log[field] == null) return;
       const batchId = typeof log.batch === 'object' ? log.batch?._id : log.batch;
       const houseId = log.house?._id || log.house;
@@ -148,35 +172,33 @@ export default function FarmPerformanceTab({
       agg[aKey].sum += value;
       agg[aKey].batches.add(batchId);
     });
-    return Object.values(agg).map(({ sum, batches, houseId, day }) => {
-      const avg = batches.size > 0 ? sum / batches.size : 0;
-      return {
-        _id: `synth-${field}-${houseId}-${day}`,
-        logType: 'DAILY',
-        cycleDay: day,
-        house: { _id: houseId },
-        [field]: avg,
-      };
-    });
+    return Object.values(agg).map(({ sum, batches, houseId, day }) => ({
+      _id: `synth-${field}-${houseId}-${day}`,
+      logType: 'DAILY',
+      cycleDay: day,
+      house: { _id: houseId },
+      [field]: batches.size > 0 ? sum / batches.size : 0,
+    }));
   }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const averagedDeathsLogs = useMemo(() => buildAveragedLogs('deaths'), [farmDailyLogs, startDateById]);
+  const averagedDeathsLogs = useMemo(() => buildAveragedLogs('deaths'), [scopedDailyLogs, startDateById]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const averagedFeedLogs = useMemo(() => buildAveragedLogs('feedKg'), [farmDailyLogs, startDateById]);
+  const averagedFeedLogs = useMemo(() => buildAveragedLogs('feedKg'), [scopedDailyLogs, startDateById]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const averagedWaterLogs = useMemo(() => buildAveragedLogs('waterLiters'), [farmDailyLogs, startDateById]);
+  const averagedWaterLogs = useMemo(() => buildAveragedLogs('waterLiters'), [scopedDailyLogs, startDateById]);
 
   const consumptionLogs = consMetric === 'feed' ? averagedFeedLogs : averagedWaterLogs;
 
-  // Hero stats — totals across all logs (not averaged), for honest top-line numbers.
+  // Hero KPIs — unaveraged totals across the scoped slice for honest
+  // top-line numbers (matches BatchPerformanceTab's recipe).
   const mortalityStats = useMemo(() => {
     let totalDeaths = 0;
     let totalInitial = 0;
     const deathsByHouse = {};
     const initialByHouse = {};
     const dayKeys = new Set();
-    farmBatches.forEach((b) => {
+    scopedBatches.forEach((b) => {
       (b.houses || []).forEach((bh) => {
         const id = (typeof bh.house === 'object' ? bh.house?._id : bh.house);
         const qty = bh.quantity || 0;
@@ -184,7 +206,7 @@ export default function FarmPerformanceTab({
         if (id) initialByHouse[id] = (initialByHouse[id] || 0) + qty;
       });
     });
-    farmDailyLogs.forEach((log) => {
+    scopedDailyLogs.forEach((log) => {
       if (log.deaths == null) return;
       const houseId = log.house?._id || log.house;
       totalDeaths += log.deaths || 0;
@@ -207,13 +229,13 @@ export default function FarmPerformanceTab({
       totalDeaths, mortalityPct, survivalPct,
       worstHouse: worst, avgDailyDeaths, totalInitial,
     };
-  }, [farmBatches, farmDailyLogs, farmHouses]);
+  }, [scopedBatches, scopedDailyLogs, farmHouses]);
 
   const consumptionStats = useMemo(() => {
     let totalFeed = 0;
     let totalWater = 0;
     const dayKeys = new Set();
-    farmDailyLogs.forEach((log) => {
+    scopedDailyLogs.forEach((log) => {
       totalFeed += log.feedKg || 0;
       totalWater += log.waterLiters || 0;
       const dateKey = log.logDate || log.date;
@@ -229,34 +251,65 @@ export default function FarmPerformanceTab({
       waterPerBird: totalInitial > 0 ? totalWater / totalInitial : 0,
       daysLogged: dayKeys.size,
     };
-  }, [farmDailyLogs, mortalityStats.totalInitial]);
+  }, [scopedDailyLogs, mortalityStats.totalInitial]);
 
+  // Last sale date per batch — used to compute the "X days" elapsed
+  // figure on completed cycles, matching the BatchesList row.
+  const lastSaleDateByBatch = useMemo(() => {
+    const map = {};
+    allSaleOrders.forEach((sale) => {
+      if (sale.deletedAt) return;
+      const batchId = typeof sale.batch === 'object' ? sale.batch?._id : sale.batch;
+      if (!batchId || !sale.saleDate) return;
+      const d = new Date(sale.saleDate);
+      if (!map[batchId] || d > map[batchId]) map[batchId] = d;
+    });
+    return map;
+  }, [allSaleOrders]);
+
+  // Per-batch summary for the bottom list. Same data shape as the cards
+  // on the Batches list so the row component below can render them
+  // identically (avatar + meta + day-of-cycle progress + bar).
   const perBatchCards = useMemo(() => {
     const deathsByBatch = {};
-    const feedByBatch = {};
-    farmDailyLogs.forEach((log) => {
+    scopedDailyLogs.forEach((log) => {
       const batchId = typeof log.batch === 'object' ? log.batch?._id : log.batch;
       if (!batchId) return;
       deathsByBatch[batchId] = (deathsByBatch[batchId] || 0) + (log.deaths || 0);
-      feedByBatch[batchId] = (feedByBatch[batchId] || 0) + (log.feedKg || 0);
     });
-    return farmBatches
+    return scopedBatches
       .map((b) => {
         const initial = (b.houses || []).reduce((s, h) => s + (h.quantity || 0), 0);
         const deaths = deathsByBatch[b._id] || 0;
+        const remaining = Math.max(0, initial - deaths);
         const mortalityPct = initial > 0 ? (deaths / initial) * 100 : 0;
-        const feed = feedByBatch[b._id] || 0;
-        const dayCount = b.startDate
-          ? Math.max(0, Math.floor((Date.now() - new Date(b.startDate)) / 86400000))
+
+        const isComplete = b.status === 'COMPLETE';
+        const isInProgress = b.status === 'IN_PROGRESS';
+        const start = b.startDate ? new Date(b.startDate) : null;
+        const end = isComplete
+          ? (lastSaleDateByBatch[b._id] || start)
+          : new Date();
+        const dayCount = (start && end)
+          ? Math.max(0, Math.floor((end - start) / 86400000))
           : 0;
+        const cycleProgressPct = isComplete
+          ? 100
+          : Math.min(100, (dayCount / CYCLE_TARGET_DAYS) * 100);
+
+        const avatarLetter = (b.batchName || '?')[0].toUpperCase();
+        const batchNum = b.sequenceNumber ?? '';
+
         return {
-          _id: b._id, batchName: b.batchName,
-          initial, deaths, mortalityPct, feed, dayCount,
-          status: b.status,
+          _id: b._id, batchName: b.batchName, status: b.status,
+          isComplete, isInProgress, hasStarted: !!b.startDate,
+          avatarLetter, batchNum,
+          initial, deaths, remaining, mortalityPct,
+          dayCount, cycleProgressPct,
         };
       })
       .sort((a, b) => b.mortalityPct - a.mortalityPct);
-  }, [farmBatches, farmDailyLogs]);
+  }, [scopedBatches, scopedDailyLogs, lastSaleDateByBatch]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -264,7 +317,7 @@ export default function FarmPerformanceTab({
     setRefreshing(false);
   };
 
-  if (dailyLogsLoading && farmDailyLogs.length === 0) {
+  if (dailyLogsLoading && allDailyLogs.length === 0) {
     return <SkeletonFarmPerformanceTab />;
   }
 
@@ -288,6 +341,14 @@ export default function FarmPerformanceTab({
     ? mortalityToneColor(mortalityStats.worstHouse.rate, tokens)
     : null;
 
+  const scopeOptions = SCOPES.map((value) => ({
+    value,
+    label:
+      value === 'active' ? t('dashboard.scopeActive', 'Active')
+      : value === 'allTime' ? t('dashboard.scopeAllTime', 'All-time')
+      : t('farms.scopeThisYear', 'This Year'),
+  }));
+
   return (
     <View style={{ flex: 1, backgroundColor: screenBg }}>
       <ScrollView
@@ -307,6 +368,22 @@ export default function FarmPerformanceTab({
         }
         showsVerticalScrollIndicator={false}
       >
+        {/* Scope toggle — same SlidingSegmentedControl as the dashboard /
+            Farm Overview, so all three farm-level surfaces honour the
+            same Active / All-time / This Year filter. */}
+        <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
+          <SlidingSegmentedControl
+            value={scope}
+            onChange={setScope}
+            options={scopeOptions}
+            bordered
+          />
+        </View>
+
+        {/* Order matches BatchPerformanceTab exactly:
+            Mortality KPI → Mortality Chart → Consumption KPI →
+            Consumption Chart → Per-cycle list. */}
+
         <BatchKpiCard
           title={t('batches.mortalitySummary', 'Mortality')}
           icon={Skull}
@@ -344,6 +421,26 @@ export default function FarmPerformanceTab({
           ]}
         />
 
+        <ChartCard
+          sectionTitle={t('charts.mortalityTrend', 'Mortality Trend')}
+          sectionIcon={Activity}
+          title={mortView === 'cumulative'
+            ? t('farms.avgCumulativeMortality', 'Avg Cumulative Mortality / House')
+            : t('farms.avgDailyDeaths', 'Avg Daily Deaths / House')}
+          segments={[
+            { value: 'cumulative', icon: Activity },
+            { value: 'daily', icon: BarChart3 },
+          ]}
+          segmentValue={mortView}
+          onSegmentChange={setMortView}
+        >
+          <MortalityChart
+            dailyLogs={averagedDeathsLogs}
+            houses={farmHouses}
+            view={mortView}
+          />
+        </ChartCard>
+
         <BatchKpiCard
           title={t('batches.consumptionSummary', 'Consumption')}
           icon={Wheat}
@@ -367,26 +464,6 @@ export default function FarmPerformanceTab({
             },
           ]}
         />
-
-        <ChartCard
-          sectionTitle={t('charts.mortalityTrend', 'Mortality Trend')}
-          sectionIcon={Activity}
-          title={mortView === 'cumulative'
-            ? t('farms.avgCumulativeMortality', 'Avg Cumulative Mortality / House')
-            : t('farms.avgDailyDeaths', 'Avg Daily Deaths / House')}
-          segments={[
-            { value: 'cumulative', icon: Activity },
-            { value: 'daily', icon: BarChart3 },
-          ]}
-          segmentValue={mortView}
-          onSegmentChange={setMortView}
-        >
-          <MortalityChart
-            dailyLogs={averagedDeathsLogs}
-            houses={farmHouses}
-            view={mortView}
-          />
-        </ChartCard>
 
         <ChartCard
           sectionTitle={t('charts.consumption', 'Consumption Trend')}
@@ -419,22 +496,37 @@ export default function FarmPerformanceTab({
           />
         </ChartCard>
 
+        {/* Per-cycle list — visual recipe lifted from the Batches list
+            row (avatar + name + bird/mortality meta, day-of-cycle label,
+            progress bar). No swipe actions, no expense aggregation; just
+            the clean batch-row look the user already trusts on the
+            Batches tab. Cards separated by the canonical 2pt rounded
+            divider used everywhere batches are listed. */}
         {perBatchCards.length > 0 ? (
           <SheetSection
             title={t('farms.perBatchPerformance', 'Per Batch')}
             icon={Layers}
             padded={false}
           >
-            <View style={{ padding: 8, gap: 12 }}>
-              {perBatchCards.map((b) => (
-                <PerBatchCard
-                  key={b._id}
-                  batch={b}
-                  tokens={tokens}
-                  isRTL={isRTL}
-                  t={t}
-                  onPress={() => router.push(`/(app)/batch/${b._id}`)}
-                />
+            <View style={cycleListStyles.list}>
+              {perBatchCards.map((b, idx) => (
+                <View key={b._id}>
+                  {idx > 0 ? (
+                    <View
+                      style={[
+                        cycleListStyles.cardSeparator,
+                        { backgroundColor: tokens.elevatedCardBorder },
+                      ]}
+                    />
+                  ) : null}
+                  <CycleRow
+                    cycle={b}
+                    tokens={tokens}
+                    isRTL={isRTL}
+                    t={t}
+                    onPress={() => router.push(`/(app)/batch/${b._id}`)}
+                  />
+                </View>
               ))}
             </View>
           </SheetSection>
@@ -445,25 +537,31 @@ export default function FarmPerformanceTab({
 }
 
 /**
- * Per-batch summary card. Elevated tappable surface with the batch name +
- * status pill and a 4-cell stat row. Layout in StyleSheet (§9 trap rule).
+ * Per-cycle row — same visual recipe as `BatchesList.BatchRow`, minus
+ * the swipe actions / edit / delete chrome. The user explicitly asked
+ * to "reuse the view we use for Batchlist view" for this list.
  */
-function PerBatchCard({ batch, tokens, isRTL, t, onPress }) {
+function CycleRow({ cycle, tokens, isRTL, t, onPress }) {
   const {
-    textColor, accentColor, dark,
+    mutedColor, textColor, accentColor, dark,
     elevatedCardBg, elevatedCardBorder, elevatedCardPressedBg,
   } = tokens;
-  const mortColor = mortalityToneColor(batch.mortalityPct, tokens);
-  const isInProgress = batch.status === 'IN_PROGRESS';
-  const statusBg = isInProgress
-    ? (dark ? 'rgba(217, 119, 6, 0.18)' : 'hsl(38, 92%, 92%)')
-    : (dark ? 'rgba(148,210,165,0.18)' : 'hsl(148, 35%, 92%)');
-  const statusFg = isInProgress
-    ? (dark ? '#fbbf24' : '#d97706')
-    : accentColor;
-  const statusLabel = isInProgress
-    ? t('batches.statusInProgress', 'In Progress')
-    : t('batches.statusComplete', 'Complete');
+  const status = getStatusConfig(cycle.status);
+  const mortalityColor = mortalityToneColor(cycle.mortalityPct, tokens);
+
+  const showHealthMeta = cycle.initial > 0;
+  const showProgressBar = cycle.hasStarted && (cycle.isInProgress || cycle.isComplete);
+  // Same complete-state behaviour as BatchesList: keep the % + track
+  // mounted for vertical-rhythm parity, but hide them with opacity 0
+  // so the card height matches in-progress rows.
+  const hideProgressChrome = cycle.isComplete;
+  const barPct = cycle.isComplete ? 100 : cycle.cycleProgressPct;
+
+  const progressLabel = cycle.isComplete
+    ? t('batches.daysShort', '{{days}} days', { days: cycle.dayCount })
+    : cycle.isInProgress
+      ? t('dashboard.dayN', 'Day {{n}}', { n: cycle.dayCount })
+      : t('batches.notStarted', 'Not started');
 
   return (
     <Pressable
@@ -474,152 +572,178 @@ function PerBatchCard({ batch, tokens, isRTL, t, onPress }) {
         borderless: false,
       }}
       style={({ pressed }) => [
-        cardStyles.card,
+        cycleStyles.card,
         {
           backgroundColor: pressed ? elevatedCardPressedBg : elevatedCardBg,
           borderColor: pressed ? accentColor : elevatedCardBorder,
           transform: [{ scale: pressed ? 0.985 : 1 }],
           opacity: pressed ? 0.95 : 1,
+          ...(dark
+            ? {}
+            : {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: pressed ? 0.04 : 0.07,
+                shadowRadius: pressed ? 6 : 10,
+                elevation: pressed ? 1 : 2,
+              }),
         },
       ]}
     >
       <View
         style={[
-          cardStyles.headerRow,
+          cycleStyles.headerRow,
           { flexDirection: isRTL ? 'row-reverse' : 'row' },
         ]}
       >
-        <Text
-          style={{
-            flex: 1,
-            minWidth: 0,
-            fontSize: 14,
-            fontFamily: 'Poppins-SemiBold',
-            color: textColor,
-            letterSpacing: -0.1,
-            textAlign: isRTL ? 'right' : 'left',
-          }}
-          numberOfLines={1}
-        >
-          {batch.batchName}
-        </Text>
-        <View style={[cardStyles.statusPill, { backgroundColor: statusBg }]}>
+        <BatchAvatar
+          letter={cycle.avatarLetter}
+          sequence={cycle.batchNum}
+          status={status}
+          size={40}
+          radius={14}
+        />
+        <View style={cycleStyles.headerTextCol}>
           <Text
             style={{
-              fontSize: 10,
+              fontSize: 15,
               fontFamily: 'Poppins-SemiBold',
-              color: statusFg,
-              letterSpacing: 0.4,
-              textTransform: 'uppercase',
+              color: textColor,
+              letterSpacing: -0.1,
+              textAlign: isRTL ? 'right' : 'left',
             }}
+            numberOfLines={1}
           >
-            {statusLabel}
+            {cycle.batchName}
           </Text>
+          {showHealthMeta ? (
+            <View
+              style={[
+                cycleStyles.metaRow,
+                { flexDirection: isRTL ? 'row-reverse' : 'row' },
+              ]}
+            >
+              <View
+                style={[
+                  cycleStyles.metaPiece,
+                  { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                ]}
+              >
+                <Bird size={11} color={mutedColor} strokeWidth={2.2} />
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontFamily: 'Poppins-Regular',
+                    color: mutedColor,
+                  }}
+                >
+                  {fmtInt(cycle.remaining)}
+                </Text>
+                {cycle.deaths > 0 ? (
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontFamily: 'Poppins-SemiBold',
+                      color: mortalityColor,
+                    }}
+                  >
+                    {`(-${fmtInt(cycle.deaths)})`}
+                  </Text>
+                ) : null}
+              </View>
+              <Text style={{ fontSize: 12, color: mutedColor }}>·</Text>
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontFamily: 'Poppins-SemiBold',
+                  color: mortalityColor,
+                }}
+              >
+                {`${cycle.mortalityPct.toFixed(2)}%`}
+              </Text>
+            </View>
+          ) : null}
         </View>
       </View>
 
       <View
         style={[
-          cardStyles.statRow,
-          {
-            flexDirection: isRTL ? 'row-reverse' : 'row',
-            borderTopColor: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-          },
+          cycleStyles.progressLabelRow,
+          { flexDirection: isRTL ? 'row-reverse' : 'row' },
         ]}
       >
-        <StatCell
-          icon={Layers}
-          label={t('batches.totalChicks', 'Chicks')}
-          value={fmtInt(batch.initial)}
-          tokens={tokens}
-          isRTL={isRTL}
-        />
-        <StatDivider tokens={tokens} />
-        <StatCell
-          icon={Skull}
-          label={t('dashboard.mortalityRate', 'Mortality')}
-          value={`${batch.mortalityPct.toFixed(2)}%`}
-          valueColor={mortColor}
-          tokens={tokens}
-          isRTL={isRTL}
-        />
-        <StatDivider tokens={tokens} />
-        <StatCell
-          icon={Wheat}
-          label={t('dashboard.feedConsumed', 'Feed')}
-          value={fmtCompactKg(batch.feed)}
-          tokens={tokens}
-          isRTL={isRTL}
-        />
-        <StatDivider tokens={tokens} />
-        <StatCell
-          icon={Activity}
-          label={t('batches.dayCount', 'Days')}
-          value={fmtInt(batch.dayCount)}
-          tokens={tokens}
-          isRTL={isRTL}
-        />
+        <View
+          style={[
+            cycleStyles.progressLabelLeft,
+            { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          ]}
+        >
+          <Calendar size={11} color={mutedColor} strokeWidth={2.4} />
+          <Text
+            style={{
+              fontSize: 10,
+              fontFamily: 'Poppins-SemiBold',
+              color: mutedColor,
+              letterSpacing: 0.8,
+              textTransform: 'uppercase',
+            }}
+            numberOfLines={1}
+          >
+            {progressLabel}
+          </Text>
+        </View>
+        {showProgressBar ? (
+          <Text
+            style={{
+              fontSize: 11,
+              fontFamily: 'Poppins-SemiBold',
+              color: mutedColor,
+              opacity: hideProgressChrome ? 0 : 1,
+            }}
+          >
+            {`${Math.round(barPct)}%`}
+          </Text>
+        ) : null}
       </View>
+
+      {showProgressBar ? (
+        <View style={{ opacity: hideProgressChrome ? 0 : 1 }}>
+          <View
+            style={[
+              cycleStyles.progressBarTrack,
+              {
+                backgroundColor: dark
+                  ? 'rgba(255,255,255,0.06)'
+                  : 'rgba(0,0,0,0.05)',
+              },
+            ]}
+          >
+            <View
+              style={[
+                cycleStyles.progressBarFill,
+                { backgroundColor: accentColor, width: `${barPct}%` },
+              ]}
+            />
+          </View>
+        </View>
+      ) : null}
     </Pressable>
   );
 }
 
-function StatCell({ icon: Icon, label, value, valueColor, tokens, isRTL }) {
-  const { mutedColor, textColor } = tokens;
-  return (
-    <View style={cardStyles.statCell}>
-      <View
-        style={[
-          cardStyles.statLabelRow,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
-        ]}
-      >
-        <Icon size={11} color={mutedColor} strokeWidth={2.4} />
-        <Text
-          style={{
-            fontSize: 10,
-            fontFamily: 'Poppins-SemiBold',
-            color: mutedColor,
-            letterSpacing: 0.8,
-            textTransform: 'uppercase',
-          }}
-          numberOfLines={1}
-        >
-          {label}
-        </Text>
-      </View>
-      <Text
-        style={{
-          fontSize: 14,
-          fontFamily: 'Poppins-SemiBold',
-          color: valueColor || textColor,
-          fontVariant: ['tabular-nums'],
-          textAlign: isRTL ? 'right' : 'left',
-          marginTop: 2,
-        }}
-        numberOfLines={1}
-      >
-        {value}
-      </Text>
-    </View>
-  );
-}
+const cycleListStyles = StyleSheet.create({
+  list: {
+    padding: 8,
+  },
+  cardSeparator: {
+    height: 2,
+    borderRadius: 1,
+    marginVertical: 12,
+    marginHorizontal: 4,
+  },
+});
 
-function StatDivider({ tokens }) {
-  const { dark } = tokens;
-  return (
-    <View
-      style={{
-        width: StyleSheet.hairlineWidth,
-        backgroundColor: dark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.08)',
-        marginHorizontal: 8,
-        alignSelf: 'stretch',
-      }}
-    />
-  );
-}
-
-const cardStyles = StyleSheet.create({
+const cycleStyles = StyleSheet.create({
   card: {
     borderRadius: 16,
     padding: 14,
@@ -628,24 +752,42 @@ const cardStyles = StyleSheet.create({
   },
   headerRow: {
     alignItems: 'center',
-    gap: 10,
-    marginBottom: 12,
+    gap: 12,
+    marginBottom: 8,
   },
-  statusPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
+  headerTextCol: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
   },
-  statRow: {
-    paddingTop: 10,
-    borderTopWidth: StyleSheet.hairlineWidth,
+  metaRow: {
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 2,
   },
-  statCell: {
+  metaPiece: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  progressLabelRow: {
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  progressLabelLeft: {
+    alignItems: 'center',
+    gap: 4,
     flex: 1,
     minWidth: 0,
   },
-  statLabelRow: {
-    alignItems: 'center',
-    gap: 4,
+  progressBarTrack: {
+    height: 5,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 3,
   },
 });

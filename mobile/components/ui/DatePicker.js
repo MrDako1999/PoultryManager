@@ -243,7 +243,9 @@ function DatePicker({ value, onChange, placeholder, label, onOpen }, ref) {
               />
             </View>
 
-            {/* Header — icon tile + title + actions + close */}
+            {/* Header — title + actions + close. No icon tile: the calendar
+                grid below is itself the visual identity, doubling up with a
+                green calendar glyph makes the chrome feel busy. */}
             <View
               style={[
                 styles.header,
@@ -252,35 +254,20 @@ function DatePicker({ value, onChange, placeholder, label, onOpen }, ref) {
             >
               <View
                 {...panResponder.panHandlers}
-                style={[
-                  styles.headerLead,
-                  { flexDirection: isRTL ? 'row-reverse' : 'row' },
-                ]}
+                style={styles.headerTextCol}
               >
-                <View
-                  style={[
-                    styles.iconTile,
-                    {
-                      backgroundColor: dark ? 'rgba(148,210,165,0.16)' : 'hsl(148, 35%, 92%)',
-                    },
-                  ]}
+                <Text
+                  style={{
+                    fontSize: 16,
+                    fontFamily: 'Poppins-SemiBold',
+                    color: textColor,
+                    letterSpacing: -0.2,
+                    textAlign: isRTL ? 'right' : 'left',
+                  }}
+                  numberOfLines={1}
                 >
-                  <Calendar size={20} color={accentColor} strokeWidth={2.2} />
-                </View>
-                <View style={styles.headerTextCol}>
-                  <Text
-                    style={{
-                      fontSize: 17,
-                      fontFamily: 'Poppins-SemiBold',
-                      color: textColor,
-                      letterSpacing: -0.2,
-                      textAlign: isRTL ? 'right' : 'left',
-                    }}
-                    numberOfLines={1}
-                  >
-                    {label || t('common.selectDate', 'Select date')}
-                  </Text>
-                </View>
+                  {label || t('common.selectDate', 'Select date')}
+                </Text>
               </View>
 
               <View
@@ -293,12 +280,14 @@ function DatePicker({ value, onChange, placeholder, label, onOpen }, ref) {
                 <Pressable
                   onPress={handleToday}
                   hitSlop={6}
-                  style={({ pressed }) => [
+                  android_ripple={{
+                    color: dark ? 'rgba(148,210,165,0.22)' : 'hsl(148, 35%, 88%)',
+                    borderless: false,
+                  }}
+                  style={[
                     styles.headerPill,
                     {
-                      backgroundColor: pressed
-                        ? (dark ? 'rgba(148,210,165,0.22)' : 'hsl(148, 35%, 88%)')
-                        : (dark ? 'rgba(148,210,165,0.14)' : 'hsl(148, 35%, 94%)'),
+                      backgroundColor: dark ? 'rgba(148,210,165,0.14)' : 'hsl(148, 35%, 94%)',
                     },
                   ]}
                 >
@@ -317,12 +306,14 @@ function DatePicker({ value, onChange, placeholder, label, onOpen }, ref) {
                   <Pressable
                     onPress={handleClear}
                     hitSlop={6}
-                    style={({ pressed }) => [
+                    android_ripple={{
+                      color: dark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.08)',
+                      borderless: false,
+                    }}
+                    style={[
                       styles.headerPill,
                       {
-                        backgroundColor: pressed
-                          ? (dark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.08)')
-                          : (dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'),
+                        backgroundColor: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
                       },
                     ]}
                   >
@@ -363,13 +354,14 @@ function DatePicker({ value, onChange, placeholder, label, onOpen }, ref) {
               <Pressable
                 onPress={onLeadingNav}
                 hitSlop={6}
-                style={({ pressed }) => [
+                android_ripple={{
+                  color: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                  borderless: true,
+                  radius: 18,
+                }}
+                style={[
                   styles.monthNavBtn,
-                  {
-                    backgroundColor: pressed
-                      ? (dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)')
-                      : (dark ? 'rgba(255,255,255,0.04)' : 'hsl(148, 18%, 94%)'),
-                  },
+                  { backgroundColor: dark ? 'rgba(255,255,255,0.04)' : 'hsl(148, 18%, 94%)' },
                 ]}
               >
                 <PrevIcon size={18} color={textColor} strokeWidth={2.2} />
@@ -390,13 +382,14 @@ function DatePicker({ value, onChange, placeholder, label, onOpen }, ref) {
               <Pressable
                 onPress={onTrailingNav}
                 hitSlop={6}
-                style={({ pressed }) => [
+                android_ripple={{
+                  color: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                  borderless: true,
+                  radius: 18,
+                }}
+                style={[
                   styles.monthNavBtn,
-                  {
-                    backgroundColor: pressed
-                      ? (dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)')
-                      : (dark ? 'rgba(255,255,255,0.04)' : 'hsl(148, 18%, 94%)'),
-                  },
+                  { backgroundColor: dark ? 'rgba(255,255,255,0.04)' : 'hsl(148, 18%, 94%)' },
                 ]}
               >
                 <NextIcon size={18} color={textColor} strokeWidth={2.2} />
@@ -564,19 +557,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 14,
-  },
-  headerLead: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 12,
-    minWidth: 0,
-  },
-  iconTile: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   headerTextCol: {
     flex: 1,

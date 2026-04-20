@@ -228,7 +228,7 @@ export default function BatchOverviewTab({ batch, batchId, onJumpTab }) {
             },
             {
               icon: Bird,
-              label: t('batches.profitPerBird', 'Profit / Bird'),
+              label: t('batches.profitPerBird', 'PNL / Bird'),
               value: profitPerBird != null ? fmt(profitPerBird) : '—',
               valueColor: perBirdColor,
             },

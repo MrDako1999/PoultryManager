@@ -21,12 +21,20 @@ import { useIsRTL } from '@/stores/localeStore';
  * Layout in StyleSheet (§9 NativeWind trap rule). The functional Pressable
  * style is reserved for press-state visuals only (background + border
  * shift, tiny scale + opacity).
+ *
+ * @param {boolean} [headlinePrefixSubscript] - Renders `headlinePrefix` small
+ *   and lowered (subscript-style) in `mutedColor`; headline keeps `headlineColor`.
+ * @param {string} [headlineSuffix] - e.g. ISO currency after the amount (dashboard PNL).
+ * @param {boolean} [headlineSuffixSubscript] - Same treatment as prefix subscript, after the figure.
  */
 export default function BatchKpiCard({
   title,
   icon: Icon,
   headline,
   headlinePrefix,
+  headlinePrefixSubscript = false,
+  headlineSuffix,
+  headlineSuffixSubscript = false,
   headlineColor,
   subline,
   sublineColor,
@@ -50,7 +58,7 @@ export default function BatchKpiCard({
   const Inner = (
     <>
       {/* Headline + chevron row */}
-      {(headline != null || headlinePrefix || tappable) ? (
+      {(headline != null || headlinePrefix || headlineSuffix || tappable) ? (
         <View
           style={[
             styles.headlineRow,
@@ -61,37 +69,70 @@ export default function BatchKpiCard({
             style={[
               styles.headlineTextRow,
               { flexDirection: isRTL ? 'row-reverse' : 'row' },
+              (headlinePrefixSubscript || headlineSuffixSubscript)
+                ? styles.headlineTextRowSubscript
+                : null,
             ]}
           >
             {headlinePrefix ? (
               <Text
-                style={{
-                  fontSize: 18,
-                  lineHeight: 32,
-                  fontFamily: 'Poppins-SemiBold',
-                  color: headlineColor || mutedColor,
-                  marginEnd: 6,
-                }}
+                style={
+                  headlinePrefixSubscript
+                    ? [styles.headlinePrefixSubscript, { color: mutedColor }]
+                    : {
+                        fontSize: 18,
+                        lineHeight: 32,
+                        fontFamily: 'Poppins-SemiBold',
+                        color: headlineColor || mutedColor,
+                        marginEnd: 6,
+                      }
+                }
               >
                 {headlinePrefix}
               </Text>
             ) : null}
-            {headline != null ? (
-              <Text
-                style={{
-                  flex: 1,
-                  fontSize: 28,
-                  lineHeight: 34,
-                  fontFamily: 'Poppins-Bold',
-                  color: headlineColor || textColor,
-                  letterSpacing: -0.4,
-                  textAlign: isRTL ? 'right' : 'left',
-                }}
-                numberOfLines={1}
-              >
-                {headline}
-              </Text>
-            ) : null}
+            <View
+              style={[
+                styles.headlineAmountCluster,
+                headlineSuffix ? styles.headlineAmountClusterLTR : null,
+              ]}
+            >
+              {headline != null ? (
+                <Text
+                  style={{
+                    flex: headlineSuffix ? 0 : 1,
+                    flexShrink: 1,
+                    minWidth: 0,
+                    fontSize: 28,
+                    lineHeight: 34,
+                    fontFamily: 'Poppins-Bold',
+                    color: headlineColor || textColor,
+                    letterSpacing: -0.4,
+                    textAlign: headlineSuffix ? 'left' : (isRTL ? 'right' : 'left'),
+                  }}
+                  numberOfLines={1}
+                >
+                  {headline}
+                </Text>
+              ) : null}
+              {headlineSuffix ? (
+                <Text
+                  style={
+                    headlineSuffixSubscript
+                      ? [styles.headlineSuffixSubscript, { color: mutedColor }]
+                      : {
+                          fontSize: 18,
+                          lineHeight: 32,
+                          fontFamily: 'Poppins-SemiBold',
+                          color: headlineColor || mutedColor,
+                          marginStart: 6,
+                        }
+                  }
+                >
+                  {headlineSuffix}
+                </Text>
+              ) : null}
+            </View>
           </View>
           {tappable ? (
             <ChevronGlyph
@@ -287,6 +328,8 @@ export function StatCell({
           textAlign: isRTL ? 'right' : 'left',
         }}
         numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.82}
       >
         {value}
       </Text>
@@ -363,6 +406,36 @@ const styles = StyleSheet.create({
   headlineTextRow: {
     flex: 1,
     alignItems: 'baseline',
+  },
+  headlineTextRowSubscript: {
+    alignItems: 'flex-end',
+  },
+  headlineAmountCluster: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    minWidth: 0,
+  },
+  headlineAmountClusterLTR: {
+    direction: 'ltr',
+  },
+  headlinePrefixSubscript: {
+    fontSize: 11,
+    lineHeight: 13,
+    fontFamily: 'Poppins-SemiBold',
+    marginEnd: 5,
+    marginBottom: 2,
+    letterSpacing: 0.35,
+    transform: [{ translateY: 3 }],
+  },
+  headlineSuffixSubscript: {
+    fontSize: 11,
+    lineHeight: 13,
+    fontFamily: 'Poppins-SemiBold',
+    marginStart: 5,
+    marginBottom: 2,
+    letterSpacing: 0.35,
+    transform: [{ translateY: 3 }],
   },
   statsRow: {
     paddingTop: 14,

@@ -7,8 +7,9 @@ import { useTranslation } from 'react-i18next';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
-  Bird, Layers, Skull, Wheat, Calendar, Home, History,
+  Bird, Layers, Skull, Calendar, History,
   DollarSign, TrendingUp, Receipt, Activity, MapPin,
+  Egg, ShoppingCart,
 } from 'lucide-react-native';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
@@ -16,7 +17,7 @@ import useSettings from '@/hooks/useSettings';
 import { deltaSync } from '@/lib/syncEngine';
 import SheetSection from '@/components/SheetSection';
 import LocationActions from '@/components/LocationActions';
-import FilterChips from '@/components/views/FilterChips';
+import SlidingSegmentedControl from '@/components/SlidingSegmentedControl';
 import BatchAvatar from '@/modules/broiler/components/BatchAvatar';
 import { getStatusConfig } from '@/modules/broiler/lib/batchStatusConfig';
 import BatchKpiCard, {
@@ -35,15 +36,59 @@ const fmt = (val) =>
 
 const fmtInt = (val) => Number(val || 0).toLocaleString(NUMERIC_LOCALE);
 
-const fmtCompactKg = (val) => {
+// Same compact recipes as the dashboard's BroilerKpiHero so flock
+// counts and financial chips render identically across the two screens.
+function trimFixedMantissa(s) {
+  if (!s.includes('.')) return s;
+  return s.replace(/\.?0+$/, '');
+}
+
+const fmtCompact = (val) => {
   const n = Number(val || 0);
-  if (n >= 1000) {
-    return `${(n / 1000).toLocaleString(NUMERIC_LOCALE, {
-      minimumFractionDigits: 1, maximumFractionDigits: 1,
-    })}t`;
+  if (!Number.isFinite(n) || n === 0) return '0';
+  const sign = n < 0 ? '-' : '';
+  const abs = Math.abs(n);
+  if (abs >= 1_000_000) {
+    const m = abs / 1_000_000;
+    return `${sign}${trimFixedMantissa(m.toFixed(3))}M`;
   }
-  return `${fmtInt(n)} kg`;
+  if (abs >= 1_000) {
+    const k = Math.floor(abs / 1_000);
+    return `${sign}${k.toLocaleString(NUMERIC_LOCALE)}K`;
+  }
+  return `${sign}${fmtInt(abs)}`;
 };
+
+const fmtCompactCurrency = (val) => {
+  const n = Number(val || 0);
+  if (!Number.isFinite(n)) return fmt(0);
+  if (n === 0) return fmt(0);
+  const sign = n < 0 ? '-' : '';
+  const abs = Math.abs(n);
+  if (abs >= 1_000_000) {
+    const m = abs / 1_000_000;
+    return `${sign}${trimFixedMantissa(m.toFixed(3))}M`;
+  }
+  if (abs >= 1_000) {
+    const k = Math.floor(abs / 1_000);
+    return `${sign}${k.toLocaleString(NUMERIC_LOCALE)}K`;
+  }
+  return fmt(n);
+};
+
+function fmtMortalityDeathsForDisplay(deaths) {
+  const n = Math.floor(Number(deaths || 0));
+  if (n <= 10_000) return fmtInt(n);
+  return `${trimFixedMantissa((n / 1000).toFixed(1))}K`;
+}
+
+function fmtFlockMortalityCountAndPct(deaths, mortalityPct) {
+  const d = Number(deaths || 0);
+  const pct = Number(mortalityPct || 0);
+  const pctStr = `${pct.toFixed(2)}%`;
+  if (d > 0) return `(-${fmtMortalityDeathsForDisplay(d)}) · ${pctStr}`;
+  return pctStr;
+}
 
 const fmtDate = (d) => {
   if (!d) return '—';
@@ -115,6 +160,7 @@ export default function FarmOverviewTab({
   const flockStats = useMemo(() => {
     let initial = 0;
     let deaths = 0;
+    let sold = 0;
     scopedBatches.forEach((b) => {
       (b.houses || []).forEach((h) => { initial += h.quantity || 0; });
     });
@@ -123,14 +169,22 @@ export default function FarmOverviewTab({
       const batchId = typeof log.batch === 'object' ? log.batch?._id : log.batch;
       if (scopedBatchIds.has(batchId)) deaths += log.deaths || 0;
     });
-    const liveBirds = Math.max(0, initial - deaths);
+    // Birds that have left the farm via sales — same recipe as
+    // useBroilerDashboardStats so the Flock card here reads identically
+    // to the dashboard one (slaughtered + live).
+    allSaleOrders.forEach((s) => {
+      if (s.deletedAt) return;
+      const batchId = typeof s.batch === 'object' ? s.batch?._id : s.batch;
+      if (!scopedBatchIds.has(batchId)) return;
+      sold += (s.counts?.chickensSent || 0) + (s.live?.birdCount || 0);
+    });
+    const liveBirds = Math.max(0, initial - deaths - sold);
     const mortalityPct = initial > 0 ? (deaths / initial) * 100 : 0;
-    const survivalPct = initial > 0 ? (liveBirds / initial) * 100 : 0;
     return {
-      initial, deaths, liveBirds, mortalityPct, survivalPct,
+      initial, deaths, sold, liveBirds, mortalityPct,
       cycleCount: scopedBatches.length,
     };
-  }, [scopedBatches, scopedBatchIds, allDailyLogs]);
+  }, [scopedBatches, scopedBatchIds, allDailyLogs, allSaleOrders]);
 
   const financials = useMemo(() => {
     const totalRevenue = allSaleOrders.reduce((s, o) => {
@@ -152,14 +206,12 @@ export default function FarmOverviewTab({
 
   const activeBatchCards = useMemo(() => {
     const deathsByBatch = {};
-    const feedByBatch = {};
     const activeIds = new Set(activeBatches.map((b) => b._id));
     allDailyLogs.forEach((log) => {
       if (log.deletedAt || log.logType !== 'DAILY') return;
       const batchId = typeof log.batch === 'object' ? log.batch?._id : log.batch;
       if (!activeIds.has(batchId)) return;
       if (log.deaths) deathsByBatch[batchId] = (deathsByBatch[batchId] || 0) + log.deaths;
-      if (log.feedKg) feedByBatch[batchId] = (feedByBatch[batchId] || 0) + log.feedKg;
     });
     return activeBatches
       .map((b) => {
@@ -167,20 +219,17 @@ export default function FarmOverviewTab({
         const deaths = deathsByBatch[b._id] || 0;
         const remaining = Math.max(0, initial - deaths);
         const mortalityPct = initial > 0 ? (deaths / initial) * 100 : 0;
-        const feed = feedByBatch[b._id] || 0;
         const dayCount = b.startDate
           ? Math.max(0, Math.floor((Date.now() - new Date(b.startDate)) / 86400000))
           : 0;
         const cycleProgressPct = Math.min(100, (dayCount / CYCLE_TARGET_DAYS) * 100);
-        const houseCount = (b.houses || []).length;
         const avatarLetter = (
           farm?.nickname || farm?.farmName || b.batchName || '?'
         )[0].toUpperCase();
         const batchNum = b.sequenceNumber ?? '';
         return {
           _id: b._id, batchName: b.batchName, avatarLetter, batchNum,
-          dayCount, cycleProgressPct, initial, remaining, mortalityPct,
-          feed, houseCount,
+          dayCount, cycleProgressPct, initial, remaining, deaths, mortalityPct,
         };
       })
       .sort((a, b) => b.mortalityPct - a.mortalityPct);
@@ -217,11 +266,11 @@ export default function FarmOverviewTab({
     }), [completedBatches, allDailyLogs, allSaleOrders]);
 
   const flockHeadlineIsLive = scope === 'active';
-  const hasFlockData = flockStats.initial > 0;
 
   const profitColor = profitToneColor(financials.netProfit, tokens);
   const profitPerBirdColor = profitToneColor(financials.profitPerBird, tokens);
   const mortColor = mortalityToneColor(flockStats.mortalityPct, tokens);
+  const finFmt = scope === 'active' ? fmt : fmtCompactCurrency;
 
   const scopeOptions = SCOPES.map((value) => ({
     value,
@@ -256,163 +305,157 @@ export default function FarmOverviewTab({
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* Location — quick shortcuts to navigation apps + share. Pinned
-            above the scope chips because the location is a property of
-            the farm itself (not a scope-filtered metric). Uses the same
-            `padded={false}` + LocationActions recipe as BusinessOverviewTab
-            so the address card reads identically across the app: address
-            text on top (when present), then a hairline-divided stack of
-            full-width navigate / share rows. */}
-        {hasFarmLocation ? (
-          <SheetSection
-            title={t('farms.locationSection', 'Farm Location')}
-            icon={MapPin}
-            padded={false}
-          >
-            {farm.location?.placeName ? (
-              <View
-                style={[
-                  locationStyles.addressHeader,
-                  { borderBottomColor: tokens.borderColor },
-                ]}
-              >
-                <Text
-                  style={{
-                    fontSize: 14,
-                    fontFamily: 'Poppins-Regular',
-                    color: textColor,
-                    lineHeight: 20,
-                    textAlign: isRTL ? 'right' : 'left',
-                    writingDirection: isRTL ? 'rtl' : 'ltr',
-                  }}
-                >
-                  {farm.location.placeName}
-                </Text>
-              </View>
-            ) : null}
-            <LocationActions
-              name={farm.farmName}
-              lat={farm.location?.lat}
-              lng={farm.location?.lng}
-              address={farm.location?.placeName}
-            />
-          </SheetSection>
-        ) : null}
-
-        {/* Scope filter chips — Active / All-time / This Year */}
-        <View style={{ marginBottom: 16 }}>
-          <FilterChips
+        {/* Scope toggle — same SlidingSegmentedControl as the dashboard
+            so the two screens read as one product. */}
+        <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
+          <SlidingSegmentedControl
             value={scope}
             onChange={setScope}
-            options={scopeOptions.map((opt) => ({ ...opt, icon: Layers }))}
+            options={scopeOptions}
+            bordered
           />
         </View>
 
-        {/* Net Profit card */}
+        {/* Flock card — exact dashboard recipe (BroilerKpiHero):
+            headline + AVAILABLE / RAISED subscript suffix, scope-aware
+            stats (Raised · Sold · Mortality on active; Sold · Cycles ·
+            Mortality otherwise). The survival bar that used to live in
+            the children slot is intentionally dropped — dashboard's
+            Flock card doesn't have one and the user asked for the
+            dashboard look. */}
+        <BatchKpiCard
+          title={t('dashboard.flockSummary', 'Flock')}
+          icon={Bird}
+          headline={
+            flockHeadlineIsLive
+              ? fmtInt(flockStats.liveBirds)
+              : fmtInt(flockStats.initial)
+          }
+          headlineSuffix={
+            flockHeadlineIsLive
+              ? t('dashboard.flockHeadlineAvailableSuffix', 'AVAILABLE')
+              : t('dashboard.flockHeadlineRaisedSuffix', 'RAISED')
+          }
+          headlineSuffixSubscript
+          stats={
+            flockHeadlineIsLive
+              ? [
+                  {
+                    icon: Egg,
+                    label: t('dashboard.flockMetricRaised', 'Raised'),
+                    value: fmtCompact(flockStats.initial),
+                  },
+                  {
+                    icon: ShoppingCart,
+                    label: t('dashboard.flockMetricSold', 'Sold'),
+                    value: fmtCompact(flockStats.sold),
+                  },
+                  {
+                    icon: Skull,
+                    label: t('dashboard.flockMetricMortality', 'Mortality'),
+                    value: fmtFlockMortalityCountAndPct(
+                      flockStats.deaths,
+                      flockStats.mortalityPct,
+                    ),
+                    valueColor: mortColor,
+                  },
+                ]
+              : [
+                  {
+                    icon: ShoppingCart,
+                    label: t('dashboard.flockMetricSold', 'Sold'),
+                    value: fmtCompact(flockStats.sold),
+                  },
+                  {
+                    icon: Layers,
+                    label: t('dashboard.flockMetricCycles', 'Cycles'),
+                    value: fmtInt(flockStats.cycleCount),
+                  },
+                  {
+                    icon: Skull,
+                    label: t('dashboard.flockMetricMortality', 'Mortality'),
+                    value: fmtFlockMortalityCountAndPct(
+                      flockStats.deaths,
+                      flockStats.mortalityPct,
+                    ),
+                    valueColor: mortColor,
+                  },
+                ]
+          }
+        />
+
+        {/* Net Profit card — currency suffix subscript instead of prefix
+            (dashboard recipe), and Revenue / Expenses use the compact
+            currency formatter on All-time so the stat cells don't
+            truncate on long horizons. */}
         <BatchKpiCard
           title={t('batches.netProfit', 'Net Profit')}
           icon={DollarSign}
-          headlinePrefix={currency}
+          headlineSuffix={currency}
+          headlineSuffixSubscript
           headline={fmt(financials.netProfit)}
           headlineColor={profitColor}
-          subline={financials.marginPct != null
-            ? t('batches.margin', 'Margin {{pct}}%', { pct: financials.marginPct.toFixed(1) })
-            : null}
+          subline={
+            scope !== 'allTime' && financials.marginPct != null
+              ? t('batches.margin', 'Margin {{pct}}%', { pct: financials.marginPct.toFixed(1) })
+              : null
+          }
           stats={[
             {
               icon: TrendingUp,
               label: t('batches.totalRevenue', 'Revenue'),
-              value: fmt(financials.totalRevenue),
+              value: finFmt(financials.totalRevenue),
             },
             {
               icon: Receipt,
               label: t('batches.expenses', 'Expenses'),
-              value: fmt(financials.totalExpenses),
+              value: finFmt(financials.totalExpenses),
             },
             {
               icon: Bird,
-              label: t('batches.profitPerBird', 'Profit / Bird'),
+              label: t('batches.profitPerBird', 'PNL / Bird'),
               value: financials.profitPerBird != null ? fmt(financials.profitPerBird) : '—',
               valueColor: profitPerBirdColor,
             },
           ]}
         />
 
-        {/* Flock Summary card */}
-        <BatchKpiCard
-          title={t('dashboard.flockSummary', 'Flock')}
-          icon={Bird}
-          headline={flockHeadlineIsLive ? fmtInt(flockStats.liveBirds) : fmtInt(flockStats.initial)}
-          subline={
-            hasFlockData && flockHeadlineIsLive
-              ? `${t('batches.ofPlaced', 'of {{count}} placed', { count: fmtInt(flockStats.initial) })}`
-              : (hasFlockData ? t('farms.birdsRaised', 'birds raised') : null)
-          }
-          stats={[
-            {
-              icon: Layers,
-              label: flockHeadlineIsLive
-                ? t('dashboard.activeBatches', 'Active Batches')
-                : t('farms.cyclesRun', 'Cycles Run'),
-              value: fmtInt(flockStats.cycleCount),
-            },
-            {
-              icon: Skull,
-              label: t('dashboard.mortalityRate', 'Mortality'),
-              value: `${flockStats.mortalityPct.toFixed(2)}%`,
-              valueColor: mortColor,
-            },
-            {
-              icon: Home,
-              label: t('dashboard.totalHouses', 'Houses'),
-              value: fmtInt(houses.length),
-            },
-          ]}
-        >
-          {hasFlockData ? (
-            <View
-              style={[
-                styles.survivalTrack,
-                {
-                  backgroundColor: dark
-                    ? 'rgba(255,255,255,0.06)'
-                    : 'rgba(0,0,0,0.05)',
-                },
-              ]}
-            >
-              <View
-                style={[
-                  styles.survivalFill,
-                  { backgroundColor: accentColor, width: `${flockStats.survivalPct}%` },
-                ]}
-              />
-            </View>
-          ) : null}
-        </BatchKpiCard>
-
-        {/* Active Batches — elevated tappable cards inside a padded={false} section */}
+        {/* Active Batches — slim card recipe matching BroilerActiveBatches
+            on the dashboard: header + day-of-cycle progress bar, no per-
+            card stat row. Cards are separated by a 2pt rounded divider
+            (the canonical inter-card separator used on the dashboard and
+            on the Batches list grouping). */}
         {activeBatchCards.length > 0 ? (
           <SheetSection
             title={t('dashboard.activeBatchesTitle', 'Active Batches')}
             icon={Layers}
             padded={false}
           >
-            <View style={{ padding: 8, gap: 12 }}>
-              {activeBatchCards.map((b) => (
-                <ActiveBatchCard
-                  key={b._id}
-                  batch={b}
-                  tokens={tokens}
-                  isRTL={isRTL}
-                  t={t}
-                  onPress={() => router.push(`/(app)/batch/${b._id}`)}
-                />
+            <View style={cardStyles.activeList}>
+              {activeBatchCards.map((b, idx) => (
+                <View key={b._id}>
+                  {idx > 0 ? (
+                    <View
+                      style={[
+                        cardStyles.cardSeparator,
+                        { backgroundColor: tokens.elevatedCardBorder },
+                      ]}
+                    />
+                  ) : null}
+                  <ActiveBatchCard
+                    batch={b}
+                    tokens={tokens}
+                    isRTL={isRTL}
+                    t={t}
+                    onPress={() => router.push(`/(app)/batch/${b._id}`)}
+                  />
+                </View>
               ))}
             </View>
           </SheetSection>
         ) : null}
 
-        {/* Past Cycles — compact summary rows */}
+        {/* Past Cycles — kept as-is per design brief */}
         {pastCycleRows.length > 0 ? (
           <SheetSection
             title={t('farms.pastCycles', 'Past Cycles')}
@@ -466,6 +509,45 @@ export default function FarmOverviewTab({
           </View>
         ) : null}
 
+        {/* Farm Location — moved to the very bottom. It's a static farm
+            property, not a scope-filtered metric, and the user asked for
+            it out of the way of the KPI / cycles content above. */}
+        {hasFarmLocation ? (
+          <SheetSection
+            title={t('farms.locationSection', 'Farm Location')}
+            icon={MapPin}
+            padded={false}
+          >
+            {farm.location?.placeName ? (
+              <View
+                style={[
+                  locationStyles.addressHeader,
+                  { borderBottomColor: tokens.borderColor },
+                ]}
+              >
+                <Text
+                  style={{
+                    fontSize: 14,
+                    fontFamily: 'Poppins-Regular',
+                    color: textColor,
+                    lineHeight: 20,
+                    textAlign: isRTL ? 'right' : 'left',
+                    writingDirection: isRTL ? 'rtl' : 'ltr',
+                  }}
+                >
+                  {farm.location.placeName}
+                </Text>
+              </View>
+            ) : null}
+            <LocationActions
+              name={farm.farmName}
+              lat={farm.location?.lat}
+              lng={farm.location?.lng}
+              address={farm.location?.placeName}
+            />
+          </SheetSection>
+        ) : null}
+
         <Text
           style={{
             fontSize: 11,
@@ -484,16 +566,18 @@ export default function FarmOverviewTab({
 }
 
 /**
- * Tappable elevated card representing a single active batch on this farm.
- * Layout in StyleSheet.create per §9; functional Pressable style is
- * reserved for press-state visual deltas (background, border, scale).
+ * Slim active-batch card — same recipe as the dashboard's
+ * `BroilerActiveBatches.BatchCard`: avatar + title + bird-count meta,
+ * then the DAY-of-cycle label and a thin progress bar. No per-card
+ * stat row. Cards are visually separated by a 2pt rounded divider
+ * owned by the parent list (see `cardStyles.cardSeparator`).
  */
 function ActiveBatchCard({ batch, tokens, isRTL, t, onPress }) {
   const {
     mutedColor, textColor, accentColor, dark,
     elevatedCardBg, elevatedCardBorder, elevatedCardPressedBg,
   } = tokens;
-  const mortColor = mortalityToneColor(batch.mortalityPct, tokens);
+  const mortalityColor = mortalityToneColor(batch.mortalityPct, tokens);
 
   return (
     <Pressable
@@ -510,9 +594,19 @@ function ActiveBatchCard({ batch, tokens, isRTL, t, onPress }) {
           borderColor: pressed ? accentColor : elevatedCardBorder,
           transform: [{ scale: pressed ? 0.985 : 1 }],
           opacity: pressed ? 0.95 : 1,
+          ...(dark
+            ? {}
+            : {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: pressed ? 0.04 : 0.07,
+                shadowRadius: pressed ? 6 : 10,
+                elevation: pressed ? 1 : 2,
+              }),
         },
       ]}
     >
+      {/* Header — avatar + title + (-deaths) · mortality% meta */}
       <View
         style={[
           cardStyles.headerRow,
@@ -524,7 +618,6 @@ function ActiveBatchCard({ batch, tokens, isRTL, t, onPress }) {
           sequence={batch.batchNum}
           status={IN_PROGRESS_STATUS}
           size={40}
-          radius={14}
         />
         <View style={cardStyles.headerTextCol}>
           <Text
@@ -546,21 +639,50 @@ function ActiveBatchCard({ batch, tokens, isRTL, t, onPress }) {
                 { flexDirection: isRTL ? 'row-reverse' : 'row' },
               ]}
             >
-              <Bird size={11} color={mutedColor} strokeWidth={2.2} />
+              <View
+                style={[
+                  cardStyles.metaPiece,
+                  { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                ]}
+              >
+                <Bird size={11} color={mutedColor} strokeWidth={2.2} />
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontFamily: 'Poppins-Regular',
+                    color: mutedColor,
+                  }}
+                >
+                  {fmtInt(batch.remaining)}
+                </Text>
+                {batch.deaths > 0 ? (
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontFamily: 'Poppins-SemiBold',
+                      color: mortalityColor,
+                    }}
+                  >
+                    {`(-${fmtInt(batch.deaths)})`}
+                  </Text>
+                ) : null}
+              </View>
+              <Text style={{ fontSize: 12, color: mutedColor }}>·</Text>
               <Text
                 style={{
                   fontSize: 12,
-                  fontFamily: 'Poppins-Regular',
-                  color: mutedColor,
+                  fontFamily: 'Poppins-SemiBold',
+                  color: mortalityColor,
                 }}
               >
-                {fmtInt(batch.remaining)}
+                {`${batch.mortalityPct.toFixed(2)}%`}
               </Text>
             </View>
           ) : null}
         </View>
       </View>
 
+      {/* Day-of-cycle progress */}
       <View
         style={[
           cardStyles.progressLabelRow,
@@ -582,11 +704,8 @@ function ActiveBatchCard({ batch, tokens, isRTL, t, onPress }) {
               letterSpacing: 0.8,
               textTransform: 'uppercase',
             }}
-            numberOfLines={1}
           >
-            {t('dashboard.dayOfTarget', 'Day {{day}} of {{target}}', {
-              day: batch.dayCount, target: CYCLE_TARGET_DAYS,
-            })}
+            {t('dashboard.dayN', 'Day {{n}}', { n: batch.dayCount })}
           </Text>
         </View>
         <Text
@@ -615,41 +734,6 @@ function ActiveBatchCard({ batch, tokens, isRTL, t, onPress }) {
             cardStyles.progressBarFill,
             { backgroundColor: accentColor, width: `${batch.cycleProgressPct}%` },
           ]}
-        />
-      </View>
-
-      <View
-        style={[
-          cardStyles.statRow,
-          {
-            flexDirection: isRTL ? 'row-reverse' : 'row',
-            borderTopColor: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-          },
-        ]}
-      >
-        <StatCell
-          icon={Skull}
-          label={t('dashboard.mortality', 'Mortality')}
-          value={`${batch.mortalityPct.toFixed(2)}%`}
-          valueColor={mortColor}
-          tokens={tokens}
-          isRTL={isRTL}
-        />
-        <StatDivider tokens={tokens} />
-        <StatCell
-          icon={Wheat}
-          label={t('dashboard.feedConsumed', 'Feed')}
-          value={fmtCompactKg(batch.feed)}
-          tokens={tokens}
-          isRTL={isRTL}
-        />
-        <StatDivider tokens={tokens} />
-        <StatCell
-          icon={Home}
-          label={t('dashboard.totalHouses', 'Houses')}
-          value={fmtInt(batch.houseCount)}
-          tokens={tokens}
-          isRTL={isRTL}
         />
       </View>
     </Pressable>
@@ -732,72 +816,7 @@ function PastCycleRow({ cycle, tokens, isRTL, t, onPress }) {
   );
 }
 
-function StatCell({ icon: Icon, label, value, valueColor, tokens, isRTL }) {
-  const { mutedColor, textColor } = tokens;
-  return (
-    <View style={cardStyles.statCell}>
-      <View
-        style={[
-          cardStyles.statLabelRow,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
-        ]}
-      >
-        <Icon size={11} color={mutedColor} strokeWidth={2.4} />
-        <Text
-          style={{
-            fontSize: 10,
-            fontFamily: 'Poppins-SemiBold',
-            color: mutedColor,
-            letterSpacing: 0.8,
-            textTransform: 'uppercase',
-          }}
-          numberOfLines={1}
-        >
-          {label}
-        </Text>
-      </View>
-      <Text
-        style={{
-          fontSize: 14,
-          fontFamily: 'Poppins-SemiBold',
-          color: valueColor || textColor,
-          fontVariant: ['tabular-nums'],
-          textAlign: isRTL ? 'right' : 'left',
-          marginTop: 2,
-        }}
-        numberOfLines={1}
-      >
-        {value}
-      </Text>
-    </View>
-  );
-}
-
-function StatDivider({ tokens }) {
-  const { dark } = tokens;
-  return (
-    <View
-      style={{
-        width: StyleSheet.hairlineWidth,
-        backgroundColor: dark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.08)',
-        marginHorizontal: 8,
-        alignSelf: 'stretch',
-      }}
-    />
-  );
-}
-
 const styles = StyleSheet.create({
-  survivalTrack: {
-    height: 6,
-    borderRadius: 3,
-    overflow: 'hidden',
-    marginTop: 12,
-  },
-  survivalFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
   emptyTile: {
     width: 44,
     height: 44,
@@ -818,6 +837,18 @@ const locationStyles = StyleSheet.create({
 });
 
 const cardStyles = StyleSheet.create({
+  // Active-batches list — same chrome as the dashboard's
+  // BroilerActiveBatches: 8pt edge padding, no gap (the cardSeparator
+  // owns the inter-card breathing room so it sits centered).
+  activeList: {
+    padding: 8,
+  },
+  cardSeparator: {
+    height: 2,
+    borderRadius: 1,
+    marginVertical: 12,
+    marginHorizontal: 4,
+  },
   card: {
     borderRadius: 16,
     padding: 14,
@@ -825,19 +856,23 @@ const cardStyles = StyleSheet.create({
     overflow: 'hidden',
   },
   headerRow: {
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 12,
-    marginBottom: 12,
+    marginBottom: 8,
   },
   headerTextCol: {
     flex: 1,
     minWidth: 0,
-    gap: 2,
   },
   metaRow: {
     alignItems: 'center',
-    gap: 4,
+    flexWrap: 'wrap',
+    gap: 6,
     marginTop: 2,
+  },
+  metaPiece: {
+    alignItems: 'center',
+    gap: 4,
   },
   progressLabelRow: {
     alignItems: 'center',
@@ -858,19 +893,6 @@ const cardStyles = StyleSheet.create({
   progressBarFill: {
     height: '100%',
     borderRadius: 3,
-  },
-  statRow: {
-    paddingTop: 12,
-    marginTop: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  statCell: {
-    flex: 1,
-    minWidth: 0,
-  },
-  statLabelRow: {
-    alignItems: 'center',
-    gap: 4,
   },
   pastRow: {
     borderRadius: 12,

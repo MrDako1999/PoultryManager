@@ -1,75 +1,84 @@
 import { useMemo, useState } from 'react';
-import { View, Text, ScrollView, Pressable, RefreshControl } from 'react-native';
+import {
+  View, Text, Pressable, ScrollView, RefreshControl, LayoutAnimation,
+  StyleSheet, Platform,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
-import { ChevronLeft, ClipboardList, Plus, Home } from 'lucide-react-native';
+import {
+  ChevronLeft, ChevronRight, ClipboardList, Plus, Home, Skull, Heart,
+  Wheat, Droplets, ChevronsDownUp, ChevronsUpDown, Tag,
+} from 'lucide-react-native';
 import useLocalRecord from '@/hooks/useLocalRecord';
 import useLocalQuery from '@/hooks/useLocalQuery';
-import useThemeStore from '@/stores/themeStore';
+import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
+import { useIsRTL } from '@/stores/localeStore';
+import SheetSection from '@/components/SheetSection';
 import EmptyState from '@/components/ui/EmptyState';
 import DailyLogRow from '@/modules/broiler/rows/DailyLogRow';
 import DailyLogSheet from '@/modules/broiler/sheets/DailyLogSheet';
+import ExpenseCategoryGroup from '@/components/rows/ExpenseCategoryGroup';
+import BatchKpiCard, {
+  mortalityToneColor,
+} from '@/modules/broiler/components/BatchKpiCard';
+import { AccountingToolbar } from '@/components/views/AccountingFilterBar';
 import { SkeletonRow } from '@/components/skeletons';
-import { LOG_TYPES, LOG_TYPE_ICONS } from '@/lib/constants';
+import { LOG_TYPES } from '@/lib/constants';
 import { deltaSync } from '@/lib/syncEngine';
 
-const MUTED = 'hsl(150, 10%, 45%)';
+const NUMERIC_LOCALE = 'en-US';
 
-function FilterChips({ value, onChange, options }) {
-  return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
-    >
-      {options.map((opt) => {
-        const Icon = opt.icon;
-        const active = opt.value === value;
-        return (
-          <Pressable
-            key={opt.value}
-            onPress={() => {
-              if (active) return;
-              Haptics.selectionAsync().catch(() => {});
-              onChange?.(opt.value);
-            }}
-            className={`flex-row items-center gap-1.5 rounded-full border px-3 py-1.5 ${active ? 'bg-primary border-primary' : 'bg-card border-border'}`}
-            hitSlop={4}
-          >
-            {Icon && (
-              <Icon
-                size={13}
-                color={active ? '#fff' : MUTED}
-              />
-            )}
-            <Text
-              className={`text-xs font-medium ${active ? 'text-primary-foreground' : 'text-muted-foreground'}`}
-              numberOfLines={1}
-            >
-              {opt.label}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </ScrollView>
-  );
-}
+const fmt = (val) =>
+  Number(val || 0).toLocaleString(NUMERIC_LOCALE);
+
+const fmtDecimal = (val, digits = 1) =>
+  Number(val || 0).toLocaleString(NUMERIC_LOCALE, {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+
+const fmtCompactKg = (val) => {
+  const n = Number(val || 0);
+  if (n >= 1000) return `${fmtDecimal(n / 1000)}t`;
+  return `${fmt(n)} kg`;
+};
+
+const fmtCompactL = (val) => {
+  const n = Number(val || 0);
+  if (n >= 1000) return `${fmtDecimal(n / 1000)}kL`;
+  return `${fmt(n)} L`;
+};
+
+// Date keys are stored ISO YYYY-MM-DD so lexicographic compare is timezone
+// safe (same trick as SalesListView). Keep it consistent across the app.
+const dateKeyOf = (log) => {
+  const raw = log.logDate || log.date;
+  if (!raw) return 'no-date';
+  return new Date(raw).toISOString().slice(0, 10);
+};
 
 export default function BatchHouseLogsList() {
   const { id, houseId } = useLocalSearchParams();
   const { t } = useTranslation();
-  const { resolvedTheme } = useThemeStore();
   const insets = useSafeAreaInsets();
+  const isRTL = useIsRTL();
+  const tokens = useHeroSheetTokens();
+  const {
+    accentColor, dark, mutedColor, textColor, screenBg, borderColor,
+    inputBg, inputBorderIdle,
+  } = tokens;
+
   const [refreshing, setRefreshing] = useState(false);
-  const [filter, setFilter] = useState('ALL');
+  const [search, setSearch] = useState('');
+  const [dateRange, setDateRange] = useState(undefined);
+  const [logTypeFilter, setLogTypeFilter] = useState([]);
+  const [groupOpen, setGroupOpen] = useState({});
   const [sheet, setSheet] = useState({ open: false, data: null });
 
-  const [batch] = useLocalRecord('batches', id);
+  const [batch, batchLoading] = useLocalRecord('batches', id);
   const [dailyLogs, logsLoading] = useLocalQuery('dailyLogs', { batch: id });
-
-  const primaryColor = resolvedTheme === 'dark' ? 'hsl(148, 48%, 38%)' : 'hsl(148, 60%, 20%)';
 
   const houses = batch?.houses || [];
 
@@ -78,47 +87,128 @@ export default function BatchHouseLogsList() {
       const hid = typeof h.house === 'object' ? h.house?._id : h.house;
       return hid === houseId;
     });
-    if (!entry) return { id: houseId, name: 'House', initial: 0 };
+    if (!entry) {
+      return {
+        id: houseId,
+        name: t('batches.viewAllLogs', 'All Logs'),
+        initial: 0,
+      };
+    }
     return {
       id: houseId,
-      name: (typeof entry.house === 'object' ? entry.house?.name : null) || entry.name || 'House',
+      name: (typeof entry.house === 'object' ? entry.house?.name : null)
+        || entry.name
+        || t('farms.house', 'House'),
       initial: entry.quantity || 0,
     };
-  }, [houses, houseId]);
+  }, [houses, houseId, t]);
 
-  const houseLogs = useMemo(() => {
-    return (dailyLogs || []).filter((log) => {
-      if (log.deletedAt) return false;
-      const lhId = log.house?._id || log.house;
-      return lhId === houseId;
-    });
+  // All non-deleted logs for this specific house, sorted desc by date.
+  const allHouseLogs = useMemo(() => {
+    return (dailyLogs || [])
+      .filter((log) => {
+        if (log.deletedAt) return false;
+        const lhId = log.house?._id || log.house;
+        return lhId === houseId;
+      })
+      .sort(
+        (a, b) =>
+          new Date(b.logDate || b.date || 0)
+          - new Date(a.logDate || a.date || 0)
+      );
   }, [dailyLogs, houseId]);
 
-  const totalDeaths = useMemo(
-    () => houseLogs.reduce((s, log) => s + (log.logType === 'DAILY' ? (log.deaths || 0) : 0), 0),
-    [houseLogs]
-  );
-  const currentBirds = Math.max(0, houseInfo.initial - totalDeaths);
-
+  // Apply search + date range + log type filters.
   const filteredLogs = useMemo(() => {
-    const sorted = [...houseLogs].sort(
-      (a, b) => new Date(b.logDate || b.date || 0) - new Date(a.logDate || a.date || 0)
-    );
-    if (filter === 'ALL') return sorted;
-    return sorted.filter((log) => log.logType === filter);
-  }, [houseLogs, filter]);
+    const q = search.trim().toLowerCase();
+    const fromIso = dateRange?.from || null;
+    const toIso = dateRange?.to || dateRange?.from || null;
+    const typeSet = logTypeFilter.length > 0 ? new Set(logTypeFilter) : null;
 
-  const filterOptions = useMemo(
-    () => [
-      { value: 'ALL', label: t('batches.filterAll', 'All') },
-      ...LOG_TYPES.map((type) => ({
+    return allHouseLogs.filter((log) => {
+      if (typeSet && !typeSet.has(log.logType)) return false;
+      if (fromIso || toIso) {
+        const key = dateKeyOf(log);
+        if (key === 'no-date') return false;
+        if (fromIso && key < fromIso) return false;
+        if (toIso && key > toIso) return false;
+      }
+      if (!q) return true;
+      const hay = [
+        log.notes,
+        log.logType,
+        log.cycleDay != null ? `day ${log.cycleDay}` : null,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [allHouseLogs, search, dateRange, logTypeFilter]);
+
+  // KPI hero stats — operate on the *filtered* set so the card always
+  // matches what the list below is showing.
+  const heroStats = useMemo(() => {
+    let deaths = 0;
+    let feedKg = 0;
+    let waterL = 0;
+    const dayCounts = new Set();
+    filteredLogs.forEach((log) => {
+      if (log.logType === 'DAILY') {
+        deaths += log.deaths || 0;
+        feedKg += log.feedKg || 0;
+        waterL += log.waterLiters || 0;
+      }
+      const key = dateKeyOf(log);
+      if (key !== 'no-date') dayCounts.add(key);
+    });
+    const initial = houseInfo.initial || 0;
+    const mortalityPct = initial > 0 ? (deaths / initial) * 100 : 0;
+    const currentBirds = Math.max(0, initial - deaths);
+    return {
+      deaths,
+      feedKg,
+      waterL,
+      mortalityPct,
+      currentBirds,
+      daysLogged: dayCounts.size,
+    };
+  }, [filteredLogs, houseInfo.initial]);
+
+  // Group filtered logs by ISO day key, newest first.
+  const groupedByDay = useMemo(() => {
+    const groups = {};
+    filteredLogs.forEach((log) => {
+      const key = dateKeyOf(log);
+      if (!groups[key]) groups[key] = { logs: [], deaths: 0, feedKg: 0 };
+      groups[key].logs.push(log);
+      if (log.logType === 'DAILY') {
+        groups[key].deaths += log.deaths || 0;
+        groups[key].feedKg += log.feedKg || 0;
+      }
+    });
+    return Object.entries(groups).sort(([a], [b]) => b.localeCompare(a));
+  }, [filteredLogs]);
+
+  const filterPills = useMemo(() => ([
+    {
+      key: 'logType',
+      label: t('batches.operations.logType', 'Entry Type'),
+      icon: Tag,
+      options: LOG_TYPES.map((type) => ({
         value: type,
         label: t(`batches.operations.logTypes.${type}`, type),
-        icon: LOG_TYPE_ICONS[type],
       })),
-    ],
-    [t]
-  );
+      values: logTypeFilter,
+      onChange: setLogTypeFilter,
+    },
+  ]), [t, logTypeFilter]);
+
+  const resetAll = () => {
+    setSearch('');
+    setDateRange(undefined);
+    setLogTypeFilter([]);
+  };
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -126,92 +216,282 @@ export default function BatchHouseLogsList() {
     setRefreshing(false);
   };
 
+  const allExpanded = groupedByDay.every(([key]) => groupOpen[key] ?? true);
+  const toggleAll = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    const next = {};
+    groupedByDay.forEach(([key]) => { next[key] = !allExpanded; });
+    setGroupOpen(next);
+  };
+  const toggleGroup = (key) =>
+    setGroupOpen((p) => ({ ...p, [key]: !(p[key] ?? true) }));
+
+  const collapseButton = groupedByDay.length > 1 ? (
+    <Pressable
+      onPress={toggleAll}
+      android_ripple={{
+        color: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+        borderless: false,
+      }}
+      style={[
+        styles.collapseBtn,
+        { backgroundColor: inputBg, borderColor: inputBorderIdle },
+      ]}
+      hitSlop={4}
+      accessibilityRole="button"
+      accessibilityLabel={allExpanded
+        ? t('common.collapseAll', 'Collapse all')
+        : t('common.expandAll', 'Expand all')}
+    >
+      {allExpanded
+        ? <ChevronsDownUp size={18} color={mutedColor} strokeWidth={2.2} />
+        : <ChevronsUpDown size={18} color={mutedColor} strokeWidth={2.2} />}
+    </Pressable>
+  ) : null;
+
+  const ChevronGlyph = isRTL ? ChevronRight : ChevronLeft;
+  const mortColor = mortalityToneColor(heroStats.mortalityPct, tokens);
+  const hasAnyFilter = !!(
+    search || dateRange?.from || dateRange?.to || logTypeFilter.length > 0
+  );
+
+  if (batchLoading) {
+    return <View style={{ flex: 1, backgroundColor: screenBg }} />;
+  }
+
   return (
-    <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
-      <View className="flex-row items-center px-2 pt-2 pb-2">
+    <View style={{ flex: 1, backgroundColor: screenBg }}>
+      {/* Custom header bar — back chevron + house name + log count */}
+      <View
+        style={[
+          styles.headerBar,
+          {
+            paddingTop: insets.top + 8,
+            backgroundColor: screenBg,
+            borderBottomColor: borderColor,
+            flexDirection: isRTL ? 'row-reverse' : 'row',
+          },
+        ]}
+      >
         <Pressable
-          onPress={() => router.back()}
-          className="p-2 -ml-1 active:opacity-60"
+          onPress={() => {
+            Haptics.selectionAsync().catch(() => {});
+            router.back();
+          }}
+          android_ripple={{
+            color: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+            borderless: true,
+            radius: 22,
+          }}
+          style={styles.backBtn}
           hitSlop={6}
           accessibilityRole="button"
           accessibilityLabel={t('common.back', 'Back')}
         >
-          <ChevronLeft size={24} color={primaryColor} />
+          <ChevronGlyph size={24} color={accentColor} strokeWidth={2.4} />
         </Pressable>
-        <View className="flex-1 min-w-0">
-          <View className="flex-row items-center gap-1.5">
-            <Home size={14} color={MUTED} />
-            <Text className="text-lg font-bold text-foreground" numberOfLines={1}>
+        <View style={styles.headerTextCol}>
+          <View
+            style={[
+              styles.headerTitleRow,
+              { flexDirection: isRTL ? 'row-reverse' : 'row' },
+            ]}
+          >
+            <Home size={14} color={mutedColor} strokeWidth={2.2} />
+            <Text
+              style={{
+                fontSize: 17,
+                fontFamily: 'Poppins-Bold',
+                color: textColor,
+                textAlign: isRTL ? 'right' : 'left',
+              }}
+              numberOfLines={1}
+            >
               {houseInfo.name}
             </Text>
           </View>
-          <Text className="text-[11px] text-muted-foreground tabular-nums">
+          <Text
+            style={{
+              fontSize: 11,
+              fontFamily: 'Poppins-Medium',
+              color: mutedColor,
+              marginTop: 1,
+              textAlign: isRTL ? 'right' : 'left',
+            }}
+            numberOfLines={1}
+          >
             {houseInfo.initial > 0
-              ? `${currentBirds.toLocaleString()} / ${houseInfo.initial.toLocaleString()} ${t('farms.birds', 'birds')}`
-              : t('batches.viewAllLogs', 'All Logs')}
+              ? `${fmt(heroStats.currentBirds)} / ${fmt(houseInfo.initial)} ${t('farms.birds', 'birds').toLowerCase()}`
+              : t('batches.operations.noEntries', 'No entries yet')}
           </Text>
         </View>
-        <Text className="text-sm text-muted-foreground mr-2 tabular-nums">{houseLogs.length}</Text>
-      </View>
-
-      <View className="pb-3">
-        <FilterChips value={filter} onChange={setFilter} options={filterOptions} />
+        <Text
+          style={{
+            fontSize: 12,
+            fontFamily: 'Poppins-SemiBold',
+            color: mutedColor,
+            marginEnd: isRTL ? 0 : 8,
+            marginStart: isRTL ? 8 : 0,
+          }}
+        >
+          {fmt(allHouseLogs.length)}
+        </Text>
       </View>
 
       <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={primaryColor} />}
+        style={{ flex: 1 }}
+        contentContainerStyle={{
+          paddingTop: 0,
+          paddingBottom: insets.bottom + 120,
+        }}
+        stickyHeaderIndices={[1]}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={accentColor}
+            colors={[accentColor]}
+            progressBackgroundColor={dark ? 'hsl(150, 18%, 14%)' : '#ffffff'}
+          />
+        }
+        showsVerticalScrollIndicator={false}
       >
-        {logsLoading && houseLogs.length === 0 ? (
-          <View className="px-4 gap-3">
+        {/* KPI Hero — scrolls away with the list */}
+        <View style={styles.heroWrap}>
+          <BatchKpiCard
+            title={t('batches.cyclePerformance', 'Cycle Performance')}
+            icon={Skull}
+            headline={fmt(heroStats.deaths)}
+            headlineColor={heroStats.deaths > 0 ? mortColor : undefined}
+            subline={
+              hasAnyFilter
+                ? t('accounting.showingOf', '{{shown}} of {{total}}', {
+                    shown: fmt(filteredLogs.length),
+                    total: fmt(allHouseLogs.length),
+                  })
+                : (houseInfo.initial > 0
+                  ? `${t('batches.totalDeaths', 'Deaths').toLowerCase()}  ·  ${heroStats.mortalityPct.toFixed(2)}%`
+                  : t('batches.totalDeaths', 'Deaths').toLowerCase())
+            }
+            sublineColor={!hasAnyFilter && houseInfo.initial > 0 ? mortColor : undefined}
+            stats={[
+              {
+                icon: Heart,
+                label: t('batches.currentBirds', 'Live Birds'),
+                value: houseInfo.initial > 0 ? fmt(heroStats.currentBirds) : '—',
+                valueColor: accentColor,
+              },
+              {
+                icon: Wheat,
+                label: t('batches.operations.feedShort', 'Feed'),
+                value: fmtCompactKg(heroStats.feedKg),
+              },
+              {
+                icon: Droplets,
+                label: t('batches.operations.waterShort', 'Water'),
+                value: fmtCompactL(heroStats.waterL),
+              },
+            ]}
+          />
+        </View>
+
+        {/* Sticky toolbar — search + date range + log type filter + reset */}
+        <View>
+          <AccountingToolbar
+            search={search}
+            setSearch={setSearch}
+            dateRange={dateRange}
+            setDateRange={setDateRange}
+            filters={filterPills}
+            onResetAll={resetAll}
+            searchTrailing={collapseButton}
+          />
+        </View>
+
+        {/* Loading state on initial load */}
+        {logsLoading && allHouseLogs.length === 0 ? (
+          <View style={{ paddingHorizontal: 16, paddingTop: 16, gap: 10 }}>
             {[1, 2, 3, 4].map((i) => <SkeletonRow key={i} />)}
           </View>
-        ) : filteredLogs.length === 0 ? (
+        ) : groupedByDay.length === 0 ? (
           <EmptyState
             icon={ClipboardList}
-            title={
-              filter === 'ALL'
-                ? t('batches.noDailyLogs', 'No daily logs')
-                : t('common.noResults', 'No results')
-            }
-            description={
-              filter === 'ALL'
-                ? t('batches.operations.noEntriesDesc', 'Add daily logs to see them here.')
-                : undefined
-            }
+            title={hasAnyFilter
+              ? t('common.noResults', 'No results found')
+              : t('batches.operations.noEntries', 'No entries yet')}
+            description={!hasAnyFilter
+              ? t('batches.operations.noEntriesDesc', 'Start logging daily data for this house.')
+              : undefined}
           />
         ) : (
-          <View className="px-4">
-            <View className="rounded-lg border border-border bg-card overflow-hidden">
-              {filteredLogs.map((log) => (
-                <DailyLogRow
-                  key={log._id}
-                  log={log}
-                  t={t}
-                  onClick={() => router.push(`/(app)/daily-log/${log._id}`)}
-                />
+          <SheetSection padded={false}>
+            <View>
+              {groupedByDay.map(([dateKey, group]) => (
+                <ExpenseCategoryGroup
+                  key={dateKey}
+                  label={dateKey === 'no-date'
+                    ? t('common.noDate', 'No Date')
+                    : new Date(`${dateKey}T00:00:00`).toLocaleDateString(NUMERIC_LOCALE, {
+                        weekday: 'short',
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                  pills={[
+                    ...(group.deaths > 0
+                      ? [{ value: `${fmt(group.deaths)} ${t('batches.operations.deathsShort', 'Deaths').toLowerCase()}` }]
+                      : []),
+                    ...(group.feedKg > 0
+                      ? [{ value: fmtCompactKg(group.feedKg) }]
+                      : []),
+                    { value: fmt(group.logs.length) },
+                  ]}
+                  open={groupOpen[dateKey] ?? true}
+                  onToggle={() => toggleGroup(dateKey)}
+                >
+                  {group.logs.map((log, i) => (
+                    <View
+                      key={log._id || `${dateKey}-${i}`}
+                      style={i > 0
+                        ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: borderColor }
+                        : null}
+                    >
+                      <DailyLogRow
+                        log={log}
+                        t={t}
+                        onClick={() => router.push(`/(app)/daily-log/${log._id}`)}
+                      />
+                    </View>
+                  ))}
+                </ExpenseCategoryGroup>
               ))}
             </View>
-          </View>
+          </SheetSection>
         )}
       </ScrollView>
 
+      {/* FAB — preserve add-log entry from the previous version. */}
       <Pressable
         onPress={() => setSheet({ open: true, data: null })}
-        className="absolute right-5 h-14 w-14 rounded-full bg-primary items-center justify-center"
-        style={{
-          bottom: insets.bottom + 16,
-          elevation: 4,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.2,
-          shadowRadius: 4,
+        android_ripple={{
+          color: 'rgba(255,255,255,0.18)',
+          borderless: true,
+          radius: 32,
         }}
+        style={({ pressed }) => [
+          styles.fab,
+          {
+            bottom: insets.bottom + 24,
+            backgroundColor: accentColor,
+            opacity: pressed ? 0.92 : 1,
+            transform: [{ scale: pressed ? 0.95 : 1 }],
+          },
+        ]}
+        hitSlop={8}
         accessibilityRole="button"
         accessibilityLabel={t('batches.operations.addEntry', 'Add Entry')}
       >
-        <Plus size={24} color="#fff" />
+        <Plus size={26} color="#ffffff" strokeWidth={2.6} />
       </Pressable>
 
       <DailyLogSheet
@@ -225,3 +505,57 @@ export default function BatchHouseLogsList() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  headerBar: {
+    paddingBottom: 10,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    gap: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTextCol: {
+    flex: 1,
+    minWidth: 0,
+    paddingHorizontal: 4,
+  },
+  headerTitleRow: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  heroWrap: {
+    paddingTop: 16,
+  },
+  collapseBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fab: {
+    position: 'absolute',
+    right: 16,
+    height: 56,
+    width: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.22,
+        shadowRadius: 12,
+      },
+      android: { elevation: 8 },
+    }),
+  },
+});

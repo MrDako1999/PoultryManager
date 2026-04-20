@@ -6,11 +6,12 @@ import { useTranslation } from 'react-i18next';
 import { router } from 'expo-router';
 import {
   Receipt, Pencil, Trash2, ChevronRight, ChevronLeft,
-  FileText, Building2, BadgePercent, Link2,
+  FileText, Building2, Link2,
   Egg, Wheat, ShoppingCart,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import HeroSheetScreen, { useHeroSheetTokens } from '@/components/HeroSheetScreen';
+import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
+import DetailCompactScreen from '@/components/DetailCompactScreen';
 import SheetSection from '@/components/SheetSection';
 import FileViewer from '@/components/FileViewer';
 import DocCard from '@/components/DocCard';
@@ -22,7 +23,6 @@ import useOfflineMutation from '@/hooks/useOfflineMutation';
 import useCapabilities from '@/hooks/useCapabilities';
 import { useIsRTL } from '@/stores/localeStore';
 import { SkeletonDetailPage } from '@/components/skeletons';
-import { EXPENSE_CATEGORY_ICONS } from '@/lib/constants';
 
 // Western digits everywhere (DL §12.4) — never i18n.language for numerics.
 const NUMERIC_LOCALE = 'en-US';
@@ -37,16 +37,6 @@ const fmtDate = (d) => {
   return new Date(d).toLocaleDateString(NUMERIC_LOCALE, {
     day: '2-digit', month: 'short', year: 'numeric',
   });
-};
-
-// Compact "12.4K" formatter for hero pulse pills so currency-prefixed
-// values don't blow out at narrow widths.
-const fmtCompact = (val) => {
-  const n = Number(val || 0);
-  const abs = Math.abs(n);
-  if (abs >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (abs >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return fmt(n);
 };
 
 export default function ExpenseDetail({ expenseId, onEdit }) {
@@ -65,16 +55,9 @@ export default function ExpenseDetail({ expenseId, onEdit }) {
 
   if (expenseLoading || !expense) {
     return (
-      <HeroSheetScreen
-        title={t('common.loading', 'Loading...')}
-        heroExtra={(
-          <View style={heroStyles.iconTile}>
-            <Receipt size={26} color="#ffffff" strokeWidth={2.2} />
-          </View>
-        )}
-      >
+      <DetailCompactScreen title={t('common.loading', 'Loading...')} headerRight={null}>
         <SkeletonDetailPage />
-      </HeroSheetScreen>
+      </DetailCompactScreen>
     );
   }
 
@@ -120,21 +103,10 @@ export default function ExpenseDetail({ expenseId, onEdit }) {
   const canEdit = !isLinked && can('expense:update');
   const canDelete = !isLinked && can('expense:delete');
 
-  const categoryLabel = t(`batches.expenseCategories.${expense.category}`, expense.category);
   const invoiceTypeLabel = t(`batches.invoiceTypes.${expense.invoiceType}`, expense.invoiceType);
   const invoiceTypeIsNone = expense.invoiceType === 'NO_INVOICE';
 
-  // Hero title — prefer the trading company; fall back to description; fall
-  // back to the category label so we always have something to show.
-  const heroTitle = tradingCompanyName
-    || expense.description
-    || categoryLabel;
-  const heroSubtitleParts = [];
-  if (expense.invoiceId) heroSubtitleParts.push(expense.invoiceId);
-  heroSubtitleParts.push(fmtDate(expense.expenseDate));
-  const heroSubtitle = heroSubtitleParts.join(' · ');
-
-  const CategoryIcon = EXPENSE_CATEGORY_ICONS[expense.category] || Receipt;
+  const compactTitle = t('batches.expenseDetail.screenTitle', 'Expense');
 
   const openEdit = () => {
     Haptics.selectionAsync().catch(() => {});
@@ -212,47 +184,9 @@ export default function ExpenseDetail({ expenseId, onEdit }) {
     </View>
   ) : null;
 
-  // Hero icon tile — category-specific glyph for at-a-glance recognition.
-  const heroExtra = (
-    <View style={heroStyles.iconTile}>
-      <CategoryIcon size={26} color="#ffffff" strokeWidth={2.2} />
-    </View>
-  );
-
-  // Hero "data pulse" — status pills + 1-2 KPI pills.
-  const heroBelow = (
-    <View style={{ gap: 14 }}>
-      <View style={[heroStyles.pillsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-        <HeroBadge label={categoryLabel} />
-        <HeroBadge label={invoiceTypeLabel} />
-      </View>
-      <View style={[heroStyles.pulseRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-        <PulsePill
-          icon={Receipt}
-          label={t('batches.expenseDetail.totalShort', 'Total')}
-          value={`${currency} ${fmtCompact(totalAmount)}`}
-        />
-        {hasVat ? (
-          <PulsePill
-            icon={BadgePercent}
-            label={t('batches.expenseDetail.vatShort', 'VAT')}
-            value={`${currency} ${fmtCompact(expense.taxableAmount)}`}
-          />
-        ) : null}
-      </View>
-    </View>
-  );
-
   return (
     <>
-      <HeroSheetScreen
-        scrollableHero
-        title={heroTitle}
-        subtitle={heroSubtitle}
-        heroExtra={heroExtra}
-        headerRight={headerRight}
-        heroBelow={heroBelow}
-      >
+      <DetailCompactScreen title={compactTitle} headerRight={headerRight}>
         {/* ─── TRADING COMPANY ─── */}
         {tradingCompanyName ? (
           <SheetSection
@@ -462,7 +396,7 @@ export default function ExpenseDetail({ expenseId, onEdit }) {
             </View>
           </View>
         ) : null}
-      </HeroSheetScreen>
+      </DetailCompactScreen>
 
       {/* Doc preview */}
       <FileViewer
@@ -487,34 +421,6 @@ export default function ExpenseDetail({ expenseId, onEdit }) {
 }
 
 /* ───────────────────── Sub-components ───────────────────── */
-
-// Translucent white pill in the hero (DL §7 hero toolbar / status pills).
-function HeroBadge({ label }) {
-  return (
-    <View style={heroStyles.badge}>
-      <Text style={heroStyles.badgeText} numberOfLines={1}>
-        {label}
-      </Text>
-    </View>
-  );
-}
-
-// Translucent KPI pill in the hero "data pulse" strip (DL §7.d).
-function PulsePill({ icon: Icon, label, value }) {
-  return (
-    <View style={heroStyles.pulsePill}>
-      <View style={heroStyles.pulseTopRow}>
-        {Icon ? <Icon size={13} color="#ffffff" strokeWidth={2.4} /> : null}
-        <Text style={heroStyles.pulseValue} numberOfLines={1}>
-          {value}
-        </Text>
-      </View>
-      <Text style={heroStyles.pulseLabel} numberOfLines={1}>
-        {label}
-      </Text>
-    </View>
-  );
-}
 
 // Tappable party row (Trading Company). Layout in StyleSheet per DL §9 —
 // inner View carries flexDirection, never the Pressable.
@@ -825,14 +731,6 @@ function CtaButton({ variant, icon: Icon, label, onPress, isRTL, tokens }) {
 /* ───────────────────── StyleSheets ───────────────────── */
 
 const heroStyles = StyleSheet.create({
-  iconTile: {
-    width: 56,
-    height: 56,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   actionsRow: {
     alignItems: 'center',
     gap: 8,
@@ -844,53 +742,6 @@ const heroStyles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.18)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  pillsRow: {
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  badge: {
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  badgeText: {
-    fontSize: 11,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#ffffff',
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-  },
-  pulseRow: {
-    gap: 8,
-  },
-  pulsePill: {
-    flex: 1,
-    minWidth: 0,
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    borderRadius: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    gap: 2,
-  },
-  pulseTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  pulseValue: {
-    flex: 1,
-    fontSize: 14,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#ffffff',
-    fontVariant: ['tabular-nums'],
-  },
-  pulseLabel: {
-    fontSize: 10.5,
-    fontFamily: 'Poppins-Medium',
-    color: 'rgba(255,255,255,0.78)',
-    letterSpacing: 0.4,
   },
 });
 

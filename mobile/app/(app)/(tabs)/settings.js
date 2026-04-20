@@ -17,6 +17,7 @@ import HeroSheetScreen, { useHeroSheetTokens } from '@/components/HeroSheetScree
 import SheetSection from '@/components/SheetSection';
 import { LanguagePickerSheet } from '@/components/LanguageSelector';
 import FlagTile, { getFlagComponent } from '@/components/flags';
+import SlidingSegmentedControl from '@/components/SlidingSegmentedControl';
 
 function SettingsRow({ icon: Icon, label, value, valueAccessory, onPress, destructive, isLast }) {
   const { iconColor, mutedColor, textColor, errorColor, borderColor, dark } = useHeroSheetTokens();
@@ -125,7 +126,7 @@ export default function SettingsScreen() {
   const { workspace, can } = useCapabilities();
   const isOwner = !!workspace?.isOwner;
 
-  const { dark, accentColor, mutedColor } = useHeroSheetTokens();
+  const { dark, mutedColor } = useHeroSheetTokens();
 
   const handleLogout = () => {
     Alert.alert(
@@ -154,6 +155,7 @@ export default function SettingsScreen() {
     dark: t('common.dark', 'Dark'),
     system: t('common.system', 'System'),
   };
+  const themeSegmentModes = ['light', 'dark', 'system'];
 
   const heroAvatar = (
     <Pressable
@@ -248,46 +250,16 @@ export default function SettingsScreen() {
     >
       {/* Theme switcher + Language */}
       <SheetSection title={t('settings.appearance', 'Appearance')} padded={false}>
-        <View style={{ flexDirection: 'row', gap: 6, padding: 6 }}>
-          {['light', 'dark', 'system'].map((mode) => {
-            const ThemeIcon = themeIcons[mode];
-            const isActive = theme === mode;
-            return (
-              <Pressable
-                key={mode}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  setTheme(mode);
-                }}
-                style={{
-                  flex: 1,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6,
-                  paddingVertical: 11,
-                  borderRadius: 12,
-                  backgroundColor: isActive
-                    ? (dark ? 'rgba(148,210,165,0.16)' : 'hsl(148, 35%, 92%)')
-                    : 'transparent',
-                  borderWidth: 1,
-                  borderColor: isActive ? accentColor : 'transparent',
-                }}
-              >
-                <ThemeIcon size={15} color={isActive ? accentColor : mutedColor} />
-                <Text
-                  style={{
-                    fontSize: 12,
-                    fontFamily: 'Poppins-Medium',
-                    color: isActive ? accentColor : mutedColor,
-                  }}
-                >
-                  {themeLabels[mode]}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+        <SlidingSegmentedControl
+          bordered={false}
+          value={theme}
+          onChange={setTheme}
+          options={themeSegmentModes.map((mode) => ({
+            value: mode,
+            label: themeLabels[mode],
+            icon: themeIcons[mode],
+          }))}
+        />
         <SettingsRow
           icon={Languages}
           label={t('common.language', 'Language')}

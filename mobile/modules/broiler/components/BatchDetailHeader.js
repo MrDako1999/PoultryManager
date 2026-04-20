@@ -142,10 +142,7 @@ export default function BatchDetailHeader({
                       textTransform: 'uppercase',
                     }}
                   >
-                    {t('dashboard.dayOfTarget', 'Day {{day}} of {{target}}', {
-                      day: dayCount,
-                      target: CYCLE_TARGET_DAYS,
-                    })}
+                    {t('dashboard.dayN', 'Day {{n}}', { n: dayCount })}
                   </Text>
                   <View style={{ flex: 1 }} />
                   <Text

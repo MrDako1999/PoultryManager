@@ -140,7 +140,14 @@
     "dayOfTarget": "Day {{day}} of {{target}}",
     "scopeActive": "Active",
     "scopeAllTime": "All-time",
-    "scopeThisMonth": "This Month"
+    "scopeThisMonth": "This Month",
+    "flockMetricAvailable": "Available",
+    "flockHeadlineAvailableSuffix": "AVAILABLE",
+    "flockHeadlineRaisedSuffix": "RAISED",
+    "flockMetricRaised": "Raised",
+    "flockMetricSold": "Sold",
+    "flockMetricMortality": "Mortality",
+    "flockMetricCycles": "Cycles"
   },
   "accounting": {
     "totalRevenue": "Total Revenue",
@@ -192,6 +199,8 @@
     "languageTitle": "Language",
     "languageSubtitle": "Choose the app language",
     "languageSearchPlaceholder": "Search language…",
+    "changingLanguageTitle": "Changing language",
+    "changingLanguageHint": "Updating layout and translations",
     "saleDefaultsTitle": "Sale Default Rates",
     "saleDefaultsDesc": "Set default selling rates for poultry portions and transportation. These rates pre-fill when creating sale orders and can be overridden per invoice.",
     "saleDefaultsUpdated": "Sale default rates updated",
@@ -743,7 +752,7 @@
     "totalChicksReceived": "Total Chicks Received",
     "sourceEntries": "Source Entries",
     "totalExpenses": "Total Expenses",
-    "totalCost": "Total Cost (AED)",
+    "totalCost": "Total Cost",
     "currentBirds": "Live Birds",
     "ofPlaced": "of {{count}} placed",
     "mortalityShort": "{{pct}}% mortality",
@@ -752,7 +761,7 @@
     "cycleDay": "Day {{days}}",
     "cycleElapsed": "{{days}} days elapsed",
     "expenses": "Expenses",
-    "profitPerBird": "Profit / Bird",
+    "profitPerBird": "PNL / Bird",
     "margin": "Margin {{pct}}%",
     "feedMix": "Feed",
     "expenseBreakdown": "Expenses by category",
@@ -764,6 +773,8 @@
     "lastLog": "Last Log",
     "viewAllLogs": "All Logs",
     "filterAll": "All",
+    "statusFilterActive": "Active",
+    "statusFilterInactive": "Inactive",
     "sourcesSummary": "Sources",
     "totalChicks": "Total Chicks",
     "costPerChick": "Cost / Chick",
@@ -895,7 +906,16 @@
     "selectFeedCompany": "Select feed company…",
     "searchFeedCompany": "Search companies…",
     "feedCompany": "Feed Company",
-    "feedCompanyHint": "Feed companies are shown first",
+    "feedCompanyHint": "Suppliers with catalogue products are listed first.",
+    "feedCompanySectionCatalogue": "With feed products",
+    "feedCompanySectionOther": "Other businesses",
+    "feedProductCount_one": "1 product",
+    "feedProductCount_many": "{{count}} products",
+    "selectFeedCompanyFirst": "Select a feed company to add line items.",
+    "feedCompanyRequired": "Select a feed company",
+    "feedTypeRequired": "Feed type is required",
+    "feedProductRequired": "Choose a catalogue product",
+    "bagsRequired": "Enter bag quantity",
     "orderDate": "Order Date",
     "addLineItem": "Add Line Item",
     "removeLineItem": "Remove",
@@ -1029,8 +1049,9 @@
       "netRevenue": "Net Revenue"
     },
     "saleDetail": {
+      "screenTitle": "Sale",
       "customer": "Customer",
-      "slaughterInfo": "Slaughter Information",
+      "slaughterInfo": "Processing Information",
       "counts": "Processing Counts",
       "wholeChickenGradeA": "Whole Chicken (Grade A)",
       "wholeChickenItems": "Whole Chicken Weights",
@@ -1069,6 +1090,7 @@
       "processingCost": "Processing Cost"
     },
     "sourceDetail": {
+      "screenTitle": "Source",
       "sourceFrom": "Source From",
       "purchaseBreakdown": "Purchase Breakdown",
       "ratePerChick": "Rate / Chick",
@@ -1101,6 +1123,7 @@
       "viewRelatedExpense": "View Related Expense"
     },
     "expenseDetail": {
+      "screenTitle": "Expense",
       "documents": "Documents",
       "linkedEntity": "Linked To",
       "createdAt": "Created",
@@ -1158,7 +1181,20 @@
       "selectEntry": "Select an entry to view details",
       "selectHouse": "Select a house…",
       "createdLabel": "Created",
-      "updatedLabel": "Last Updated"
+      "updatedLabel": "Last Updated",
+      "dailyMetrics": "Daily Metrics",
+      "weightMetrics": "Weight Sample",
+      "environmentMetrics": "Environment Readings",
+      "photo": "Photo",
+      "audit": "Audit",
+      "deathsShort": "Deaths",
+      "feedShort": "Feed",
+      "waterShort": "Water",
+      "weightShort": "Avg Weight",
+      "temperatureShort": "Temp",
+      "humidityShort": "Humidity",
+      "tdsShort": "TDS",
+      "phShort": "pH"
     }
   },
   "feed": {

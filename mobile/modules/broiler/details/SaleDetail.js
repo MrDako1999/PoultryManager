@@ -5,11 +5,12 @@ import {
 import { useTranslation } from 'react-i18next';
 import { router } from 'expo-router';
 import {
-  Receipt, Pencil, Trash2, ChevronRight, ChevronLeft, ChevronDown,
-  TrendingUp, FileText, Building2, Bird, Wallet,
+  Receipt, Pencil, Trash2, ChevronRight, ChevronLeft, ChevronDown, ChevronUp,
+  TrendingUp, FileText, Building2,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import HeroSheetScreen, { useHeroSheetTokens } from '@/components/HeroSheetScreen';
+import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
+import DetailCompactScreen from '@/components/DetailCompactScreen';
 import SheetSection from '@/components/SheetSection';
 import FileViewer from '@/components/FileViewer';
 import DocCard from '@/components/DocCard';
@@ -43,18 +44,6 @@ const fmtDate = (d) => {
   });
 };
 
-// Compact "12.4K" formatter for hero pulse pills so they don't blow out.
-// Threshold is intentionally low (>=1000) — currency-prefixed values like
-// "AED 6,816.75" overflow the flex:1 pill on a 4.7" iPhone, so we render
-// "AED 6.8K" instead and reserve the full precision for the totals card.
-const fmtCompact = (val) => {
-  const n = Number(val || 0);
-  const abs = Math.abs(n);
-  if (abs >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (abs >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return fmt(n);
-};
-
 export default function SaleDetail({ saleId, onEdit }) {
   const { t } = useTranslation();
   const isRTL = useIsRTL();
@@ -72,16 +61,9 @@ export default function SaleDetail({ saleId, onEdit }) {
 
   if (saleLoading || !sale) {
     return (
-      <HeroSheetScreen
-        title={t('common.loading', 'Loading...')}
-        heroExtra={(
-          <View style={heroStyles.iconTile}>
-            <Receipt size={26} color="#ffffff" strokeWidth={2.2} />
-          </View>
-        )}
-      >
+      <DetailCompactScreen title={t('common.loading', 'Loading...')} headerRight={null}>
         <SkeletonDetailPage />
-      </HeroSheetScreen>
+      </DetailCompactScreen>
     );
   }
 
@@ -136,13 +118,7 @@ export default function SaleDetail({ saleId, onEdit }) {
   const canEdit = can('saleOrder:update');
   const canDelete = can('saleOrder:delete');
 
-  const heroTitle = sale.customer?.companyName
-    || sale.saleNumber
-    || t('batches.saleDetail.customer', 'Customer');
-  const heroSubtitleParts = [];
-  if (sale.saleNumber && sale.customer?.companyName) heroSubtitleParts.push(sale.saleNumber);
-  heroSubtitleParts.push(fmtDate(sale.saleDate));
-  const heroSubtitle = heroSubtitleParts.join(' · ');
+  const compactTitle = t('batches.saleDetail.screenTitle', 'Sale');
 
   const handleDelete = async () => {
     if (deleting) return;
@@ -184,10 +160,6 @@ export default function SaleDetail({ saleId, onEdit }) {
     setViewerDoc(invoiceMedia);
   };
 
-  // Hero header-right: view-invoice + edit + delete translucent circles
-  // (per DL §7). The view-invoice quick-action sits as the leading icon so
-  // it stays reachable in the compact pinned toolbar after the hero scrolls
-  // away (scrollableHero mode).
   const headerRight = (invoiceMedia || canEdit || canDelete) ? (
     <View style={[heroStyles.actionsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
       {invoiceMedia ? (
@@ -229,62 +201,9 @@ export default function SaleDetail({ saleId, onEdit }) {
     </View>
   ) : null;
 
-  // Hero icon tile — sub-page identity per DL §7.b.
-  const heroExtra = (
-    <View style={heroStyles.iconTile}>
-      <Receipt size={26} color="#ffffff" strokeWidth={2.2} />
-    </View>
-  );
-
-  // Hero "data pulse" — status pills + 3 KPI pills (mirrors §7.d).
-  const heroBelow = (
-    <View style={{ gap: 14 }}>
-      <View style={[heroStyles.pillsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-        <HeroBadge label={t(`batches.saleInvoiceTypes.${sale.invoiceType}`, sale.invoiceType)} />
-        <HeroBadge label={t(`batches.saleMethods.${sale.saleMethod}`, sale.saleMethod)} />
-      </View>
-      <View style={[heroStyles.pulseRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-        <PulsePill
-          icon={Receipt}
-          label={t('batches.saleDetail.grandTotalShort', 'Total')}
-          value={`${currency} ${fmtCompact(grandTotal)}`}
-        />
-        {processingCost > 0 ? (
-          <PulsePill
-            icon={TrendingUp}
-            label={t('batches.saleDetail.netRevenueShort', 'Net')}
-            value={`${currency} ${fmtCompact(netRevenue)}`}
-          />
-        ) : (
-          <PulsePill
-            icon={Bird}
-            label={isLive
-              ? t('batches.saleDetail.birdsShort', 'Birds')
-              : t('batches.saleDetail.chickensShort', 'Chickens')}
-            value={fmtInt(chickenCount)}
-          />
-        )}
-        {chickenCount > 0 && processingCost > 0 ? (
-          <PulsePill
-            icon={Wallet}
-            label={t('batches.saleDetail.revenuePerChickenShort', '/ Bird')}
-            value={`${currency} ${fmt(profitPerChicken)}`}
-          />
-        ) : null}
-      </View>
-    </View>
-  );
-
   return (
     <>
-      <HeroSheetScreen
-        scrollableHero
-        title={heroTitle}
-        subtitle={heroSubtitle}
-        heroExtra={heroExtra}
-        headerRight={headerRight}
-        heroBelow={heroBelow}
-      >
+      <DetailCompactScreen title={compactTitle} headerRight={headerRight}>
         {/* ─── BILL TO / SLAUGHTERHOUSE ─── */}
         {(sale.customer?.companyName || hasDistinctSlaughterhouse) ? (
           <SheetSection
@@ -321,7 +240,7 @@ export default function SaleDetail({ saleId, onEdit }) {
 
         {/* ─── SLAUGHTER DETAILS ─── */}
         {isSlaughtered && (sl.date || sl.invoiceRef || processingCost > 0) ? (
-          <SheetSection title={t('batches.saleDetail.slaughterInfo', 'Slaughter Information')}>
+          <SheetSection title={t('batches.saleDetail.slaughterInfo', 'Processing Information')}>
             <View style={{ gap: 10 }}>
               {sl.date ? (
                 <KvRow
@@ -368,12 +287,21 @@ export default function SaleDetail({ saleId, onEdit }) {
                   { flexDirection: isRTL ? 'row-reverse' : 'row' },
                 ]}
               >
-                <ChevronDown
-                  size={16}
-                  color={tokens.mutedColor}
-                  strokeWidth={2.2}
-                  style={{ transform: [{ rotate: countsOpen ? '0deg' : (isRTL ? '90deg' : '-90deg') }] }}
-                />
+                <View style={countsStyles.chevronSlot}>
+                  {countsOpen ? (
+                    <ChevronDown
+                      size={18}
+                      color={tokens.textColor}
+                      strokeWidth={2.4}
+                    />
+                  ) : (
+                    <ChevronUp
+                      size={18}
+                      color={tokens.textColor}
+                      strokeWidth={2.4}
+                    />
+                  )}
+                </View>
                 <Text
                   style={{
                     flex: 1,
@@ -784,7 +712,7 @@ export default function SaleDetail({ saleId, onEdit }) {
             ) : null}
           </View>
         ) : null}
-      </HeroSheetScreen>
+      </DetailCompactScreen>
 
       {/* Doc preview */}
       <FileViewer
@@ -812,34 +740,6 @@ export default function SaleDetail({ saleId, onEdit }) {
 }
 
 /* ───────────────────── Sub-components ───────────────────── */
-
-// Translucent white pill in the hero (DL §7 hero toolbar / status pills).
-function HeroBadge({ label }) {
-  return (
-    <View style={heroStyles.badge}>
-      <Text style={heroStyles.badgeText} numberOfLines={1}>
-        {label}
-      </Text>
-    </View>
-  );
-}
-
-// Translucent KPI pill in the hero "data pulse" strip (DL §7.d).
-function PulsePill({ icon: Icon, label, value }) {
-  return (
-    <View style={heroStyles.pulsePill}>
-      <View style={heroStyles.pulseTopRow}>
-        {Icon ? <Icon size={13} color="#ffffff" strokeWidth={2.4} /> : null}
-        <Text style={heroStyles.pulseValue} numberOfLines={1}>
-          {value}
-        </Text>
-      </View>
-      <Text style={heroStyles.pulseLabel} numberOfLines={1}>
-        {label}
-      </Text>
-    </View>
-  );
-}
 
 // Tappable party row (Bill To / Slaughterhouse). Layout in StyleSheet per
 // DL §9 — inner View carries flexDirection, never the Pressable.
@@ -1155,14 +1055,6 @@ function CtaButton({ variant, icon: Icon, label, onPress, isRTL, tokens }) {
 /* ───────────────────── StyleSheets ───────────────────── */
 
 const heroStyles = StyleSheet.create({
-  iconTile: {
-    width: 56,
-    height: 56,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   actionsRow: {
     alignItems: 'center',
     gap: 8,
@@ -1174,53 +1066,6 @@ const heroStyles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.18)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  pillsRow: {
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  badge: {
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  badgeText: {
-    fontSize: 11,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#ffffff',
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-  },
-  pulseRow: {
-    gap: 8,
-  },
-  pulsePill: {
-    flex: 1,
-    minWidth: 0,
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    borderRadius: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    gap: 2,
-  },
-  pulseTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  pulseValue: {
-    flex: 1,
-    fontSize: 14,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#ffffff',
-    fontVariant: ['tabular-nums'],
-  },
-  pulseLabel: {
-    fontSize: 10.5,
-    fontFamily: 'Poppins-Medium',
-    color: 'rgba(255,255,255,0.78)',
-    letterSpacing: 0.4,
   },
 });
 
@@ -1261,6 +1106,12 @@ const countsStyles = StyleSheet.create({
   toggle: {
     paddingHorizontal: 14,
     paddingVertical: 12,
+  },
+  chevronSlot: {
+    width: 22,
+    height: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   toggleRow: {
     alignItems: 'center',

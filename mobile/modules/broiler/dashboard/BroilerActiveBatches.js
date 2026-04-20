@@ -3,13 +3,14 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { Layers, Skull, Wheat, Calendar, Warehouse, Bird, Home } from 'lucide-react-native';
+import { Layers, Calendar, Bird } from 'lucide-react-native';
 import useLocalQuery from '@/hooks/useLocalQuery';
 import useCapabilities from '@/hooks/useCapabilities';
 import EmptyState from '@/components/ui/EmptyState';
 import BatchSheet from '@/modules/broiler/sheets/BatchSheet';
 import BatchAvatar from '@/modules/broiler/components/BatchAvatar';
 import { getStatusConfig } from '@/modules/broiler/lib/batchStatusConfig';
+import { mortalityToneColor } from '@/modules/broiler/components/BatchKpiCard';
 import { SkeletonDashboardBatchCard } from '@/components/skeletons';
 import SheetSection from '@/components/SheetSection';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
@@ -21,62 +22,11 @@ const IN_PROGRESS_STATUS = getStatusConfig('IN_PROGRESS');
 
 const fmtInt = (val) => Number(val || 0).toLocaleString();
 
-const fmtCompactKg = (val) => {
-  const n = Number(val || 0);
-  if (n >= 1000) return `${(n / 1000).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}t`;
-  return `${fmtInt(n)} kg`;
-};
-
-function mortalityToneColor(pct, tokens) {
-  if (pct >= 5) return tokens.errorColor;
-  if (pct >= 2) return tokens.dark ? '#fbbf24' : '#d97706';
-  return tokens.accentColor;
-}
-
-function StatCell({ icon: Icon, label, value, valueColor, isRTL }) {
-  const { mutedColor, textColor } = useHeroSheetTokens();
-  return (
-    <View style={cardStyles.statCell}>
-      <View style={[cardStyles.statLabelRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-        {Icon && <Icon size={11} color={mutedColor} strokeWidth={2.4} />}
-        <Text
-          style={{
-            fontSize: 10,
-            fontFamily: 'Poppins-SemiBold',
-            color: mutedColor,
-            letterSpacing: 0.8,
-            textTransform: 'uppercase',
-          }}
-          numberOfLines={1}
-        >
-          {label}
-        </Text>
-      </View>
-      <Text
-        style={{
-          fontSize: 13,
-          fontFamily: 'Poppins-SemiBold',
-          color: valueColor || textColor,
-          textAlign: isRTL ? 'right' : 'left',
-        }}
-        numberOfLines={1}
-      >
-        {value}
-      </Text>
-    </View>
-  );
-}
-
-function StatDivider() {
-  const { borderColor } = useHeroSheetTokens();
-  return <View style={[cardStyles.statDivider, { backgroundColor: borderColor }]} />;
-}
-
 export default function BroilerActiveBatches() {
   const { t } = useTranslation();
   const tokens = useHeroSheetTokens();
   const {
-    mutedColor, textColor, accentColor, borderColor, dark,
+    mutedColor, textColor, accentColor, dark,
     elevatedCardBg, elevatedCardBorder, elevatedCardPressedBg,
   } = tokens;
   const isRTL = useIsRTL();
@@ -95,14 +45,12 @@ export default function BroilerActiveBatches() {
   const batchCards = useMemo(() => {
     const activeBatchIds = new Set(activeBatches.map((b) => b._id));
     const deathsByBatch = {};
-    const feedByBatch = {};
 
     dailyLogs.forEach((log) => {
       if (log.deletedAt || log.logType !== 'DAILY') return;
       const batchId = typeof log.batch === 'object' ? log.batch?._id : log.batch;
       if (!activeBatchIds.has(batchId)) return;
       if (log.deaths) deathsByBatch[batchId] = (deathsByBatch[batchId] || 0) + log.deaths;
-      if (log.feedKg) feedByBatch[batchId] = (feedByBatch[batchId] || 0) + log.feedKg;
     });
 
     return activeBatches
@@ -111,28 +59,24 @@ export default function BroilerActiveBatches() {
         const deaths = deathsByBatch[b._id] || 0;
         const remaining = Math.max(0, initial - deaths);
         const mortalityPct = initial > 0 ? (deaths / initial) * 100 : 0;
-        const feed = feedByBatch[b._id] || 0;
         const dayCount = b.startDate
           ? Math.max(0, Math.floor((Date.now() - new Date(b.startDate)) / 86400000))
           : 0;
         const cycleProgressPct = Math.min(100, (dayCount / CYCLE_TARGET_DAYS) * 100);
-        const houseCount = (b.houses || []).length;
         const farm = b.farm;
         const avatarLetter = (farm?.nickname || farm?.farmName || b.batchName || '?')[0].toUpperCase();
         const batchNum = b.sequenceNumber ?? '';
         return {
           _id: b._id,
           batchName: b.batchName,
-          farmName: farm?.farmName || farm?.nickname || '',
           avatarLetter,
           batchNum,
           dayCount,
           cycleProgressPct,
           initial,
           remaining,
+          deaths,
           mortalityPct,
-          feed,
-          houseCount,
         };
       })
       .sort((a, b) => b.mortalityPct - a.mortalityPct);
@@ -175,19 +119,33 @@ export default function BroilerActiveBatches() {
         padded={false}
       >
         <View style={cardStyles.list}>
-          {batchCards.map((b) => (
-            <BatchCard
-              key={b._id}
-              card={b}
-              isRTL={isRTL}
-              tokens={{
-                mutedColor, textColor, accentColor, borderColor, dark,
-                elevatedCardBg, elevatedCardBorder, elevatedCardPressedBg,
-              }}
-              t={t}
-              onPress={() => router.push(`/(app)/batch/${b._id}`)}
-              mortalityColor={mortalityToneColor(b.mortalityPct, tokens)}
-            />
+          {batchCards.map((b, idx) => (
+            <View key={b._id}>
+              {/* 2pt rounded divider in the gap between cards. Uses the
+                  `elevatedCardBorder` token (the strongest border tone in
+                  the palette — same one the card outlines use, sized up
+                  here so it reads clearly against the white section bg).
+                  Skipped above the first card so the section's top edge
+                  stays clean. */}
+              {idx > 0 ? (
+                <View
+                  style={[
+                    cardStyles.cardSeparator,
+                    { backgroundColor: elevatedCardBorder },
+                  ]}
+                />
+              ) : null}
+              <BatchCard
+                card={b}
+                isRTL={isRTL}
+                tokens={{
+                  mutedColor, textColor, accentColor, dark,
+                  elevatedCardBg, elevatedCardBorder, elevatedCardPressedBg,
+                }}
+                t={t}
+                onPress={() => router.push(`/(app)/batch/${b._id}`)}
+              />
+            </View>
           ))}
         </View>
       </SheetSection>
@@ -207,8 +165,15 @@ export default function BroilerActiveBatches() {
  * visual deltas only (background, border colour, scale, opacity). This is
  * the §9 "card press recipe" + the NativeWind trap rule from the design doc.
  */
-function BatchCard({ card: b, isRTL, tokens, t, onPress, mortalityColor }) {
-  const { mutedColor, textColor, accentColor, borderColor, dark, elevatedCardBg, elevatedCardBorder, elevatedCardPressedBg } = tokens;
+function BatchCard({ card: b, isRTL, tokens, t, onPress }) {
+  const {
+    mutedColor, textColor, accentColor, dark,
+    elevatedCardBg, elevatedCardBorder, elevatedCardPressedBg,
+  } = tokens;
+  // Mortality tone (green / amber / red as deaths climb) — pulled from
+  // the shared helper so the dashboard cards colour mortality the exact
+  // same way the BatchesList rows do.
+  const mortalityColor = mortalityToneColor(b.mortalityPct, tokens);
 
   return (
     <Pressable
@@ -258,37 +223,47 @@ function BatchCard({ card: b, isRTL, tokens, t, onPress, mortalityColor }) {
           >
             {b.batchName}
           </Text>
-          <View
-            style={[
-              cardStyles.metaRow,
-              { flexDirection: isRTL ? 'row-reverse' : 'row' },
-            ]}
-          >
-            {!!b.farmName && (
+          {/* Health summary — mirrors the BatchesList row: bird icon +
+              remaining count + (-deaths) when there have been losses,
+              separator dot, then mortality %. The deaths and the
+              percentage both pick up `mortalityColor` so the
+              "needs-attention" signal carries through visually. */}
+          {b.initial > 0 ? (
+            <View
+              style={[
+                cardStyles.metaRow,
+                { flexDirection: isRTL ? 'row-reverse' : 'row' },
+              ]}
+            >
               <View style={[cardStyles.metaPiece, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                <Warehouse size={11} color={mutedColor} strokeWidth={2.2} />
-                <Text
-                  style={{ fontSize: 12, fontFamily: 'Poppins-Regular', color: mutedColor }}
-                  numberOfLines={1}
-                >
-                  {b.farmName}
+                <Bird size={11} color={mutedColor} strokeWidth={2.2} />
+                <Text style={{ fontSize: 12, fontFamily: 'Poppins-Regular', color: mutedColor }}>
+                  {fmtInt(b.remaining)}
                 </Text>
-              </View>
-            )}
-            {b.initial > 0 && (
-              <>
-                {!!b.farmName && (
-                  <Text style={{ fontSize: 12, color: mutedColor }}>·</Text>
-                )}
-                <View style={[cardStyles.metaPiece, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                  <Bird size={11} color={mutedColor} strokeWidth={2.2} />
-                  <Text style={{ fontSize: 12, fontFamily: 'Poppins-Regular', color: mutedColor }}>
-                    {fmtInt(b.remaining)}
+                {b.deaths > 0 ? (
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontFamily: 'Poppins-SemiBold',
+                      color: mortalityColor,
+                    }}
+                  >
+                    {`(-${fmtInt(b.deaths)})`}
                   </Text>
-                </View>
-              </>
-            )}
-          </View>
+                ) : null}
+              </View>
+              <Text style={{ fontSize: 12, color: mutedColor }}>·</Text>
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontFamily: 'Poppins-SemiBold',
+                  color: mortalityColor,
+                }}
+              >
+                {`${b.mortalityPct.toFixed(2)}%`}
+              </Text>
+            </View>
+          ) : null}
         </View>
       </View>
 
@@ -305,10 +280,7 @@ function BatchCard({ card: b, isRTL, tokens, t, onPress, mortalityColor }) {
               textTransform: 'uppercase',
             }}
           >
-            {t('dashboard.dayOfTarget', 'Day {{day}} of {{target}}', {
-              day: b.dayCount,
-              target: CYCLE_TARGET_DAYS,
-            })}
+            {t('dashboard.dayN', 'Day {{n}}', { n: b.dayCount })}
           </Text>
         </View>
         <Text
@@ -335,39 +307,6 @@ function BatchCard({ card: b, isRTL, tokens, t, onPress, mortalityColor }) {
           ]}
         />
       </View>
-
-      {/* Stats row */}
-      <View
-        style={[
-          cardStyles.statsRow,
-          {
-            flexDirection: isRTL ? 'row-reverse' : 'row',
-            borderTopColor: borderColor,
-          },
-        ]}
-      >
-        <StatCell
-          icon={Skull}
-          label={t('dashboard.mortality', 'Mortality')}
-          value={`${b.mortalityPct.toFixed(2)}%`}
-          valueColor={mortalityColor}
-          isRTL={isRTL}
-        />
-        <StatDivider />
-        <StatCell
-          icon={Wheat}
-          label={t('dashboard.feedConsumed', 'Feed')}
-          value={fmtCompactKg(b.feed)}
-          isRTL={isRTL}
-        />
-        <StatDivider />
-        <StatCell
-          icon={Home}
-          label={t('dashboard.totalHouses', 'Houses')}
-          value={fmtInt(b.houseCount)}
-          isRTL={isRTL}
-        />
-      </View>
     </Pressable>
   );
 }
@@ -375,7 +314,15 @@ function BatchCard({ card: b, isRTL, tokens, t, onPress, mortalityColor }) {
 const cardStyles = StyleSheet.create({
   list: {
     padding: 8,
-    gap: 14,
+    // No `gap` — vertical breathing room between cards is owned by
+    // `cardSeparator`'s `marginVertical` so the divider can sit
+    // visually centred in the inter-card space.
+  },
+  cardSeparator: {
+    height: 2,
+    borderRadius: 1,
+    marginVertical: 12,
+    marginHorizontal: 4,
   },
   card: {
     borderRadius: 16,
@@ -386,7 +333,8 @@ const cardStyles = StyleSheet.create({
   headerRow: {
     alignItems: 'flex-start',
     gap: 12,
-    marginBottom: 14,
+    // Keep DAY row visually tied to the header; 14 felt like a full extra line of air.
+    marginBottom: 8,
   },
   headerTextCol: {
     flex: 1,
@@ -415,27 +363,11 @@ const cardStyles = StyleSheet.create({
     height: 5,
     borderRadius: 3,
     overflow: 'hidden',
-    marginBottom: 14,
+    // The progress bar is now the last element in the card; the card's
+    // own 14pt padding handles the trailing space, no extra margin needed.
   },
   progressBarFill: {
     height: '100%',
     borderRadius: 3,
-  },
-  statsRow: {
-    paddingTop: 12,
-    borderTopWidth: 1,
-  },
-  statCell: {
-    flex: 1,
-    alignItems: 'flex-start',
-  },
-  statLabelRow: {
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: 4,
-  },
-  statDivider: {
-    width: 1,
-    marginHorizontal: 8,
   },
 });

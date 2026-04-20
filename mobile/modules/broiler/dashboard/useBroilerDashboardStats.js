@@ -45,6 +45,7 @@ export default function useBroilerDashboardStats(scope = 'active') {
   const flockStats = useMemo(() => {
     let initial = 0;
     let deaths = 0;
+    let sold = 0;
     const houseIds = new Set();
 
     scopedBatches.forEach((b) => {
@@ -61,19 +62,38 @@ export default function useBroilerDashboardStats(scope = 'active') {
       if (scopedBatchIds.has(batchId)) deaths += log.deaths || 0;
     });
 
-    const liveBirds = Math.max(0, initial - deaths);
+    // Chickens that have already left the farm via sale orders. Mirrors
+    // the canonical chicken-count formula from
+    // backend/services/statementService.js: chickensSent (slaughtered
+    // sales) + birdCount (live sales). Together these account for every
+    // bird on a sale invoice regardless of sale method, so once we
+    // subtract them from `initial` (along with deaths) we get the true
+    // "still being raised on the farm" count.
+    saleOrders.forEach((s) => {
+      if (s.deletedAt) return;
+      const batchId = typeof s.batch === 'object' ? s.batch?._id : s.batch;
+      if (!scopedBatchIds.has(batchId)) return;
+      sold += (s.counts?.chickensSent || 0) + (s.live?.birdCount || 0);
+    });
+
+    const accountedFor = deaths + sold;
+    const liveBirds = Math.max(0, initial - accountedFor);
     const mortalityPct = initial > 0 ? (deaths / initial) * 100 : 0;
+    const soldPct = initial > 0 ? (sold / initial) * 100 : 0;
     const survivalPct = initial > 0 ? (liveBirds / initial) * 100 : 0;
 
     return {
       initial,
       liveBirds,
+      sold,
+      deaths,
       mortalityPct,
+      soldPct,
       survivalPct,
       cycleCount: scopedBatches.length,
       houseCount: houseIds.size,
     };
-  }, [scopedBatches, scopedBatchIds, dailyLogs]);
+  }, [scopedBatches, scopedBatchIds, dailyLogs, saleOrders]);
 
   const financials = useMemo(() => {
     const matchSale = (s) => {

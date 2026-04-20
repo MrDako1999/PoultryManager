@@ -14,7 +14,8 @@ import { useIsRTL } from '@/stores/localeStore';
  * @param {string} props.value
  * @param {(v: string) => void} props.onChange
  * @param {number} [props.columns]
- * @param {boolean} [props.compact] - 40pt row, icon left of label
+ * @param {boolean} [props.compact] - shorter row, icon left of label
+ * @param {number} [props.compactLabelLines=1] - max lines for label in compact mode (use 2 to avoid clipping)
  * @param {boolean} [props.disabled]
  */
 export default function EnumButtonSelect({
@@ -23,6 +24,7 @@ export default function EnumButtonSelect({
   onChange,
   columns,
   compact,
+  compactLabelLines = 1,
   disabled,
 }) {
   const { accentColor, mutedColor, textColor, inputBg, inputBorderIdle, dark } = useHeroSheetTokens();
@@ -52,8 +54,11 @@ export default function EnumButtonSelect({
     >
       {options.map(({ value: optVal, label, icon: Icon }) => {
         const selected = value === optVal;
-        const baseTileStyle = compact ? styles.tileCompact : styles.tileTall;
+        const baseTileStyle = compact
+          ? (compactLabelLines > 1 ? styles.tileCompactMultiline : styles.tileCompact)
+          : styles.tileTall;
         const iconColor = selected ? accentColor : mutedColor;
+        const labelLines = compact ? compactLabelLines : 2;
         return (
           <View
             key={optVal}
@@ -69,6 +74,7 @@ export default function EnumButtonSelect({
               style={[
                 baseTileStyle,
                 {
+                  width: '100%',
                   flexDirection: compact
                     ? (isRTL ? 'row-reverse' : 'row')
                     : 'column',
@@ -82,19 +88,21 @@ export default function EnumButtonSelect({
             >
               {Icon ? (
                 <Icon
-                  size={compact ? 14 : 20}
+                  size={compact ? 15 : 20}
                   color={iconColor}
                   strokeWidth={selected ? 2.4 : 2}
                 />
               ) : null}
               <Text
                 style={{
-                  fontSize: compact ? 12 : 12.5,
+                  flex: compact ? 1 : undefined,
+                  minWidth: 0,
+                  fontSize: compact ? 12.5 : 12.5,
                   fontFamily: selected ? 'Poppins-SemiBold' : 'Poppins-Medium',
                   color: selected ? accentColor : textColor,
-                  textAlign: 'center',
+                  textAlign: compact ? (isRTL ? 'right' : 'left') : 'center',
                 }}
-                numberOfLines={compact ? 1 : 2}
+                numberOfLines={labelLines}
               >
                 {label}
               </Text>
@@ -111,7 +119,18 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   tileCompact: {
-    height: 42,
+    minHeight: 44,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderWidth: 1.5,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  tileCompactMultiline: {
+    minHeight: 52,
+    paddingVertical: 10,
     paddingHorizontal: 10,
     borderWidth: 1.5,
     borderRadius: 12,

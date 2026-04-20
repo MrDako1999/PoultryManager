@@ -18,6 +18,7 @@ import { SkeletonFeedOrdersTab } from '@/components/skeletons';
 import { deltaSync } from '@/lib/syncEngine';
 import FilterChips from '@/components/views/FilterChips';
 import FeedMixHeroCard from '@/components/views/FeedMixHeroCard';
+import useSettings from '@/hooks/useSettings';
 
 const NUMERIC_LOCALE = 'en-US';
 
@@ -31,6 +32,19 @@ const fmtInt = (val) => Number(val || 0).toLocaleString(NUMERIC_LOCALE);
 
 const FEED_TYPE_ORDER = { STARTER: 0, GROWER: 1, FINISHER: 2, OTHER: 3 };
 const FEED_TYPES_DISPLAYED = ['STARTER', 'GROWER', 'FINISHER'];
+
+// Per-item cost INCLUDING VAT. Mirrors the helper in FeedMixHeroCard so
+// the per-feed-type group totals shown in the list match what the hero
+// card aggregates above. Prefers the persisted `lineTotal`; falls back
+// to subtotal × (1 + vatRate) for legacy items.
+const itemCostWithVat = (item, vatRate) => {
+  if (item?.lineTotal) return item.lineTotal;
+  if (item?.subtotal != null && item?.vatAmount != null) {
+    return (item.subtotal || 0) + (item.vatAmount || 0);
+  }
+  const sub = (item?.bags || 0) * (item?.pricePerBag || 0);
+  return sub * (1 + (vatRate || 0) / 100);
+};
 
 export default function FeedOrdersListView({
   feedOrders = [],
@@ -67,6 +81,8 @@ export default function FeedOrdersListView({
     accentColor, dark, mutedColor, screenBg, borderColor,
     inputBg, inputBorderIdle,
   } = tokens;
+  const accounting = useSettings('accounting');
+  const vatRate = accounting?.vatRate ?? 5;
 
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -106,11 +122,11 @@ export default function FeedOrdersListView({
         if (!groups[type]) groups[type] = { totalKg: 0, totalBags: 0, totalCost: 0 };
         groups[type].totalKg += itemKg;
         groups[type].totalBags += bags;
-        groups[type].totalCost += bags * (item.pricePerBag || 0);
+        groups[type].totalCost += itemCostWithVat(item, vatRate);
       });
     });
     return groups;
-  }, [ordersAfterBatch, hideTypeChips]);
+  }, [ordersAfterBatch, hideTypeChips, vatRate]);
 
   const otherFeedTotalKg = useMemo(() => Object.entries(feedByType)
     .filter(([type]) => !FEED_TYPES_DISPLAYED.includes(type))
@@ -162,7 +178,7 @@ export default function FeedOrdersListView({
       groups[type].items.push(item);
       groups[type].totalKg += itemKg;
       groups[type].totalBags += bags;
-      groups[type].totalCost += bags * (item.pricePerBag || 0);
+      groups[type].totalCost += itemCostWithVat(item, vatRate);
     });
     Object.values(groups).forEach((g) => {
       g.items.sort((a, b) => new Date(b.orderDate || 0) - new Date(a.orderDate || 0));
@@ -170,7 +186,7 @@ export default function FeedOrdersListView({
     return Object.entries(groups).sort(
       ([a], [b]) => (FEED_TYPE_ORDER[a] ?? 99) - (FEED_TYPE_ORDER[b] ?? 99)
     );
-  }, [flatItems]);
+  }, [flatItems, vatRate]);
 
   const filterOptions = useMemo(() => {
     const options = [{ value: 'ALL', label: t('batches.filterAll', 'All') }];

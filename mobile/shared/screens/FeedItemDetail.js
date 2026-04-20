@@ -5,11 +5,12 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useLocalSearchParams, router } from 'expo-router';
 import {
-  Receipt, Pencil, Trash2, ChevronRight, ChevronLeft,
-  Building2, Wheat, Tag,
+  Pencil, Trash2, ChevronRight, ChevronLeft,
+  Building2,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import HeroSheetScreen, { useHeroSheetTokens } from '@/components/HeroSheetScreen';
+import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
+import DetailCompactScreen from '@/components/DetailCompactScreen';
 import SheetSection from '@/components/SheetSection';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useToast } from '@/components/ui/Toast';
@@ -20,7 +21,6 @@ import useCapabilities from '@/hooks/useCapabilities';
 import { useIsRTL } from '@/stores/localeStore';
 import { SkeletonDetailPage } from '@/components/skeletons';
 import FeedItemSheet from '@/shared/sheets/FeedItemSheet';
-import { FEED_TYPE_ICONS } from '@/lib/constants';
 
 // Western digits everywhere (DL §12.4) — never i18n.language for numerics.
 const NUMERIC_LOCALE = 'en-US';
@@ -39,16 +39,10 @@ const fmtDate = (d) => {
   });
 };
 
-// Compact "12.4K" formatter for hero pulse pills so currency-prefixed
-// values don't blow out at narrow widths.
-const fmtCompact = (val) => {
-  const n = Number(val || 0);
-  const abs = Math.abs(n);
-  if (abs >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (abs >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return fmt(n);
-};
-
+/**
+ * Feed catalogue item detail — full-page scroll under DetailCompactScreen
+ * (no HeroSheet hero / KPI pills; pricing and specs stay in sections below).
+ */
 export default function FeedItemScreen() {
   const { id } = useLocalSearchParams();
   const { t } = useTranslation();
@@ -69,20 +63,12 @@ export default function FeedItemScreen() {
 
   if (itemLoading || !item) {
     return (
-      <HeroSheetScreen
-        title={t('common.loading', 'Loading...')}
-        heroExtra={(
-          <View style={heroStyles.iconTile}>
-            <Wheat size={26} color="#ffffff" strokeWidth={2.2} />
-          </View>
-        )}
-      >
+      <DetailCompactScreen title={t('common.loading', 'Loading...')} headerRight={null}>
         <SkeletonDetailPage />
-      </HeroSheetScreen>
+      </DetailCompactScreen>
     );
   }
 
-  const FeedTypeIcon = FEED_TYPE_ICONS[item.feedType] || Wheat;
   const isInactive = item.isActive === false;
 
   // Money-side derivation. The catalogue stores `pricePerQty` (subtotal),
@@ -109,11 +95,7 @@ export default function FeedItemScreen() {
   const canEdit = can('feedItem:update');
   const canDelete = can('feedItem:delete');
 
-  const heroTitle = item.feedDescription || t('feed.unknownCompany', 'Feed Item');
-  const heroSubtitleParts = [];
-  if (companyName) heroSubtitleParts.push(companyName);
-  if (sizeStr) heroSubtitleParts.push(sizeStr);
-  const heroSubtitle = heroSubtitleParts.join(' · ');
+  const compactTitle = item.feedDescription || t('feed.unknownCompany', 'Feed Item');
 
   const openEdit = () => {
     Haptics.selectionAsync().catch(() => {});
@@ -173,49 +155,9 @@ export default function FeedItemScreen() {
     </View>
   ) : null;
 
-  // Hero icon tile — feed-type-specific glyph for at-a-glance recognition.
-  const heroExtra = (
-    <View style={heroStyles.iconTile}>
-      <FeedTypeIcon size={26} color="#ffffff" strokeWidth={2.2} />
-    </View>
-  );
-
-  // Hero "data pulse" — feed-type / status pills + 2 KPI pills.
-  const heroBelow = (
-    <View style={{ gap: 14 }}>
-      <View style={[heroStyles.pillsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-        <HeroBadge label={t(`feed.feedTypes.${item.feedType}`, item.feedType || '')} />
-        <HeroBadge
-          label={isInactive
-            ? t('feed.inactiveLabel', 'Inactive')
-            : t('feed.activeLabel', 'Active')}
-        />
-      </View>
-      <View style={[heroStyles.pulseRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-        <PulsePill
-          icon={Tag}
-          label={t('feed.feedItemDetail.priceShort', 'Price')}
-          value={`${currency} ${fmtCompact(pricePerUnit)}`}
-        />
-        <PulsePill
-          icon={Receipt}
-          label={t('feed.feedItemDetail.totalShort', 'Total')}
-          value={`${currency} ${fmtCompact(totalPerUnit)}`}
-        />
-      </View>
-    </View>
-  );
-
   return (
     <>
-      <HeroSheetScreen
-        scrollableHero
-        title={heroTitle}
-        subtitle={heroSubtitle}
-        heroExtra={heroExtra}
-        headerRight={headerRight}
-        heroBelow={heroBelow}
-      >
+      <DetailCompactScreen title={compactTitle} headerRight={headerRight}>
         {/* ─── FEED COMPANY ─── */}
         {companyName ? (
           <SheetSection
@@ -331,7 +273,7 @@ export default function FeedItemScreen() {
             </View>
           </View>
         ) : null}
-      </HeroSheetScreen>
+      </DetailCompactScreen>
 
       <FeedItemSheet
         open={editOpen}
@@ -359,32 +301,6 @@ export default function FeedItemScreen() {
 }
 
 /* ───────────────────── Sub-components ───────────────────── */
-
-function HeroBadge({ label }) {
-  return (
-    <View style={heroStyles.badge}>
-      <Text style={heroStyles.badgeText} numberOfLines={1}>
-        {label}
-      </Text>
-    </View>
-  );
-}
-
-function PulsePill({ icon: Icon, label, value }) {
-  return (
-    <View style={heroStyles.pulsePill}>
-      <View style={heroStyles.pulseTopRow}>
-        {Icon ? <Icon size={13} color="#ffffff" strokeWidth={2.4} /> : null}
-        <Text style={heroStyles.pulseValue} numberOfLines={1}>
-          {value}
-        </Text>
-      </View>
-      <Text style={heroStyles.pulseLabel} numberOfLines={1}>
-        {label}
-      </Text>
-    </View>
-  );
-}
 
 function PartyRow({ tokens, isRTL, name, caption, onPress }) {
   const {
@@ -615,14 +531,6 @@ function CtaButton({ variant, icon: Icon, label, onPress, isRTL, tokens }) {
 /* ───────────────────── StyleSheets ───────────────────── */
 
 const heroStyles = StyleSheet.create({
-  iconTile: {
-    width: 56,
-    height: 56,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   actionsRow: {
     alignItems: 'center',
     gap: 8,
@@ -634,53 +542,6 @@ const heroStyles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.18)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  pillsRow: {
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  badge: {
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  badgeText: {
-    fontSize: 11,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#ffffff',
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-  },
-  pulseRow: {
-    gap: 8,
-  },
-  pulsePill: {
-    flex: 1,
-    minWidth: 0,
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    borderRadius: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    gap: 2,
-  },
-  pulseTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  pulseValue: {
-    flex: 1,
-    fontSize: 14,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#ffffff',
-    fontVariant: ['tabular-nums'],
-  },
-  pulseLabel: {
-    fontSize: 10.5,
-    fontFamily: 'Poppins-Medium',
-    color: 'rgba(255,255,255,0.78)',
-    letterSpacing: 0.4,
   },
 });
 

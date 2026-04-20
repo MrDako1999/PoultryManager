@@ -60,12 +60,21 @@ export default function BatchAvatar({
       </View>
       {status && (
         <View
-          className={`absolute items-center justify-center rounded-full ${status.bg}`}
           style={{
+            position: 'absolute',
             width: pinSize,
             height: pinSize,
             bottom: -3,
             right: -3,
+            borderRadius: pinSize / 2,
+            alignItems: 'center',
+            justifyContent: 'center',
+            // Solid, fully opaque background so the pin reads as a
+            // proper filled circle on every surface. NativeWind
+            // `dark:bg-*-900/40` was 40% alpha and let the avatar
+            // tile bleed through, which is what made the pin look
+            // hollow / transparent in dark mode.
+            backgroundColor: dark ? status.pinBgDark : status.pinBgLight,
             borderWidth: 2,
             borderColor: cardColor,
           }}

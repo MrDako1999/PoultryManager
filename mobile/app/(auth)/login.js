@@ -115,6 +115,7 @@ export default function LoginScreen() {
       showBack={false}
       headerRight={headerRight}
       heroExtra={heroExtra}
+      heroComfort="relaxed"
       keyboardAvoiding
       contentStyle={{ paddingHorizontal: 20, gap: 18 }}
     >

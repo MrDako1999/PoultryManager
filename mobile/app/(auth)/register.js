@@ -159,12 +159,7 @@ export default function RegisterScreen() {
 function ModulePickerStep({ t, isRTL, row, ForwardArrow, selectedModules, onToggle, onNext }) {
   const activeCount = selectedModules.length;
 
-  const headerRight = (
-    <View style={{ flexDirection: row, alignItems: 'center', gap: 8 }}>
-      <CountChip count={activeCount} t={t} />
-      <AuthHeroToolbar />
-    </View>
-  );
+  const headerRight = <AuthHeroToolbar />;
 
   return (
     <HeroSheetScreen
@@ -172,6 +167,7 @@ function ModulePickerStep({ t, isRTL, row, ForwardArrow, selectedModules, onTogg
       subtitle={t('modules.subtitle', 'Choose which modules you need access to')}
       showBack={false}
       headerRight={headerRight}
+      heroComfort="relaxed"
       heroExtra={
         <Image
           source={banner}
@@ -180,6 +176,15 @@ function ModulePickerStep({ t, isRTL, row, ForwardArrow, selectedModules, onTogg
         />
       }
     >
+      <View
+        style={{
+          marginHorizontal: 16,
+          marginBottom: 12,
+          alignItems: isRTL ? 'flex-end' : 'flex-start',
+        }}
+      >
+        <CountChip count={activeCount} t={t} />
+      </View>
       <View style={{ marginHorizontal: 16, gap: 12 }}>
         {AVAILABLE_MODULES.map((mod) => (
           <ModuleCard
@@ -221,25 +226,30 @@ function ModulePickerStep({ t, isRTL, row, ForwardArrow, selectedModules, onTogg
 }
 
 function CountChip({ count, t }) {
+  const tokens = useHeroSheetTokens();
   if (count === 0) return null;
+
+  const { accentColor, textColor, dark } = tokens;
   return (
     <View
       style={{
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
-        backgroundColor: 'rgba(255,255,255,0.18)',
+        gap: 8,
+        backgroundColor: dark ? 'rgba(148,210,165,0.12)' : 'hsl(148, 35%, 94%)',
         borderRadius: 999,
-        paddingHorizontal: 11,
-        paddingVertical: 6,
+        borderWidth: 1,
+        borderColor: accentColor,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
       }}
     >
-      <Check size={12} color="#ffffff" strokeWidth={2.6} />
+      <Check size={14} color={accentColor} strokeWidth={2.6} />
       <Text
         style={{
-          fontSize: 12,
+          fontSize: 13,
           fontFamily: 'Poppins-SemiBold',
-          color: '#ffffff',
+          color: textColor,
           letterSpacing: 0.2,
         }}
       >
@@ -491,6 +501,7 @@ function FormStep({
       onBack={onBack}
       headerRight={<AuthHeroToolbar />}
       heroExtra={heroExtra}
+      heroComfort="relaxed"
       keyboardAvoiding
     >
       <SheetSection title={t('auth.personalInfoSection', 'Personal Information')}>

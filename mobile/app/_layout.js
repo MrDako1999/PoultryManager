@@ -12,6 +12,7 @@ import useThemeStore from '@/stores/themeStore';
 import useLocaleStore from '@/stores/localeStore';
 import useNetwork from '@/hooks/useNetwork';
 import FullResyncOverlay from '@/components/FullResyncOverlay';
+import LanguageChangeOverlay from '@/components/LanguageChangeOverlay';
 import '../i18n';
 
 SplashScreen.preventAutoHideAsync();
@@ -62,6 +63,7 @@ export default function RootLayout() {
             <Stack.Screen name="(app)" />
           </Stack>
           <FullResyncOverlay />
+          <LanguageChangeOverlay />
         </ToastProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

@@ -1,7 +1,6 @@
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
-import { Calendar } from 'lucide-react-native';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
 
@@ -62,46 +61,23 @@ export default function FeedItemRow({ item, onClick }) {
             >
               {item.feedDescription || item.companyName || t('feed.feedItem', 'Feed Item')}
             </Text>
-            <View
-              style={[
-                styles.metaRow,
-                { flexDirection: isRTL ? 'row-reverse' : 'row' },
-              ]}
-            >
-              {dateLabel ? (
-                <View
-                  style={[
-                    styles.metaPiece,
-                    { flexDirection: isRTL ? 'row-reverse' : 'row' },
-                  ]}
-                >
-                  <Calendar size={11} color={mutedColor} strokeWidth={2.2} />
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      fontFamily: 'Poppins-Regular',
-                      color: mutedColor,
-                    }}
-                  >
-                    {dateLabel}
-                  </Text>
-                </View>
-              ) : null}
-              {item.companyName && item.feedDescription ? (
-                <Text
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    fontSize: 12,
-                    fontFamily: 'Poppins-Regular',
-                    color: mutedColor,
-                  }}
-                  numberOfLines={1}
-                >
-                  {item.companyName}
-                </Text>
-              ) : null}
-            </View>
+            {/* Single secondary line — just the order date. Company name
+                and bag breakdown ("150 × 50 kg") are intentionally
+                dropped from the row and live on the detail screen
+                instead, where they have room to breathe. */}
+            {dateLabel ? (
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontFamily: 'Poppins-Regular',
+                  color: mutedColor,
+                  textAlign: isRTL ? 'right' : 'left',
+                }}
+                numberOfLines={1}
+              >
+                {dateLabel}
+              </Text>
+            ) : null}
           </View>
 
           <View style={[styles.rightCol, { alignItems: isRTL ? 'flex-start' : 'flex-end' }]}>
@@ -115,17 +91,6 @@ export default function FeedItemRow({ item, onClick }) {
               numberOfLines={1}
             >
               {`${fmtInt(totalKg)} kg`}
-            </Text>
-            <Text
-              style={{
-                fontSize: 11,
-                fontFamily: 'Poppins-Regular',
-                color: mutedColor,
-                fontVariant: ['tabular-nums'],
-              }}
-              numberOfLines={1}
-            >
-              {`${fmtInt(bags)} × ${fmtInt(sizePerBag)} kg`}
             </Text>
           </View>
         </View>
@@ -146,19 +111,9 @@ const styles = StyleSheet.create({
   textCol: {
     flex: 1,
     minWidth: 0,
-    gap: 4,
-  },
-  metaRow: {
-    alignItems: 'center',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  metaPiece: {
-    alignItems: 'center',
-    gap: 4,
+    gap: 3,
   },
   rightCol: {
     minWidth: 0,
-    gap: 3,
   },
 });

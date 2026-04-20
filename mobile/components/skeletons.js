@@ -322,41 +322,9 @@ export function SkeletonDashboardKpiHero() {
         <Skeleton width={180} height={28} borderRadius={6} />
       </View>
 
-      <View className="rounded-xl border border-border bg-card p-4 gap-3">
-        <View className="flex-row items-center justify-between">
-          <View className="flex-row items-center gap-2 flex-1">
-            <Skeleton width={16} height={16} borderRadius={4} />
-            <SkeletonText width="20%" height={10} />
-          </View>
-          <Skeleton width={16} height={16} borderRadius={4} />
-        </View>
-        <View className="gap-1.5">
-          <Skeleton width="50%" height={26} borderRadius={6} />
-          <Skeleton width="100%" height={6} borderRadius={3} />
-        </View>
-        <View className="flex-row pt-3 border-t border-border gap-2">
-          {[0, 1, 2].map((i) => (
-            <View key={i} className="flex-1 gap-1.5">
-              <SkeletonText width="60%" height={9} />
-              <SkeletonText width="50%" height={13} />
-            </View>
-          ))}
-        </View>
-      </View>
-
-      <View className="rounded-xl border border-border bg-card p-4 gap-2">
-        <SkeletonText width="25%" height={10} />
-        <Skeleton width="60%" height={26} borderRadius={6} />
-        <SkeletonText width="20%" height={11} />
-        <View className="flex-row pt-3 border-t border-border gap-2 mt-1">
-          {[0, 1, 2].map((i) => (
-            <View key={i} className="flex-1 gap-1.5">
-              <SkeletonText width="60%" height={9} />
-              <SkeletonText width="80%" height={13} />
-            </View>
-          ))}
-        </View>
-      </View>
+      {/* Flock + Net Profit — BatchKpiCard layout (headline + stat grid) */}
+      <KpiCardSkeleton eyebrowWidth="14%" />
+      <KpiCardSkeleton eyebrowWidth="32%" />
     </View>
   );
 }

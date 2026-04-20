@@ -40,7 +40,7 @@ function Select({
     inputBg, inputBorderIdle,
   } = tokens;
   const isRTL = useIsRTL();
-  const selected = options.find((o) => o.value === value);
+  const selected = options.find((o) => o.value === value && !o.isSectionHeader);
 
   const openSheet = useCallback(() => {
     sheetRef.current?.open();

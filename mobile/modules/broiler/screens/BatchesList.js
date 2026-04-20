@@ -12,6 +12,7 @@ import Swipeable from 'react-native-gesture-handler/Swipeable';
 import {
   Search, ChevronDown, ChevronUp, ChevronRight, ChevronLeft,
   Layers, Warehouse, Pencil, Trash2, X, Calendar, Bird, RotateCcw,
+  Clock, CheckCircle2, Filter, ChevronsDownUp, ChevronsUpDown,
 } from 'lucide-react-native';
 import useLocalQuery from '@/hooks/useLocalQuery';
 import useOfflineMutation from '@/hooks/useOfflineMutation';
@@ -71,12 +72,19 @@ export default function BatchesScreen() {
   const [farmFilter, setFarmFilter] = useState([]);
   // dateRange = { from?: 'YYYY-MM-DD', to?: 'YYYY-MM-DD' } | null
   const [dateRange, setDateRange] = useState(null);
+  const [statusFilter, setStatusFilter] = useState('all');
   const [dateSheetOpen, setDateSheetOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [batchSheet, setBatchSheet] = useState({ open: false, data: null });
   const [batchToDelete, setBatchToDelete] = useState(null);
+  // Lifted from the per-group component so the toolbar's collapse-all
+  // button can flip every farm group at once. Map of `farmId -> open`;
+  // groups missing from the map default to true (matches the previous
+  // local-state default and the BatchHouseLogsList recipe).
+  const [groupOpen, setGroupOpen] = useState({});
 
   const farmPickerRef = useRef(null);
+  const statusPickerRef = useRef(null);
 
   const [allBatches, batchesLoading] = useLocalQuery('batches');
   const [farms] = useLocalQuery('farms');
@@ -136,10 +144,18 @@ export default function BatchesScreen() {
     });
   }, [batchesByFarmFilter, dateRange]);
 
+  const batchesByStatus = useMemo(() => {
+    if (statusFilter === 'all') return batchesByDateRange;
+    if (statusFilter === 'active') {
+      return batchesByDateRange.filter((b) => b.status === 'IN_PROGRESS');
+    }
+    return batchesByDateRange.filter((b) => b.status === 'COMPLETE');
+  }, [batchesByDateRange, statusFilter]);
+
   const filteredBatches = useMemo(() => {
-    if (!searchQuery.trim()) return batchesByDateRange;
+    if (!searchQuery.trim()) return batchesByStatus;
     const q = searchQuery.toLowerCase();
-    return batchesByDateRange.filter((b) => {
+    return batchesByStatus.filter((b) => {
       if (b.batchName?.toLowerCase().includes(q)) return true;
       const farm = resolveFarm(b);
       return (
@@ -147,7 +163,7 @@ export default function BatchesScreen() {
         farm?.nickname?.toLowerCase().includes(q)
       );
     });
-  }, [batchesByDateRange, searchQuery, farmsById]);
+  }, [batchesByStatus, searchQuery, farmsById]);
 
   const groupedByFarm = useMemo(() => {
     const groups = {};
@@ -188,6 +204,30 @@ export default function BatchesScreen() {
 
   const farmFilterCount = farmFilter.length;
   const dateRangeActive = !!(dateRange && (dateRange.from || dateRange.to));
+
+  const isGroupOpen = useCallback(
+    (farmId) => groupOpen[farmId] ?? true,
+    [groupOpen]
+  );
+
+  const allGroupsExpanded = useMemo(
+    () => groupedByFarm.every((g) => isGroupOpen(g.farmId)),
+    [groupedByFarm, isGroupOpen]
+  );
+
+  const toggleGroup = useCallback((farmId) => {
+    Haptics.selectionAsync().catch(() => {});
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setGroupOpen((p) => ({ ...p, [farmId]: !(p[farmId] ?? true) }));
+  }, []);
+
+  const toggleAllGroups = useCallback(() => {
+    Haptics.selectionAsync().catch(() => {});
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    const next = {};
+    groupedByFarm.forEach((g) => { next[g.farmId] = !allGroupsExpanded; });
+    setGroupOpen(next);
+  }, [groupedByFarm, allGroupsExpanded]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -281,6 +321,14 @@ export default function BatchesScreen() {
             dateRangeActive={dateRangeActive}
             onOpenDatePicker={() => setDateSheetOpen(true)}
             onClearDateRange={() => setDateRange(null)}
+            statusFilter={statusFilter}
+            onOpenStatusPicker={() => statusPickerRef.current?.open()}
+            onStatusFilterChange={setStatusFilter}
+            // Collapse-all only meaningful when there's more than one
+            // farm group on screen — same gating used by BatchHouseLogsList.
+            collapseAllVisible={groupedByFarm.length > 1}
+            allGroupsExpanded={allGroupsExpanded}
+            onToggleAllGroups={toggleAllGroups}
             isRTL={isRTL}
             tokens={tokens}
             t={t}
@@ -328,6 +376,8 @@ export default function BatchesScreen() {
               <FarmGroupSection
                 key={group.farmId}
                 group={group}
+                open={isGroupOpen(group.farmId)}
+                onToggle={() => toggleGroup(group.farmId)}
                 isRTL={isRTL}
                 tokens={tokens}
                 t={t}
@@ -363,6 +413,22 @@ export default function BatchesScreen() {
         onValueChange={(val) => setFarmFilter(val || [])}
         multiple
         forceSearchable
+      />
+
+      <BottomPickerSheet
+        ref={statusPickerRef}
+        icon={Filter}
+        title={t('batches.filterByStatus', 'Filter by status')}
+        subtitle={t('batches.filterByStatusDesc', 'Show all batches or narrow by status')}
+        searchable={false}
+        options={[
+          { value: 'all', label: t('batches.filterAll', 'All') },
+          { value: 'active', label: t('batches.statusFilterActive', 'Active') },
+          { value: 'inactive', label: t('batches.statusFilterInactive', 'Inactive') },
+        ]}
+        value={statusFilter}
+        onValueChange={(val) => setStatusFilter(val || 'all')}
+        sheetHeightFraction={0.42}
       />
 
       <DateRangePicker
@@ -456,75 +522,78 @@ function Toolbar({
   searchQuery, onSearchChange,
   farmFilterCount, onOpenFarmPicker, onClearFarmFilter,
   dateRangeActive, onOpenDatePicker, onClearDateRange,
+  statusFilter, onOpenStatusPicker, onStatusFilterChange,
+  collapseAllVisible, allGroupsExpanded, onToggleAllGroups,
   isRTL, tokens, t,
 }) {
-  const { mutedColor, accentColor, dark } = tokens;
-  const anyFilterActive = !!searchQuery || farmFilterCount > 0 || dateRangeActive;
+  const { mutedColor, accentColor, dark, inputBg, inputBorderIdle } = tokens;
+  const statusActive = statusFilter !== 'all';
+  const anyFilterActive = !!searchQuery || farmFilterCount > 0 || dateRangeActive
+    || statusActive;
 
   const onResetAll = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     if (searchQuery) onSearchChange('');
     if (farmFilterCount > 0) onClearFarmFilter();
     if (dateRangeActive) onClearDateRange();
+    if (statusActive) onStatusFilterChange('all');
   }, [
     searchQuery, onSearchChange,
     farmFilterCount, onClearFarmFilter,
     dateRangeActive, onClearDateRange,
+    statusActive, onStatusFilterChange,
   ]);
 
-  // Triggers always show the filter NAME only — never the selection
-  // summary. There isn't enough horizontal room to fit both the name and
-  // a multi-farm / date-range summary without truncation. The accent
-  // border + tinted icon tile + accent text already communicate
-  // "this filter is on"; tapping it opens the sheet for full detail.
+  // Status pill mirrors the Farms / Date dropdowns: shows the filter name
+  // when nothing is selected, swaps to the picked value (Active / Inactive)
+  // with accent treatment when active. The icon also swaps to communicate
+  // state at a glance.
+  const statusMeta = useMemo(() => {
+    if (statusFilter === 'active') {
+      return { label: t('batches.statusFilterActive', 'Active'), icon: Clock };
+    }
+    if (statusFilter === 'inactive') {
+      return { label: t('batches.statusFilterInactive', 'Inactive'), icon: CheckCircle2 };
+    }
+    return { label: t('batches.statusFilter', 'Status'), icon: Filter };
+  }, [statusFilter, t]);
+
   const farmsLabel = t('batches.farmsFilter', 'Farms');
   const dateLabel = t('batches.dateFilter', 'Date');
 
   return (
     <View style={{ gap: 12 }}>
-      <SheetInput
-        icon={Search}
-        value={searchQuery}
-        onChangeText={onSearchChange}
-        placeholder={t('batches.searchPlaceholder', 'Search batches...')}
-        autoCapitalize="none"
-        autoCorrect={false}
-        dense
-        suffix={
-          searchQuery ? (
-            <Pressable
-              onPress={() => onSearchChange('')}
-              hitSlop={10}
-              style={toolbarStyles.clearBtn}
-            >
-              <X size={14} color={mutedColor} />
-            </Pressable>
-          ) : null
-        }
-      />
-
+      {/* Search row — SheetInput + inline Reset (when active) + collapse-all
+          toggle. Same recipe as AccountingFilterBar / BatchHouseLogsList so
+          the Batches screen follows the rest of the list views. */}
       <View
         style={[
-          toolbarStyles.triggerRow,
+          toolbarStyles.searchRow,
           { flexDirection: isRTL ? 'row-reverse' : 'row' },
         ]}
       >
-        <FilterTrigger
-          icon={Warehouse}
-          label={farmsLabel}
-          active={farmFilterCount > 0}
-          onPress={onOpenFarmPicker}
-          isRTL={isRTL}
-          tokens={tokens}
-        />
-        <FilterTrigger
-          icon={Calendar}
-          label={dateLabel}
-          active={dateRangeActive}
-          onPress={onOpenDatePicker}
-          isRTL={isRTL}
-          tokens={tokens}
-        />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <SheetInput
+            icon={Search}
+            value={searchQuery}
+            onChangeText={onSearchChange}
+            placeholder={t('batches.searchPlaceholder', 'Search batches...')}
+            autoCapitalize="none"
+            autoCorrect={false}
+            dense
+            suffix={
+              searchQuery ? (
+                <Pressable
+                  onPress={() => onSearchChange('')}
+                  hitSlop={10}
+                  style={toolbarStyles.clearBtn}
+                >
+                  <X size={14} color={mutedColor} />
+                </Pressable>
+              ) : null
+            }
+          />
+        </View>
         {anyFilterActive ? (
           <Pressable
             onPress={onResetAll}
@@ -564,6 +633,60 @@ function Toolbar({
             </View>
           </Pressable>
         ) : null}
+        {collapseAllVisible ? (
+          <Pressable
+            onPress={onToggleAllGroups}
+            android_ripple={{
+              color: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+              borderless: false,
+            }}
+            style={[
+              toolbarStyles.collapseBtn,
+              { backgroundColor: inputBg, borderColor: inputBorderIdle },
+            ]}
+            hitSlop={4}
+            accessibilityRole="button"
+            accessibilityLabel={allGroupsExpanded
+              ? t('common.collapseAll', 'Collapse all')
+              : t('common.expandAll', 'Expand all')}
+          >
+            {allGroupsExpanded
+              ? <ChevronsDownUp size={18} color={mutedColor} strokeWidth={2.2} />
+              : <ChevronsUpDown size={18} color={mutedColor} strokeWidth={2.2} />}
+          </Pressable>
+        ) : null}
+      </View>
+
+      <View
+        style={[
+          toolbarStyles.triggerRow,
+          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+        ]}
+      >
+        <FilterTrigger
+          icon={statusMeta.icon}
+          label={statusMeta.label}
+          active={statusActive}
+          onPress={onOpenStatusPicker}
+          isRTL={isRTL}
+          tokens={tokens}
+        />
+        <FilterTrigger
+          icon={Warehouse}
+          label={farmsLabel}
+          active={farmFilterCount > 0}
+          onPress={onOpenFarmPicker}
+          isRTL={isRTL}
+          tokens={tokens}
+        />
+        <FilterTrigger
+          icon={Calendar}
+          label={dateLabel}
+          active={dateRangeActive}
+          onPress={onOpenDatePicker}
+          isRTL={isRTL}
+          tokens={tokens}
+        />
       </View>
     </View>
   );
@@ -655,31 +778,19 @@ function FilterTrigger({ icon: Icon, label, active, countBadge, onPress, isRTL, 
   );
 }
 
-// Vertical gap between batch cards inside a farm group. Applied via
-// Swipeable's `containerStyle` because wrapping the card in an outer View
-// doesn't reliably propagate marginBottom through gesture-handler's internal
-// layout. Matches the dashboard's stacked-card spacing.
-const CARD_GAP = 14;
-
 function FarmGroupSection({
-  group, isRTL, tokens, t, resolveFarm, lastSaleDateByBatch, deathsByBatch,
+  group, open, onToggle,
+  isRTL, tokens, t, resolveFarm, lastSaleDateByBatch, deathsByBatch,
   onPressBatch, onEditBatch, onDeleteBatch,
 }) {
-  const { mutedColor } = tokens;
-  const [open, setOpen] = useState(true);
-
-  const toggle = useCallback(() => {
-    Haptics.selectionAsync().catch(() => {});
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setOpen((o) => !o);
-  }, []);
+  const { mutedColor, elevatedCardBorder } = tokens;
 
   const Chevron = open ? ChevronUp : (isRTL ? ChevronLeft : ChevronRight);
 
   return (
     <View style={{ marginBottom: open ? 0 : 16 }}>
       <Pressable
-        onPress={toggle}
+        onPress={onToggle}
         hitSlop={6}
         style={[
           sectionStyles.eyebrow,
@@ -700,28 +811,7 @@ function FarmGroupSection({
         >
           {group.farmName}
         </Text>
-        <View
-          style={[
-            sectionStyles.eyebrowTrailing,
-            { flexDirection: isRTL ? 'row-reverse' : 'row' },
-          ]}
-        >
-          <Text
-            style={{
-              fontSize: 11,
-              fontFamily: 'Poppins-SemiBold',
-              color: mutedColor,
-              letterSpacing: 0.4,
-            }}
-          >
-            {`${fmtInt(group.batches.length)} ${
-              group.batches.length === 1
-                ? t('batches.batch', 'batch')
-                : t('batches.batches', 'batches')
-            }`}
-          </Text>
-          <Chevron size={14} color={mutedColor} strokeWidth={2.4} />
-        </View>
+        <Chevron size={14} color={mutedColor} strokeWidth={2.4} />
       </Pressable>
 
       {open ? (
@@ -729,11 +819,23 @@ function FarmGroupSection({
           {/* Inner padding inset so cards don't kiss the section edge —
               same recipe as the dashboard's BroilerActiveBatches. */}
           <View style={{ padding: 8 }}>
-            {group.batches.map((batch, idx) => {
-              const isLast = idx === group.batches.length - 1;
-              return (
+            {group.batches.map((batch, idx) => (
+              <View key={batch._id}>
+                {/* 2pt rounded divider in the gap between cards. Same
+                    `elevatedCardBorder` token + sizing as the dashboard's
+                    BroilerActiveBatches separator, so the two batch
+                    surfaces (dashboard widget + Batches tab) are
+                    visually consistent. Skipped above the first card so
+                    the section's top edge stays clean. */}
+                {idx > 0 ? (
+                  <View
+                    style={[
+                      cardStyles.cardSeparator,
+                      { backgroundColor: elevatedCardBorder },
+                    ]}
+                  />
+                ) : null}
                 <BatchRow
-                  key={batch._id}
                   batch={batch}
                   tokens={tokens}
                   isRTL={isRTL}
@@ -741,13 +843,12 @@ function FarmGroupSection({
                   resolveFarm={resolveFarm}
                   lastSaleDateByBatch={lastSaleDateByBatch}
                   deathsByBatch={deathsByBatch}
-                  bottomGap={isLast ? 0 : CARD_GAP}
                   onPress={() => onPressBatch(batch)}
                   onEdit={() => onEditBatch(batch)}
                   onDelete={() => onDeleteBatch(batch)}
                 />
-              );
-            })}
+              </View>
+            ))}
           </View>
         </SheetSection>
       ) : null}
@@ -759,15 +860,15 @@ function FarmGroupSection({
  * Batch card. Modeled on the dashboard's `BroilerActiveBatches.BatchCard`:
  * elevated surface, header (avatar + title + bird-count meta), day-of-target
  * progress + bar. We skip the farm-name meta because the parent
- * `FarmGroupSection` already groups by farm. For COMPLETE batches the bar
- * shows 100% with a "Completed in X days" label.
+ * `FarmGroupSection` already groups by farm. For COMPLETE batches the label
+ * reads "Completed in X days"; the % and bar stay mounted with opacity 0 so
+ * card height matches in-progress rows.
  *
  * Layout lives in `StyleSheet.create` and on plain inner Views — Pressable's
  * functional style is reserved for press-state visuals only (DESIGN_LANGUAGE.md §9).
  */
 function BatchRow({
   batch, tokens, isRTL, t, resolveFarm, lastSaleDateByBatch, deathsByBatch,
-  bottomGap = 0,
   onPress, onEdit, onDelete,
 }) {
   const {
@@ -814,14 +915,18 @@ function BatchRow({
   // "Completed in X days" (no day-of-target target is meaningful any more).
   const showProgressBar = hasStarted && (isInProgress || isComplete);
   const barPct = isComplete ? 100 : cycleProgressPct;
+  // Keep % + track in the tree for identical vertical rhythm; hide visually.
+  const hideProgressChrome = isComplete;
 
   const progressLabel = isComplete
-    ? t('batches.completedInDays', 'Completed in {{days}} days', { days: dayCount })
+    // List rows are already grouped under the farm header and clearly
+    // styled as "complete" via the avatar's status pip + green bar — the
+    // "Completed in" prefix is redundant noise here, so we just say
+    // "X days". The full phrasing is preserved on BatchDetailHeader
+    // where it stands alone without the surrounding row context.
+    ? t('batches.daysShort', '{{days}} days', { days: dayCount })
     : isInProgress
-      ? t('dashboard.dayOfTarget', 'Day {{day}} of {{target}}', {
-          day: dayCount,
-          target: CYCLE_TARGET_DAYS,
-        })
+      ? t('dashboard.dayN', 'Day {{n}}', { n: dayCount })
       : t('batches.notStarted', 'Not started');
 
   const handleEdit = () => {
@@ -872,7 +977,6 @@ function BatchRow({
       rightThreshold={40}
       overshootRight={false}
       renderRightActions={renderRightActions}
-      containerStyle={bottomGap ? { marginBottom: bottomGap } : undefined}
     >
       <Pressable
         onPressIn={() => Haptics.selectionAsync().catch(() => {})}
@@ -1011,6 +1115,7 @@ function BatchRow({
                 fontSize: 11,
                 fontFamily: 'Poppins-SemiBold',
                 color: mutedColor,
+                opacity: hideProgressChrome ? 0 : 1,
               }}
             >
               {`${Math.round(barPct)}%`}
@@ -1019,22 +1124,24 @@ function BatchRow({
         </View>
 
         {showProgressBar ? (
-          <View
-            style={[
-              cardStyles.progressBarTrack,
-              {
-                backgroundColor: dark
-                  ? 'rgba(255,255,255,0.06)'
-                  : 'rgba(0,0,0,0.05)',
-              },
-            ]}
-          >
+          <View style={{ opacity: hideProgressChrome ? 0 : 1 }}>
             <View
               style={[
-                cardStyles.progressBarFill,
-                { backgroundColor: accentColor, width: `${barPct}%` },
+                cardStyles.progressBarTrack,
+                {
+                  backgroundColor: dark
+                    ? 'rgba(255,255,255,0.06)'
+                    : 'rgba(0,0,0,0.05)',
+                },
               ]}
-            />
+            >
+              <View
+                style={[
+                  cardStyles.progressBarFill,
+                  { backgroundColor: accentColor, width: `${barPct}%` },
+                ]}
+              />
+            </View>
           </View>
         ) : null}
       </Pressable>
@@ -1049,13 +1156,20 @@ const sectionStyles = StyleSheet.create({
     marginHorizontal: 22,
     marginBottom: 10,
   },
-  eyebrowTrailing: {
-    alignItems: 'center',
-    gap: 6,
-  },
 });
 
 const cardStyles = StyleSheet.create({
+  // 2pt rounded divider between batch cards inside a farm group. Same
+  // recipe as the dashboard's BroilerActiveBatches separator —
+  // `elevatedCardBorder` colour, 2pt height, soft pill ends, with
+  // `marginVertical` owning the inter-card breathing room (replaces
+  // the legacy `containerStyle: { marginBottom: 14 }` on Swipeable).
+  cardSeparator: {
+    height: 2,
+    borderRadius: 1,
+    marginVertical: 12,
+    marginHorizontal: 4,
+  },
   card: {
     borderRadius: 16,
     padding: 14,
@@ -1065,7 +1179,8 @@ const cardStyles = StyleSheet.create({
   headerRow: {
     alignItems: 'center',
     gap: 12,
-    marginBottom: 12,
+    // Match dashboard `BroilerActiveBatches` — tight gap before DAY / progress row.
+    marginBottom: 8,
   },
   headerTextCol: {
     flex: 1,
@@ -1116,29 +1231,36 @@ const cardStyles = StyleSheet.create({
 });
 
 const toolbarStyles = StyleSheet.create({
+  // Search row hosts the SheetInput plus optional inline Reset chip and
+  // the collapse-all toggle, matching the AccountingFilterBar pattern
+  // used across the other list views.
+  searchRow: {
+    alignItems: 'center',
+    gap: 10,
+  },
   triggerRow: {
     alignItems: 'stretch',
-    gap: 10,
+    gap: 8,
   },
   trigger: {
     flex: 1,
     minWidth: 0,
     borderRadius: 14,
     borderWidth: 1.5,
-    height: 48,
+    height: 46,
     justifyContent: 'center',
-    paddingStart: 8,
-    paddingEnd: 12,
+    paddingStart: 6,
+    paddingEnd: 10,
   },
   triggerInner: {
     flex: 1,
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
   },
   triggerIconTile: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
+    width: 26,
+    height: 26,
+    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1157,8 +1279,10 @@ const toolbarStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Inline reset chip — same height/radius profile as SheetInput's
+  // dense field so the search row reads as one unified strip.
   resetChip: {
-    height: 48,
+    height: 44,
     paddingHorizontal: 12,
     borderRadius: 14,
     borderWidth: 1.5,
@@ -1167,5 +1291,15 @@ const toolbarStyles = StyleSheet.create({
   resetChipInner: {
     alignItems: 'center',
     gap: 6,
+  },
+  // Square collapse-all toggle — borrowed from BatchHouseLogsList so the
+  // affordance is identical across screens.
+  collapseBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

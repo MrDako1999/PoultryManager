@@ -5,10 +5,9 @@ import ExpenseDetail from '@/modules/broiler/details/ExpenseDetail';
 import ExpenseSheet from '@/modules/broiler/sheets/ExpenseSheet';
 
 /**
- * Expense detail route. The new ExpenseDetail renders its own
- * HeroSheetScreen (back button, view-receipt / edit / delete chrome,
- * brand hero, sectioned sheet, CTAs) — this screen just owns the
- * ExpenseSheet edit wiring.
+ * Expense detail route. ExpenseDetail uses DetailCompactScreen (compact
+ * gradient bar, sectioned scroll body, CTAs) — this screen owns ExpenseSheet
+ * edit wiring.
  */
 export default function ExpenseScreen() {
   const { id } = useLocalSearchParams();

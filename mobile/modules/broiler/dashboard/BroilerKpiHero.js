@@ -1,138 +1,127 @@
 import { useState } from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
-  Bird, Layers, Skull, Home, ChevronRight, TrendingUp,
+  Bird, DollarSign, TrendingUp, Receipt, Egg, Skull, ShoppingCart, Layers,
 } from 'lucide-react-native';
-import useSettings from '@/hooks/useSettings';
 import { SkeletonDashboardKpiHero } from '@/components/skeletons';
-import SheetSection from '@/components/SheetSection';
+import SlidingSegmentedControl from '@/components/SlidingSegmentedControl';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
+import useCapabilities from '@/hooks/useCapabilities';
+import useSettings from '@/hooks/useSettings';
+import BatchKpiCard, { profitToneColor } from '@/modules/broiler/components/BatchKpiCard';
 import useBroilerDashboardStats from './useBroilerDashboardStats';
 
-const fmt = (val) =>
-  Number(val || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// Western digits everywhere (DL §12.4) — never i18n.language for numerics.
+const NUMERIC_LOCALE = 'en-US';
 
-const fmtInt = (val) => Number(val || 0).toLocaleString();
+const fmtInt = (val) => Number(val || 0).toLocaleString(NUMERIC_LOCALE);
+
+const fmtMoney = (val) =>
+  Number(val || 0).toLocaleString(NUMERIC_LOCALE, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+function trimFixedMantissa(s) {
+  if (!s.includes('.')) return s;
+  return s.replace(/\.?0+$/, '');
+}
+
+// Compact flock + all-time financial headlines: integer K (floor thousands)
+// and up to 3 dp on millions, trailing zeros trimmed (e.g. 409K, 776K, 1.185M).
+const fmtCompact = (val) => {
+  const n = Number(val || 0);
+  if (!Number.isFinite(n) || n === 0) return '0';
+  const sign = n < 0 ? '-' : '';
+  const abs = Math.abs(n);
+  if (abs >= 1_000_000) {
+    const m = abs / 1_000_000;
+    const body = trimFixedMantissa(m.toFixed(3));
+    return `${sign}${body}M`;
+  }
+  if (abs >= 1_000) {
+    const k = Math.floor(abs / 1_000);
+    return `${sign}${k.toLocaleString(NUMERIC_LOCALE)}K`;
+  }
+  return `${sign}${fmtInt(abs)}`;
+};
+
+// Same K/M rules as `fmtCompact`; sub‑1K amounts keep full currency decimals.
+const fmtCompactCurrency = (val) => {
+  const n = Number(val || 0);
+  if (!Number.isFinite(n)) return fmtMoney(0);
+  if (n === 0) return fmtMoney(0);
+  const sign = n < 0 ? '-' : '';
+  const abs = Math.abs(n);
+  if (abs >= 1_000_000) {
+    const m = abs / 1_000_000;
+    const body = trimFixedMantissa(m.toFixed(3));
+    return `${sign}${body}M`;
+  }
+  if (abs >= 1_000) {
+    const k = Math.floor(abs / 1_000);
+    return `${sign}${k.toLocaleString(NUMERIC_LOCALE)}K`;
+  }
+  return fmtMoney(n);
+};
+
+/** Deaths in mortality chip: full integer until strictly above 10k, then one-decimal K (e.g. 10.4K). */
+function fmtMortalityDeathsForDisplay(deaths) {
+  const n = Math.floor(Number(deaths || 0));
+  if (n <= 10_000) return fmtInt(n);
+  const k = n / 1000;
+  return `${trimFixedMantissa(k.toFixed(1))}K`;
+}
+
+/** Same recipe as `BroilerActiveBatches` meta row: `(-count) · pct%` when losses exist. */
+function fmtFlockMortalityCountAndPct(deaths, mortalityPct) {
+  const d = Number(deaths || 0);
+  const pct = Number(mortalityPct || 0);
+  const pctStr = `${pct.toFixed(2)}%`;
+  if (d > 0) return `(-${fmtMortalityDeathsForDisplay(d)}) · ${pctStr}`;
+  return pctStr;
+}
 
 const SCOPES = ['active', 'allTime', 'thisMonth'];
 
-function mortalityToneColor(pct, tokens) {
-  if (pct >= 5) return tokens.errorColor;
-  if (pct >= 2) return tokens.dark ? '#fbbf24' : '#d97706';
-  return tokens.accentColor;
+// Tone classifiers — each returns one of `'good' | 'warning' | 'bad'`.
+// The chip tint table below paints those tones consistently in both
+// themes; we never pass raw colour strings into the chip because some
+// of our colour tokens are HSL (e.g. `accentColor`) and HSL strings
+// don't accept the hex-alpha append trick that hex tokens do — that's
+// what produced the "solid green pill, invisible text" bug.
+function mortalityTone(pct) {
+  if (pct >= 5) return 'bad';
+  if (pct >= 2) return 'warning';
+  return 'good';
 }
 
-function ScopeSegmented({ value, onChange, options }) {
-  const { dark, accentColor, mutedColor, sectionBg, borderColor } = useHeroSheetTokens();
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        backgroundColor: sectionBg,
-        borderRadius: 14,
-        padding: 4,
-        borderWidth: 1,
-        borderColor,
-        ...(dark
-          ? {}
-          : {
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 1 },
-              shadowOpacity: 0.04,
-              shadowRadius: 6,
-              elevation: 1,
-            }),
-      }}
-    >
-      {options.map((opt) => {
-        const active = opt.value === value;
-        return (
-          <Pressable
-            key={opt.value}
-            onPress={() => {
-              if (active) return;
-              Haptics.selectionAsync().catch(() => {});
-              onChange?.(opt.value);
-            }}
-            style={{
-              flex: 1,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              paddingVertical: 8,
-              borderRadius: 10,
-              backgroundColor: active
-                ? (dark ? 'rgba(148,210,165,0.16)' : 'hsl(148, 35%, 92%)')
-                : 'transparent',
-              borderWidth: 1,
-              borderColor: active ? accentColor : 'transparent',
-            }}
-            hitSlop={4}
-          >
-            <Text
-              style={{
-                fontSize: 12,
-                fontFamily: 'Poppins-Medium',
-                color: active ? accentColor : mutedColor,
-              }}
-              numberOfLines={1}
-            >
-              {opt.label}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}
-
-function StatCell({ icon: Icon, label, value, valueColor }) {
-  const { mutedColor, textColor } = useHeroSheetTokens();
-  return (
-    <View style={{ flex: 1, alignItems: 'flex-start' }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 }}>
-        {Icon && <Icon size={11} color={mutedColor} strokeWidth={2.4} />}
-        <Text
-          style={{
-            fontSize: 10,
-            fontFamily: 'Poppins-SemiBold',
-            color: mutedColor,
-            letterSpacing: 0.8,
-            textTransform: 'uppercase',
-          }}
-          numberOfLines={1}
-        >
-          {label}
-        </Text>
-      </View>
-      <Text
-        style={{
-          fontSize: 14,
-          fontFamily: 'Poppins-SemiBold',
-          color: valueColor || textColor,
-        }}
-        numberOfLines={1}
-      >
-        {value}
-      </Text>
-    </View>
-  );
-}
-
-function StatDivider() {
-  const { borderColor } = useHeroSheetTokens();
-  return <View style={{ width: 1, backgroundColor: borderColor, marginHorizontal: 8 }} />;
-}
+const CHIP_TINTS = {
+  good: {
+    light: { bg: 'hsl(148, 35%, 92%)',      border: 'hsl(148, 35%, 80%)',      fg: 'hsl(148, 60%, 28%)' },
+    dark:  { bg: 'rgba(148,210,165,0.16)',  border: 'rgba(148,210,165,0.30)',  fg: 'hsl(148, 55%, 55%)' },
+  },
+  warning: {
+    light: { bg: 'rgba(217,119,6,0.10)',    border: 'rgba(217,119,6,0.22)',    fg: '#d97706' },
+    dark:  { bg: 'rgba(251,191,36,0.16)',   border: 'rgba(251,191,36,0.30)',   fg: '#fbbf24' },
+  },
+  bad: {
+    light: { bg: 'rgba(220,38,38,0.08)',    border: 'rgba(220,38,38,0.20)',    fg: '#dc2626' },
+    dark:  { bg: 'rgba(252,165,165,0.14)',  border: 'rgba(252,165,165,0.30)',  fg: '#fca5a5' },
+  },
+};
 
 export default function BroilerKpiHero() {
   const { t } = useTranslation();
   const tokens = useHeroSheetTokens();
-  const { mutedColor, textColor, accentColor, errorColor, borderColor, dark } = tokens;
+  const { dark } = tokens;
   const accounting = useSettings('accounting');
   const currency = accounting?.currency || 'AED';
+  const { can } = useCapabilities();
+  const canOpenAccounting = can('expense:read') || can('saleOrder:read');
 
   const [scope, setScope] = useState('active');
   const { flockStats, financials, isLoading } = useBroilerDashboardStats(scope);
@@ -146,6 +135,11 @@ export default function BroilerKpiHero() {
     router.push('/(app)/(tabs)/batches');
   };
 
+  const goAccounting = () => {
+    Haptics.selectionAsync().catch(() => {});
+    router.push('/(app)/(tabs)/accounting');
+  };
+
   const scopeOptions = SCOPES.map((value) => ({
     value,
     label:
@@ -155,172 +149,120 @@ export default function BroilerKpiHero() {
   }));
 
   const flockHeadlineIsLive = scope === 'active';
-  const hasFlock = flockStats.initial > 0;
-  const profitColor = financials.netProfit < 0 ? errorColor : accentColor;
-  const mortalityColor = mortalityToneColor(flockStats.mortalityPct, tokens);
+  // Mortality stat value — chip-tint table (green / amber / red by rate).
+  const mortalityFg = CHIP_TINTS[mortalityTone(flockStats.mortalityPct)][dark ? 'dark' : 'light'].fg;
+  const profitColor = profitToneColor(financials.netProfit, tokens);
+  const perBirdColor = profitToneColor(financials.profitPerBird, tokens);
+  const finFmt = scope === 'active' ? fmtMoney : fmtCompactCurrency;
 
   return (
     <View>
       {/* Scope segmented control sits ABOVE the sections, like a global filter */}
       <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
-        <ScopeSegmented value={scope} onChange={setScope} options={scopeOptions} />
+        <SlidingSegmentedControl
+          value={scope}
+          onChange={setScope}
+          options={scopeOptions}
+          bordered
+        />
       </View>
 
-      {/* Flock card */}
-      <SheetSection
+      {/* Flock — same BatchKpiCard recipe as Net Profit (headline + 3 icon stats; mortality only in stat row) */}
+      <BatchKpiCard
         title={t('dashboard.flockSummary', 'Flock')}
         icon={Bird}
-      >
-        <Pressable
-          onPress={goBatches}
-          style={({ pressed }) => ({
-            opacity: pressed ? 0.7 : 1,
-          })}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4 }}>
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
-                <Text
-                  style={{
-                    fontSize: 30,
-                    fontFamily: 'Poppins-Bold',
-                    color: textColor,
-                    letterSpacing: -0.8,
-                    lineHeight: 36,
-                  }}
-                >
-                  {flockHeadlineIsLive ? fmtInt(flockStats.liveBirds) : fmtInt(flockStats.initial)}
-                </Text>
-                {hasFlock && flockHeadlineIsLive && (
-                  <Text style={{ fontSize: 12, fontFamily: 'Poppins-Regular', color: mutedColor }}>
-                    / {fmtInt(flockStats.initial)} {t('dashboard.birds', 'birds')}
-                  </Text>
-                )}
-                {hasFlock && !flockHeadlineIsLive && (
-                  <Text style={{ fontSize: 12, fontFamily: 'Poppins-Regular', color: mutedColor }}>
-                    {t('farms.birdsRaised', 'birds raised')}
-                  </Text>
-                )}
-              </View>
-            </View>
-            <ChevronRight size={18} color={mutedColor} />
-          </View>
+        headline={
+          flockHeadlineIsLive
+            ? fmtInt(flockStats.liveBirds)
+            : fmtInt(flockStats.initial)
+        }
+        headlineSuffix={
+          flockHeadlineIsLive
+            ? t('dashboard.flockHeadlineAvailableSuffix', 'AVAILABLE')
+            : t('dashboard.flockHeadlineRaisedSuffix', 'RAISED')
+        }
+        headlineSuffixSubscript
+        onPress={goBatches}
+        stats={
+          flockHeadlineIsLive
+            ? [
+                {
+                  icon: Egg,
+                  label: t('dashboard.flockMetricRaised', 'Raised'),
+                  value: fmtCompact(flockStats.initial),
+                },
+                {
+                  icon: ShoppingCart,
+                  label: t('dashboard.flockMetricSold', 'Sold'),
+                  value: fmtCompact(flockStats.sold),
+                },
+                {
+                  icon: Skull,
+                  label: t('dashboard.flockMetricMortality', 'Mortality'),
+                  value: fmtFlockMortalityCountAndPct(
+                    flockStats.deaths,
+                    flockStats.mortalityPct,
+                  ),
+                  valueColor: mortalityFg,
+                },
+              ]
+            : [
+                {
+                  icon: ShoppingCart,
+                  label: t('dashboard.flockMetricSold', 'Sold'),
+                  value: fmtCompact(flockStats.sold),
+                },
+                {
+                  icon: Layers,
+                  label: t('dashboard.flockMetricCycles', 'Cycles'),
+                  value: fmtInt(flockStats.cycleCount),
+                },
+                {
+                  icon: Skull,
+                  label: t('dashboard.flockMetricMortality', 'Mortality'),
+                  value: fmtFlockMortalityCountAndPct(
+                    flockStats.deaths,
+                    flockStats.mortalityPct,
+                  ),
+                  valueColor: mortalityFg,
+                },
+              ]
+        }
+      />
 
-          {hasFlock && (
-            <View
-              style={{
-                height: 6,
-                borderRadius: 3,
-                backgroundColor: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
-                overflow: 'hidden',
-                marginTop: 12,
-                marginBottom: 14,
-              }}
-            >
-              <View
-                style={{
-                  height: '100%',
-                  borderRadius: 3,
-                  backgroundColor: accentColor,
-                  width: `${flockStats.survivalPct}%`,
-                }}
-              />
-            </View>
-          )}
-
-          <View
-            style={{
-              flexDirection: 'row',
-              paddingTop: 12,
-              borderTopWidth: 1,
-              borderTopColor: borderColor,
-            }}
-          >
-            <StatCell
-              icon={Layers}
-              label={
-                flockHeadlineIsLive
-                  ? t('dashboard.activeBatches', 'Active Batches')
-                  : t('farms.cyclesRun', 'Cycles')
-              }
-              value={fmtInt(flockStats.cycleCount)}
-            />
-            <StatDivider />
-            <StatCell
-              icon={Skull}
-              label={t('dashboard.mortalityRate', 'Mortality')}
-              value={`${flockStats.mortalityPct.toFixed(2)}%`}
-              valueColor={mortalityColor}
-            />
-            <StatDivider />
-            <StatCell
-              icon={Home}
-              label={t('dashboard.totalHouses', 'Houses')}
-              value={fmtInt(flockStats.houseCount)}
-            />
-          </View>
-        </Pressable>
-      </SheetSection>
-
-      {/* Net Profit card */}
-      <SheetSection
+      {/* Same Net Profit KPI card as Batch Overview / Farm Overview */}
+      <BatchKpiCard
         title={t('batches.netProfit', 'Net Profit')}
-        icon={TrendingUp}
-      >
-        <Text
-          style={{
-            fontSize: 30,
-            fontFamily: 'Poppins-Bold',
-            color: profitColor,
-            letterSpacing: -0.8,
-            lineHeight: 36,
-          }}
-        >
-          {currency} {fmt(financials.netProfit)}
-        </Text>
-        {financials.marginPct != null && (
-          <Text
-            style={{
-              fontSize: 12,
-              fontFamily: 'Poppins-Regular',
-              color: mutedColor,
-              marginTop: 2,
-            }}
-          >
-            {t('batches.margin', 'Margin {{pct}}%', { pct: financials.marginPct.toFixed(1) })}
-          </Text>
-        )}
-
-        <View
-          style={{
-            flexDirection: 'row',
-            marginTop: 14,
-            paddingTop: 12,
-            borderTopWidth: 1,
-            borderTopColor: borderColor,
-          }}
-        >
-          <StatCell
-            label={t('batches.totalRevenue', 'Revenue')}
-            value={fmt(financials.totalRevenue)}
-          />
-          <StatDivider />
-          <StatCell
-            label={t('batches.expenses', 'Expenses')}
-            value={fmt(financials.totalExpenses)}
-          />
-          <StatDivider />
-          <StatCell
-            label={t('batches.profitPerBird', 'Profit / Bird')}
-            value={financials.profitPerBird != null ? fmt(financials.profitPerBird) : '—'}
-            valueColor={
-              financials.profitPerBird != null && financials.profitPerBird < 0
-                ? errorColor
-                : textColor
-            }
-          />
-        </View>
-      </SheetSection>
+        icon={DollarSign}
+        headlineSuffix={currency}
+        headlineSuffixSubscript
+        headline={fmtMoney(financials.netProfit)}
+        headlineColor={profitColor}
+        subline={
+          scope !== 'allTime' && financials.marginPct != null
+            ? t('batches.margin', 'Margin {{pct}}%', { pct: financials.marginPct.toFixed(1) })
+            : null
+        }
+        onPress={canOpenAccounting ? goAccounting : undefined}
+        stats={[
+          {
+            icon: TrendingUp,
+            label: t('batches.totalRevenue', 'Revenue'),
+            value: finFmt(financials.totalRevenue),
+          },
+          {
+            icon: Receipt,
+            label: t('batches.expenses', 'Expenses'),
+            value: finFmt(financials.totalExpenses),
+          },
+          {
+            icon: Bird,
+            label: t('batches.profitPerBird', 'PNL / Bird'),
+            value: financials.profitPerBird != null ? fmtMoney(financials.profitPerBird) : '—',
+            valueColor: perBirdColor,
+          },
+        ]}
+      />
     </View>
   );
 }

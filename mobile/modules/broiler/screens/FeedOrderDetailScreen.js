@@ -5,10 +5,8 @@ import FeedOrderDetail from '@/modules/broiler/details/FeedOrderDetail';
 import FeedOrderSheet from '@/modules/broiler/sheets/FeedOrderSheet';
 
 /**
- * Feed Order detail route. The new FeedOrderDetail renders its own
- * HeroSheetScreen (back button, view-invoice / edit / delete chrome,
- * brand hero, sectioned sheet, CTAs) — this screen just owns the
- * FeedOrderSheet edit wiring.
+ * Feed Order detail route. FeedOrderDetail uses DetailCompactScreen (compact
+ * gradient bar + full-page scroll) — this screen wires FeedOrderSheet.
  */
 export default function FeedOrderScreen() {
   const { id } = useLocalSearchParams();

@@ -266,10 +266,6 @@ export default function FeedOrderSheet({ open, onOpenChange, batchId, editingFee
   const { mutate, isPending: isMutating } = useOfflineMutation('feedOrders');
 
   const onSubmit = () => {
-    if (!taxInvoiceId.trim()) {
-      setTaxInvoiceIdError(t('batches.taxInvoiceIdRequired'));
-      return;
-    }
     setTaxInvoiceIdError('');
 
     const items = lineItems.map((li) => {
@@ -367,7 +363,7 @@ export default function FeedOrderSheet({ open, onOpenChange, batchId, editingFee
                   </div>
 
                   <div className="space-y-2">
-                    <Label>{t('batches.taxInvoiceId')} <span className="text-destructive">*</span></Label>
+                    <Label>{t('batches.taxInvoiceId')}</Label>
                     <Input
                       value={taxInvoiceId}
                       onChange={(e) => { setTaxInvoiceId(e.target.value); setTaxInvoiceIdError(''); markDirty(); }}

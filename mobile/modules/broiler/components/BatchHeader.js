@@ -68,10 +68,7 @@ export default function BatchHeader({
             <View className="mt-1.5">
               <View className="flex-row items-center justify-between mb-0.5">
                 <Text className="text-[10px] text-muted-foreground tabular-nums">
-                  {t('dashboard.dayOfTarget', 'Day {{day}} of {{target}}', {
-                    day: cycleProgress.days,
-                    target: CYCLE_TARGET_DAYS,
-                  })}
+                  {t('dashboard.dayN', 'Day {{n}}', { n: cycleProgress.days })}
                 </Text>
                 <Text className="text-[10px] font-medium text-muted-foreground tabular-nums">
                   {Math.round(cycleProgress.pct)}%

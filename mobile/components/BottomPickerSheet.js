@@ -142,6 +142,20 @@ const BottomPickerSheet = forwardRef(function BottomPickerSheet({
     });
   }, [slideAnim, backdropAnim, sheetHeight, onSearchChange]);
 
+  // Same end state as `slideOut` but with no slide-down animation — the
+  // Modal disappears in a single frame. Use this when the next UI on screen
+  // is going to take over visually (e.g. the language picker hands off to
+  // the LanguageChangeOverlay) so we skip the picker's exit animation
+  // entirely and let the takeover read as instant. iOS only allows one
+  // Modal presented at a time per VC, so dismissing immediately is also
+  // what unblocks the next overlay's Modal from being able to mount.
+  const dismissImmediate = useCallback(() => {
+    Keyboard.dismiss();
+    setOpen(false);
+    setSearch('');
+    onSearchChange?.('');
+  }, [onSearchChange]);
+
   const openSheet = useCallback(() => {
     Keyboard.dismiss();
     onOpen?.();
@@ -150,7 +164,11 @@ const BottomPickerSheet = forwardRef(function BottomPickerSheet({
     requestAnimationFrame(() => slideIn());
   }, [slideIn, onOpen]);
 
-  useImperativeHandle(ref, () => ({ open: openSheet, close: slideOut }), [openSheet, slideOut]);
+  useImperativeHandle(
+    ref,
+    () => ({ open: openSheet, close: slideOut, dismissImmediate }),
+    [openSheet, slideOut, dismissImmediate]
+  );
 
   // Drag-to-dismiss responder — same handlers are attached to BOTH the drag
   // pill zone AND the icon/title block of the header so the entire
@@ -196,6 +214,9 @@ const BottomPickerSheet = forwardRef(function BottomPickerSheet({
   }), [slideOut]);
 
   const handleSelect = useCallback((val) => {
+    const target = options.find((o) => o.value === val);
+    if (target?.isSectionHeader) return;
+
     if (multiple) {
       Haptics.selectionAsync().catch(() => {});
       const cur = toArray(value);
@@ -206,7 +227,7 @@ const BottomPickerSheet = forwardRef(function BottomPickerSheet({
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     onValueChange?.(val);
     slideOut();
-  }, [multiple, onValueChange, slideOut, value]);
+  }, [multiple, onValueChange, options, slideOut, value]);
 
   const resetMulti = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -216,12 +237,40 @@ const BottomPickerSheet = forwardRef(function BottomPickerSheet({
   const filtered = useMemo(() => {
     if (!search.trim()) return options;
     const q = search.toLowerCase();
-    return options.filter((o) =>
+    const rowMatches = (o) =>
+      !o?.isSectionHeader &&
       searchFields.some((field) => {
         const v = o?.[field];
         return typeof v === 'string' && v.toLowerCase().includes(q);
-      })
-    );
+      });
+
+    const hasSections = options.some((o) => o?.isSectionHeader);
+    if (!hasSections) {
+      return options.filter((o) => rowMatches(o));
+    }
+
+    const out = [];
+    let i = 0;
+    while (i < options.length) {
+      const o = options[i];
+      if (o?.isSectionHeader) {
+        const header = o;
+        i += 1;
+        const group = [];
+        while (i < options.length && !options[i]?.isSectionHeader) {
+          if (rowMatches(options[i])) group.push(options[i]);
+          i += 1;
+        }
+        if (group.length) {
+          out.push(header);
+          out.push(...group);
+        }
+      } else {
+        if (rowMatches(o)) out.push(o);
+        i += 1;
+      }
+    }
+    return out;
   }, [options, search, searchFields]);
 
   const showEmpty = search.trim().length > 0 && filtered.length === 0;
@@ -286,6 +335,30 @@ const BottomPickerSheet = forwardRef(function BottomPickerSheet({
               </Text>
             ) : null}
           </View>
+          {item.catalogueTag ? (
+            <View
+              style={{
+                paddingHorizontal: 8,
+                paddingVertical: 3,
+                borderRadius: 8,
+                backgroundColor: dark ? 'rgba(148,210,165,0.18)' : 'hsl(148, 35%, 92%)',
+                marginHorizontal: 6,
+                flexShrink: 0,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 10,
+                  fontFamily: 'Poppins-SemiBold',
+                  color: accentColor,
+                  letterSpacing: 0.3,
+                }}
+                numberOfLines={1}
+              >
+                {item.catalogueTag}
+              </Text>
+            </View>
+          ) : null}
           {!multiple && isSelected ? <Check size={18} color={accentColor} strokeWidth={2.6} /> : null}
         </View>
       </Pressable>
@@ -509,7 +582,9 @@ const BottomPickerSheet = forwardRef(function BottomPickerSheet({
           {/* Options list */}
           <FlatList
             data={filtered}
-            keyExtractor={(item) => String(item.value)}
+            keyExtractor={(item, index) =>
+              (item?.isSectionHeader ? `hdr:${item.value}` : `row:${item.value}`) + String(index)
+            }
             keyboardShouldPersistTaps="handled"
             style={{ flex: 1 }}
             contentContainerStyle={
@@ -518,6 +593,31 @@ const BottomPickerSheet = forwardRef(function BottomPickerSheet({
                 : { paddingBottom: 12 }
             }
             renderItem={({ item }) => {
+              if (item?.isSectionHeader) {
+                return (
+                  <View
+                    style={{
+                      paddingHorizontal: 20,
+                      paddingTop: 14,
+                      paddingBottom: 6,
+                      backgroundColor: dark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontFamily: 'Poppins-SemiBold',
+                        color: mutedColor,
+                        letterSpacing: 1,
+                        textTransform: 'uppercase',
+                        textAlign: isRTL ? 'right' : 'left',
+                      }}
+                    >
+                      {item.label}
+                    </Text>
+                  </View>
+                );
+              }
               const isSelected = multiple
                 ? selectedSet.has(item.value)
                 : value === item.value;

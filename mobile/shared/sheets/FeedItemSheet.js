@@ -10,7 +10,7 @@ import useLocalQuery from '@/hooks/useLocalQuery';
 import useSettings from '@/hooks/useSettings';
 import SheetInput, { SheetCurrencyInput } from '@/components/SheetInput';
 import Select from '@/components/ui/Select';
-import EnumButtonSelect from '@/components/ui/EnumButtonSelect';
+import SlidingSegmentedControl from '@/components/SlidingSegmentedControl';
 import Switch from '@/components/ui/Switch';
 import FormSheet from '@/components/FormSheet';
 import {
@@ -254,12 +254,11 @@ export default function FeedItemSheet({
             control={control}
             name="feedType"
             render={({ field: { value, onChange } }) => (
-              <EnumButtonSelect
+              <SlidingSegmentedControl
                 value={value}
                 onChange={onChange}
                 options={feedTypeOptions}
-                columns={4}
-                compact
+                bordered={false}
               />
             )}
           />

@@ -1,7 +1,7 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View, Text, Pressable, Animated, Modal, StyleSheet, Easing,
-  useWindowDimensions,
+  useWindowDimensions, Platform,
 } from 'react-native';
 import { Plus } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
@@ -41,6 +41,11 @@ export default function QuickAddFAB({ items, bottomInset = 0, directAction = nul
   const [open, setOpen] = useState(false);
   const [anchor, setAnchor] = useState(null); // { x, y, width, height } in window coords
   const triggerRef = useRef(null);
+  // Selected item's onPress is deferred until AFTER the FAB modal is fully
+  // dismissed. Opening a second iOS Modal (pageSheet) while this one is
+  // still mid-dismiss locks up the UI / crashes (you tap an item and
+  // nothing happens, or the app freezes).
+  const pendingActionRef = useRef(null);
 
   const card = useRef(new Animated.Value(0)).current;
   const rowsRef = useRef(null);
@@ -105,11 +110,29 @@ export default function QuickAddFAB({ items, bottomInset = 0, directAction = nul
 
   const handleSelect = useCallback(
     (onPress) => {
+      // Queue the action and start dismissing. The action fires from the
+      // Modal's onDismiss (iOS) or from the open->false effect (Android).
+      pendingActionRef.current = onPress;
       hide();
-      setTimeout(onPress, 100);
     },
     [hide],
   );
+
+  const flushPendingAction = useCallback(() => {
+    const fn = pendingActionRef.current;
+    if (!fn) return;
+    pendingActionRef.current = null;
+    fn();
+  }, []);
+
+  // Android Modal has no onDismiss; the close is effectively immediate, so
+  // run the queued action one frame after the open flag flips false.
+  useEffect(() => {
+    if (open || Platform.OS === 'ios') return;
+    if (!pendingActionRef.current) return;
+    const id = setTimeout(flushPendingAction, 50);
+    return () => clearTimeout(id);
+  }, [open, flushPendingAction]);
 
   const fabRotation = card.interpolate({
     inputRange: [0, 1],
@@ -164,6 +187,7 @@ export default function QuickAddFAB({ items, bottomInset = 0, directAction = nul
           statusBarTranslucent
           animationType="none"
           onRequestClose={hide}
+          onDismiss={Platform.OS === 'ios' ? flushPendingAction : undefined}
         >
           {/* Dim backdrop — fills the Modal's native window which spans the
               entire screen, including the tab bar. */}

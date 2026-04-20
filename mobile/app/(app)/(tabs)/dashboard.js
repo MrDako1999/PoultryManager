@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 import { Sun, Sunrise, Sunset, Moon } from 'lucide-react-native';
 import useAuthStore from '@/stores/authStore';
 import useCapabilities from '@/hooks/useCapabilities';
-import useSettings from '@/hooks/useSettings';
 import SyncIconButton from '@/components/SyncIconButton';
 import ModuleSwitcher from '@/shared/components/ModuleSwitcher';
 import HeroSheetScreen, { useHeroSheetTokens } from '@/components/HeroSheetScreen';
@@ -41,73 +40,10 @@ const BUCKET_TO_ICON = {
   night: Moon,
 };
 
-// Owns the per-module quick-stats hook so its hook ordering can't bleed
-// into DashboardScreen's. The dashboard mounts at most one of these and
-// keys it by moduleId so switching modules cleanly remounts the subtree.
-function ModuleQuickStats({ useHook, hookProps }) {
-  const stats = useHook(hookProps);
-  return <HeroQuickStats stats={stats} />;
-}
-
-function HeroQuickStats({ stats }) {
-  if (!stats || stats.length === 0) return null;
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 8,
-      }}
-    >
-      {stats.map((stat) => {
-        const Icon = stat.icon;
-        return (
-          <View
-            key={stat.key}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 6,
-              backgroundColor: 'rgba(255,255,255,0.18)',
-              borderRadius: 999,
-              paddingHorizontal: 11,
-              paddingVertical: 6,
-            }}
-          >
-            {Icon && <Icon size={13} color="#ffffff" strokeWidth={2.4} />}
-            <Text
-              style={{
-                fontSize: 13,
-                fontFamily: 'Poppins-SemiBold',
-                color: '#ffffff',
-                letterSpacing: -0.1,
-              }}
-              numberOfLines={1}
-            >
-              {stat.value}
-            </Text>
-            <Text
-              style={{
-                fontSize: 11,
-                fontFamily: 'Poppins-Regular',
-                color: 'rgba(255,255,255,0.78)',
-              }}
-              numberOfLines={1}
-            >
-              {stat.label}
-            </Text>
-          </View>
-        );
-      })}
-    </View>
-  );
-}
-
 export default function DashboardScreen() {
   const { t, i18n } = useTranslation();
   const { user } = useAuthStore();
   const { visibleModules, can, role, activeModule } = useCapabilities();
-  const accounting = useSettings('accounting');
   const [refreshing, setRefreshing] = useState(false);
   const { mutedColor, accentColor, dark } = useHeroSheetTokens();
 
@@ -153,22 +89,6 @@ export default function DashboardScreen() {
     setRefreshing(false);
   };
 
-  // Active module's quick-stats hook is mounted inside <ModuleQuickStats /> so
-  // its hook ordering is isolated from DashboardScreen's. Calling it directly
-  // would mean hook count changes when activeModule resolves async, which
-  // crashes React with "Rendered more hooks than during the previous render."
-  const activeMod = activeModule ? MODULES[activeModule] : null;
-  const useQuickStats = activeMod?.useDashboardQuickStats || null;
-  const quickStatsNode = useQuickStats
-    ? (
-      <ModuleQuickStats
-        key={activeModule}
-        useHook={useQuickStats}
-        hookProps={{ currency: accounting?.currency || 'AED', t }}
-      />
-    )
-    : null;
-
   if (RoleDashboard) {
     return <RoleDashboard />;
   }
@@ -204,7 +124,6 @@ export default function DashboardScreen() {
       showBack={false}
       heroExtra={heroExtra}
       headerRight={headerRight}
-      heroBelow={quickStatsNode}
       scrollableHero
       refreshControl={
         <RefreshControl

@@ -1,7 +1,6 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
-  View, Text, Pressable, ScrollView, RefreshControl,
-  LayoutAnimation, UIManager, Platform, StyleSheet,
+  View, Text, Pressable, ScrollView, RefreshControl, StyleSheet,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -9,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
 import {
   Home, Wheat, Droplets, Activity, BarChart3, Skull, Heart, ClipboardList,
-  TrendingDown, ChevronDown, ChevronRight, ChevronLeft,
+  TrendingDown, ChevronRight, ChevronLeft,
 } from 'lucide-react-native';
 import useLocalQuery from '@/hooks/useLocalQuery';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
@@ -19,18 +18,11 @@ import EmptyState from '@/components/ui/EmptyState';
 import ChartCard from '@/components/ChartCard';
 import MortalityChart from '@/modules/broiler/charts/MortalityChart';
 import ConsumptionChart from '@/modules/broiler/charts/ConsumptionChart';
-import DailyLogRow from '@/modules/broiler/rows/DailyLogRow';
 import { SkeletonBatchPerformance } from '@/components/skeletons';
 import { deltaSync } from '@/lib/syncEngine';
 import BatchKpiCard, {
   mortalityToneColor,
 } from '@/modules/broiler/components/BatchKpiCard';
-
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
-
-const PER_HOUSE_LOG_PREVIEW = 5;
 
 const NUMERIC_LOCALE = 'en-US';
 
@@ -73,16 +65,14 @@ export default function BatchPerformanceTab({ batch, batchId }) {
   const [mortView, setMortView] = useState('cumulative');
   const [consMetric, setConsMetric] = useState('feed');
   const [consView, setConsView] = useState('cumulative');
-  const [houseOpen, setHouseOpen] = useState({});
   const [dailyLogs, dailyLogsLoading] = useLocalQuery('dailyLogs', { batch: batchId });
   const houses = batch?.houses || [];
   const startDate = batch?.startDate;
 
-  const toggleHouse = useCallback((id) => {
+  const openHouseLogs = (id) => {
     Haptics.selectionAsync().catch(() => {});
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setHouseOpen((p) => ({ ...p, [id]: !p[id] }));
-  }, []);
+    router.push(`/(app)/batch/${batchId}/house/${id}/logs`);
+  };
 
   const totalInitial = useMemo(
     () => houses.reduce((s, h) => s + (h.quantity || 0), 0),
@@ -271,6 +261,27 @@ export default function BatchPerformanceTab({ batch, batchId }) {
           ]}
         />
 
+        <ChartCard
+          sectionTitle={t('charts.mortalityTrend', 'Mortality Trend')}
+          sectionIcon={Activity}
+          title={mortView === 'cumulative'
+            ? t('charts.cumulativeMortality', 'Cumulative Mortality')
+            : t('charts.dailyDeaths', 'Daily Deaths')}
+          segments={[
+            { value: 'cumulative', icon: Activity },
+            { value: 'daily', icon: BarChart3 },
+          ]}
+          segmentValue={mortView}
+          onSegmentChange={setMortView}
+        >
+          <MortalityChart
+            dailyLogs={dailyLogs}
+            houses={houses}
+            startDate={startDate}
+            view={mortView}
+          />
+        </ChartCard>
+
         <BatchKpiCard
           title={t('batches.consumptionSummary', 'Consumption')}
           icon={Wheat}
@@ -294,27 +305,6 @@ export default function BatchPerformanceTab({ batch, batchId }) {
             },
           ]}
         />
-
-        <ChartCard
-          sectionTitle={t('charts.mortalityTrend', 'Mortality Trend')}
-          sectionIcon={Activity}
-          title={mortView === 'cumulative'
-            ? t('charts.cumulativeMortality', 'Cumulative Mortality')
-            : t('charts.dailyDeaths', 'Daily Deaths')}
-          segments={[
-            { value: 'cumulative', icon: Activity },
-            { value: 'daily', icon: BarChart3 },
-          ]}
-          segmentValue={mortView}
-          onSegmentChange={setMortView}
-        >
-          <MortalityChart
-            dailyLogs={dailyLogs}
-            houses={houses}
-            startDate={startDate}
-            view={mortView}
-          />
-        </ChartCard>
 
         <ChartCard
           sectionTitle={t('charts.consumption', 'Consumption Trend')}
@@ -342,8 +332,10 @@ export default function BatchPerformanceTab({ batch, batchId }) {
           />
         </ChartCard>
 
-        {/* Per-house raw data tables — collapsible sections so the user can
-            drill into individual log entries without leaving the page. */}
+        {/* Per-house raw data — each card opens a full house log detail
+            screen (KPI hero + filters + day-grouped logs). The card itself
+            shows a quick-stat sub-line so the user can compare houses at a
+            glance without drilling in. */}
         {housesData.length > 0 ? (
           <SheetSection
             title={t('batches.rawDataByHouse', 'Raw data by house')}
@@ -352,13 +344,28 @@ export default function BatchPerformanceTab({ batch, batchId }) {
           >
             <View style={{ padding: 8, gap: 10 }}>
               {housesData.map((house) => {
-                const open = !!houseOpen[house.id];
-                const Glyph = open ? ChevronDown : (isRTL ? ChevronLeft : ChevronRight);
-                const previewLogs = house.logs.slice(0, PER_HOUSE_LOG_PREVIEW);
-                const moreCount = Math.max(0, house.logs.length - previewLogs.length);
+                const ChevronGlyph = isRTL ? ChevronLeft : ChevronRight;
+                const subParts = [];
+                if (house.deaths > 0) {
+                  subParts.push(`${fmt(house.deaths)} ${t('batches.operations.deathsShort', 'Deaths').toLowerCase()}`);
+                }
+                if (house.feedKg > 0) {
+                  subParts.push(`${fmt(house.feedKg)} kg ${t('batches.operations.feedShort', 'Feed').toLowerCase()}`);
+                }
+                if (house.waterL > 0) {
+                  subParts.push(`${fmt(house.waterL)} L ${t('batches.operations.waterShort', 'Water').toLowerCase()}`);
+                }
+                const subline = subParts.length > 0
+                  ? subParts.join('  ·  ')
+                  : t('batches.operations.noEntries', 'No entries yet');
                 return (
-                  <View
+                  <Pressable
                     key={house.id}
+                    onPress={() => openHouseLogs(house.id)}
+                    android_ripple={{
+                      color: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+                      borderless: false,
+                    }}
                     style={[
                       perHouseStyles.card,
                       {
@@ -366,128 +373,81 @@ export default function BatchPerformanceTab({ batch, batchId }) {
                         borderColor: elevatedCardBorder,
                       },
                     ]}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('batches.viewAllLogs', 'All Logs')}
                   >
-                    <Pressable
-                      onPress={() => toggleHouse(house.id)}
-                      android_ripple={{
-                        color: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-                        borderless: false,
-                      }}
-                      style={perHouseStyles.headerPressable}
+                    <View
+                      style={[
+                        perHouseStyles.headerRow,
+                        { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                      ]}
                     >
-                      <View
-                        style={[
-                          perHouseStyles.headerRow,
-                          { flexDirection: isRTL ? 'row-reverse' : 'row' },
-                        ]}
-                      >
-                        <Glyph size={16} color={mutedColor} strokeWidth={2.4} />
-                        <Home size={14} color={mutedColor} strokeWidth={2.2} />
-                        <Text
-                          style={{
-                            flex: 1,
-                            fontSize: 14,
-                            fontFamily: 'Poppins-SemiBold',
-                            color: textColor,
-                            textAlign: isRTL ? 'right' : 'left',
-                          }}
-                          numberOfLines={1}
-                        >
-                          {house.name}
-                        </Text>
-                        <Text
-                          style={{
-                            fontSize: 11,
-                            fontFamily: 'Poppins-SemiBold',
-                            color: mutedColor,
-                            letterSpacing: 0.4,
-                          }}
-                        >
-                          {`${fmt(house.qty)} ${t('farms.birds', 'birds').toLowerCase()}`}
-                        </Text>
+                      <Home size={14} color={mutedColor} strokeWidth={2.2} />
+                      <View style={perHouseStyles.textCol}>
                         <View
                           style={[
-                            perHouseStyles.countPill,
-                            {
-                              backgroundColor: dark ? 'rgba(255,255,255,0.06)' : 'hsl(148, 18%, 96%)',
-                              borderColor: dark ? 'rgba(255,255,255,0.08)' : borderColor,
-                            },
+                            perHouseStyles.titleRow,
+                            { flexDirection: isRTL ? 'row-reverse' : 'row' },
                           ]}
                         >
+                          <Text
+                            style={{
+                              flex: 1,
+                              fontSize: 14,
+                              fontFamily: 'Poppins-SemiBold',
+                              color: textColor,
+                              textAlign: isRTL ? 'right' : 'left',
+                            }}
+                            numberOfLines={1}
+                          >
+                            {house.name}
+                          </Text>
                           <Text
                             style={{
                               fontSize: 11,
                               fontFamily: 'Poppins-SemiBold',
                               color: mutedColor,
+                              letterSpacing: 0.4,
                             }}
                           >
-                            {fmt(house.logs.length)}
+                            {`${fmt(house.qty)} ${t('farms.birds', 'birds').toLowerCase()}`}
                           </Text>
                         </View>
-                      </View>
-                    </Pressable>
-
-                    {open ? (
-                      house.logs.length === 0 ? (
                         <Text
                           style={{
-                            fontSize: 13,
-                            fontFamily: 'Poppins-Regular',
+                            fontSize: 11,
+                            fontFamily: 'Poppins-Medium',
                             color: mutedColor,
-                            textAlign: 'center',
-                            paddingVertical: 16,
-                            paddingHorizontal: 16,
+                            marginTop: 3,
+                            textAlign: isRTL ? 'right' : 'left',
+                          }}
+                          numberOfLines={1}
+                        >
+                          {subline}
+                        </Text>
+                      </View>
+                      <View
+                        style={[
+                          perHouseStyles.countPill,
+                          {
+                            backgroundColor: dark ? 'rgba(255,255,255,0.06)' : 'hsl(148, 18%, 96%)',
+                            borderColor: dark ? 'rgba(255,255,255,0.08)' : borderColor,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            fontFamily: 'Poppins-SemiBold',
+                            color: mutedColor,
                           }}
                         >
-                          {t('batches.operations.noEntries', 'No entries yet')}
+                          {fmt(house.logs.length)}
                         </Text>
-                      ) : (
-                        <View>
-                          <View
-                            style={{
-                              height: StyleSheet.hairlineWidth,
-                              backgroundColor: borderColor,
-                            }}
-                          />
-                          {previewLogs.map((log, i) => (
-                            <View
-                              key={log._id || `l${i}`}
-                              style={i > 0
-                                ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: borderColor }
-                                : null}
-                            >
-                              <DailyLogRow
-                                log={log}
-                                t={t}
-                                onClick={() => router.push(`/(app)/daily-log/${log._id}`)}
-                              />
-                            </View>
-                          ))}
-                          {moreCount > 0 ? (
-                            <View
-                              style={{
-                                paddingHorizontal: 14,
-                                paddingVertical: 10,
-                                borderTopWidth: StyleSheet.hairlineWidth,
-                                borderTopColor: borderColor,
-                              }}
-                            >
-                              <Text
-                                style={{
-                                  fontSize: 12,
-                                  fontFamily: 'Poppins-Medium',
-                                  color: mutedColor,
-                                  textAlign: 'center',
-                                }}
-                              >
-                                {t('batches.moreLogs', '+ {{count}} more', { count: fmt(moreCount) })}
-                              </Text>
-                            </View>
-                          ) : null}
-                        </View>
-                      )
-                    ) : null}
-                  </View>
+                      </View>
+                      <ChevronGlyph size={16} color={mutedColor} strokeWidth={2.4} />
+                    </View>
+                  </Pressable>
                 );
               })}
             </View>
@@ -503,14 +463,20 @@ const perHouseStyles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     overflow: 'hidden',
-  },
-  headerPressable: {
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
   headerRow: {
     alignItems: 'center',
     gap: 10,
+  },
+  textCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  titleRow: {
+    alignItems: 'center',
+    gap: 8,
   },
   countPill: {
     minWidth: 28,

@@ -5,10 +5,9 @@ import SourceDetail from '@/modules/broiler/details/SourceDetail';
 import SourceSheet from '@/modules/broiler/sheets/SourceSheet';
 
 /**
- * Source detail route. The new SourceDetail renders its own
- * HeroSheetScreen (back button, view-invoice / edit / delete chrome,
- * brand hero, sectioned sheet, CTAs) — this screen just owns the
- * SourceSheet edit wiring.
+ * Source detail route. SourceDetail uses DetailCompactScreen (compact
+ * gradient bar, sectioned scroll body, CTAs) — this screen owns SourceSheet
+ * edit wiring.
  */
 export default function SourceScreen() {
   const { id } = useLocalSearchParams();

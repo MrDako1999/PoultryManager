@@ -5,9 +5,9 @@ import SaleDetail from '@/modules/broiler/details/SaleDetail';
 import SaleOrderSheet from '@/modules/broiler/sheets/SaleOrderSheet';
 
 /**
- * Sale detail route. The new SaleDetail renders its own HeroSheetScreen
- * (back button, edit / delete chrome, brand hero, sectioned sheet, CTAs)
- * — this screen just owns the SaleOrderSheet edit wiring.
+ * Sale detail route. SaleDetail uses DetailCompactScreen (compact gradient
+ * bar, sectioned scroll body, CTAs) — this screen owns SaleOrderSheet edit
+ * wiring.
  */
 export default function SaleScreen() {
   const { id } = useLocalSearchParams();

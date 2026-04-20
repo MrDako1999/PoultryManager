@@ -1,10 +1,10 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Plus, Trash2, Wheat } from 'lucide-react-native';
 import SheetInput from '@/components/SheetInput';
 import Select from '@/components/ui/Select';
-import EnumButtonSelect from '@/components/ui/EnumButtonSelect';
+import SlidingSegmentedControl from '@/components/SlidingSegmentedControl';
 import DatePicker from '@/components/ui/DatePicker';
 import MultiFileUpload from '@/components/MultiFileUpload';
 import QuickAddBusinessSheet from '@/shared/sheets/QuickAddBusinessSheet';
@@ -31,8 +31,10 @@ const emptyLineItem = () => ({
 export default function FeedOrderSheet({ open, onClose, batchId, editData }) {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const tokens = useHeroSheetTokens();
   const accounting = useSettings('accounting');
   const [businesses] = useLocalQuery('businesses');
+  const [feedItems] = useLocalQuery('feedItems');
   const { create, update } = useOfflineMutation('feedOrders');
   const [saving, setSaving] = useState(false);
   const [quickAddBiz, setQuickAddBiz] = useState(false);
@@ -52,6 +54,92 @@ export default function FeedOrderSheet({ open, onClose, batchId, editData }) {
   const [deliveryDate, setDeliveryDate] = useState('');
   const [deliveryCharge, setDeliveryCharge] = useState('');
   const [lineItems, setLineItems] = useState([emptyLineItem()]);
+
+  const feedCompanyIds = useMemo(() => {
+    const ids = new Set();
+    feedItems.forEach((fi) => {
+      if (fi.isActive === false) return;
+      const cid = fi.feedCompany?._id ?? fi.feedCompany;
+      if (cid) ids.add(String(cid));
+    });
+    return ids;
+  }, [feedItems]);
+
+  const feedItemCountByCompany = useMemo(() => {
+    const m = new Map();
+    feedItems.forEach((fi) => {
+      if (fi.isActive === false) return;
+      const cid = fi.feedCompany?._id ?? fi.feedCompany;
+      if (cid == null) return;
+      const k = String(cid);
+      m.set(k, (m.get(k) || 0) + 1);
+    });
+    return m;
+  }, [feedItems]);
+
+  const companyFeedItems = useMemo(() => {
+    if (!selectedCompany) return [];
+    const sid = String(selectedCompany);
+    return feedItems.filter((fi) => {
+      if (fi.isActive === false) return false;
+      const cid = fi.feedCompany?._id ?? fi.feedCompany;
+      return cid != null && String(cid) === sid;
+    });
+  }, [feedItems, selectedCompany]);
+
+  const companyPickerOptions = useMemo(() => {
+    let priRaw = businesses.filter((b) => feedCompanyIds.has(String(b._id)));
+    let othRaw = businesses.filter((b) => !feedCompanyIds.has(String(b._id)));
+    if (pendingBiz
+      && !priRaw.some((b) => b._id === pendingBiz._id)
+      && !othRaw.some((b) => b._id === pendingBiz._id)) {
+      othRaw = [{ _id: pendingBiz._id, companyName: pendingBiz.companyName, trnNumber: pendingBiz.trnNumber }, ...othRaw];
+    }
+    const pri = priRaw.map((b) => {
+      const n = feedItemCountByCompany.get(String(b._id)) || 0;
+      const catalogueTag = n === 1
+        ? t('batches.feedProductCount_one', '1 product')
+        : n > 1
+          ? t('batches.feedProductCount_many', '{{count}} products', { count: n })
+          : undefined;
+      return {
+        value: b._id,
+        label: b.companyName,
+        description: b.trnNumber ? `TRN: ${b.trnNumber}` : '',
+        catalogueTag,
+      };
+    });
+    const oth = othRaw.map((b) => ({
+      value: b._id,
+      label: b.companyName,
+      description: b.trnNumber ? `TRN: ${b.trnNumber}` : '',
+    }));
+    const out = [];
+    if (pri.length) {
+      out.push({
+        value: '__section_feed',
+        label: t('batches.feedCompanySectionCatalogue', 'With feed products'),
+        isSectionHeader: true,
+      });
+      out.push(...pri);
+    }
+    if (oth.length) {
+      if (pri.length) {
+        out.push({
+          value: '__section_other',
+          label: t('batches.feedCompanySectionOther', 'Other businesses'),
+          isSectionHeader: true,
+        });
+      }
+      out.push(...oth);
+    }
+    return out;
+  }, [businesses, feedCompanyIds, feedItemCountByCompany, pendingBiz, t]);
+
+  const handleCompanyChange = useCallback((val) => {
+    setSelectedCompany(val || '');
+    setLineItems([emptyLineItem()]);
+  }, []);
 
   useEffect(() => {
     if (editData) {
@@ -88,21 +176,54 @@ export default function FeedOrderSheet({ open, onClose, batchId, editData }) {
     }
   }, [editData, open]);
 
-  const businessOptions = useMemo(() => {
-    const opts = businesses.map((b) => ({ value: b._id, label: b.companyName }));
-    if (pendingBiz && !opts.some((o) => o.value === pendingBiz._id)) {
-      opts.unshift({ value: pendingBiz._id, label: pendingBiz.companyName });
-    }
-    return opts;
-  }, [businesses, pendingBiz]);
-
   const feedTypeOptions = useMemo(
     () => FEED_TYPES.map((v) => ({ value: v, label: t(`feed.feedTypes.${v}`), icon: FEED_TYPE_ICONS[v] })),
     [t]
   );
 
+  const applyFeedTypeSelection = useCallback((index, ftVal) => {
+    const filtered = companyFeedItems.filter((fi) => fi.feedType === ftVal);
+    setLineItems((prev) => prev.map((li, i) => {
+      if (i !== index) return li;
+      if (filtered.length === 1) {
+        const fi = filtered[0];
+        return {
+          ...li,
+          feedType: ftVal,
+          feedItem: fi._id,
+          feedDescription: fi.feedDescription || '',
+          pricePerBag: fi.pricePerQty != null ? String(fi.pricePerQty) : '',
+          quantitySize: String(fi.quantitySize ?? 50),
+          quantityUnit: fi.quantityUnit || 'KG',
+        };
+      }
+      return {
+        ...li,
+        feedType: ftVal,
+        feedItem: '',
+        feedDescription: '',
+        pricePerBag: '',
+        quantitySize: '50',
+        quantityUnit: 'KG',
+      };
+    }));
+  }, [companyFeedItems]);
+
+  const applyProductSelection = useCallback((index, feedItemId) => {
+    const fi = companyFeedItems.find((f) => f._id === feedItemId);
+    if (!fi) return;
+    setLineItems((prev) => prev.map((li, i) => (i === index ? {
+      ...li,
+      feedItem: fi._id,
+      feedDescription: fi.feedDescription || '',
+      pricePerBag: fi.pricePerQty != null ? String(fi.pricePerQty) : '',
+      quantitySize: String(fi.quantitySize ?? 50),
+      quantityUnit: fi.quantityUnit || 'KG',
+    } : li)));
+  }, [companyFeedItems]);
+
   const updateLine = (index, field, value) => {
-    setLineItems((prev) => prev.map((li, i) => i === index ? { ...li, [field]: value } : li));
+    setLineItems((prev) => prev.map((li, i) => (i === index ? { ...li, [field]: value } : li)));
   };
 
   const removeLine = (index) => {
@@ -114,12 +235,16 @@ export default function FeedOrderSheet({ open, onClose, batchId, editData }) {
   const vatAmount = subtotal * (vatRate / 100);
   const grandTotal = subtotal + deliveryChargeNum + vatAmount;
 
+  const priCount = businesses.filter((b) => feedCompanyIds.has(String(b._id))).length;
+
   const handleSave = async () => {
     const errs = {};
-    if (!taxInvoiceId.trim()) errs.taxInvoiceId = t('batches.taxInvoiceIdRequired', 'Invoice ID is required');
+    if (!selectedCompany) errs.feedCompany = t('batches.feedCompanyRequired');
     if (lineItems.length === 0) errs.lineItems = 'At least one line item is required';
     lineItems.forEach((li, i) => {
-      if (!li.feedType) errs[`line_${i}_feedType`] = 'Feed type is required';
+      if (!li.feedType) errs[`line_${i}_feedType`] = t('batches.feedTypeRequired');
+      if (!li.feedItem) errs[`line_${i}_feedItem`] = t('batches.feedProductRequired');
+      if (parseNum(li.bags) <= 0) errs[`line_${i}_bags`] = t('batches.bagsRequired');
     });
     if (Object.keys(errs).length > 0) {
       setFieldErrors(errs);
@@ -128,16 +253,22 @@ export default function FeedOrderSheet({ open, onClose, batchId, editData }) {
     setFieldErrors({});
     setSaving(true);
     try {
-      const items = lineItems.map((li) => ({
-        feedType: li.feedType,
-        feedItem: li.feedItem || null,
-        feedDescription: li.feedDescription,
-        pricePerBag: parseNum(li.pricePerBag),
-        bags: parseNum(li.bags),
-        quantitySize: parseNum(li.quantitySize) || 50,
-        quantityUnit: li.quantityUnit || 'KG',
-        subtotal: parseNum(li.pricePerBag) * parseNum(li.bags),
-      }));
+      const items = lineItems.map((li) => {
+        const liSub = parseNum(li.pricePerBag) * parseNum(li.bags);
+        const liVat = liSub * (vatRate / 100);
+        return {
+          feedType: li.feedType,
+          feedItem: li.feedItem || null,
+          feedDescription: li.feedDescription,
+          pricePerBag: parseNum(li.pricePerBag),
+          bags: parseNum(li.bags),
+          quantitySize: parseNum(li.quantitySize) || 50,
+          quantityUnit: li.quantityUnit || 'KG',
+          subtotal: liSub,
+          vatAmount: liVat,
+          lineTotal: liSub + liVat,
+        };
+      });
 
       const payload = {
         batch: batchId,
@@ -182,24 +313,39 @@ export default function FeedOrderSheet({ open, onClose, batchId, editData }) {
         onSubmit={handleSave}
         submitLabel={editData ? t('common.save') : t('common.create')}
         loading={saving}
-        disabled={saving || lineItems.length === 0}
+        disabled={saving || lineItems.length === 0 || !selectedCompany}
       >
         {/* Vendor & invoice */}
         <FormSection title={t('batches.feedVendor', 'Vendor & Invoice')}>
-          <FormField label={t('batches.feedCompany')}>
+          <FormField label={t('batches.feedCompany')} error={fieldErrors.feedCompany}>
             <Select
               value={selectedCompany}
-              onValueChange={setSelectedCompany}
-              options={businessOptions}
+              onValueChange={handleCompanyChange}
+              options={companyPickerOptions}
               placeholder={t('batches.selectFeedCompany')}
               label={t('batches.feedCompany')}
+              searchPlaceholder={t('batches.searchFeedCompany', 'Search…')}
+              forceSearchable
               onCreateNew={(searchText) => { setBizInitialName(searchText || ''); setQuickAddBiz(true); }}
               createNewLabel={t('businesses.addBusiness', 'Add Business')}
             />
           </FormField>
+          {priCount > 0 ? (
+            <Text
+              style={{
+                fontSize: 12,
+                fontFamily: 'Poppins-Regular',
+                color: tokens.mutedColor,
+                marginTop: -4,
+                marginBottom: 4,
+              }}
+            >
+              {t('batches.feedCompanyHint')}
+            </Text>
+          ) : null}
 
           <SheetInput
-            label={`${t('batches.taxInvoiceId')} *`}
+            label={t('batches.taxInvoiceId')}
             value={taxInvoiceId}
             onChangeText={setTaxInvoiceId}
             placeholder={t('batches.invoiceIdPlaceholder')}
@@ -221,26 +367,46 @@ export default function FeedOrderSheet({ open, onClose, batchId, editData }) {
         <FormSection
           title={t('batches.lineItems', 'Line Items')}
           headerRight={
-            <AddRowButton
-              icon={Plus}
-              label={t('batches.addLineItem', 'Add Line Item')}
-              onPress={() => setLineItems((prev) => [...prev, emptyLineItem()])}
-            />
+            selectedCompany ? (
+              <AddRowButton
+                icon={Plus}
+                label={t('batches.addLineItem', 'Add Line Item')}
+                onPress={() => setLineItems((prev) => [...prev, emptyLineItem()])}
+              />
+            ) : null
           }
         >
-          {lineItems.map((item, index) => (
-            <FeedLineItemCard
-              key={item.key}
-              index={index}
-              item={item}
-              count={lineItems.length}
-              feedTypeOptions={feedTypeOptions}
-              fieldErrors={fieldErrors}
-              t={t}
-              onUpdate={updateLine}
-              onRemove={removeLine}
-            />
-          ))}
+          {!selectedCompany ? (
+            <Text
+              style={{
+                fontSize: 14,
+                fontFamily: 'Poppins-Regular',
+                color: tokens.mutedColor,
+                textAlign: 'center',
+                paddingVertical: 16,
+              }}
+            >
+              {t('batches.selectFeedCompanyFirst')}
+            </Text>
+          ) : (
+            lineItems.map((item, index) => (
+              <FeedLineItemCard
+                key={item.key}
+                index={index}
+                item={item}
+                count={lineItems.length}
+                feedTypeOptions={feedTypeOptions}
+                companyFeedItems={companyFeedItems}
+                currency={currency}
+                fieldErrors={fieldErrors}
+                t={t}
+                onFeedTypeChange={applyFeedTypeSelection}
+                onProductChange={applyProductSelection}
+                onUpdate={updateLine}
+                onRemove={removeLine}
+              />
+            ))
+          )}
         </FormSection>
 
         {/* Charges & totals */}
@@ -303,6 +469,7 @@ export default function FeedOrderSheet({ open, onClose, batchId, editData }) {
         onCreated={(biz) => {
           setPendingBiz(biz);
           setSelectedCompany(biz._id);
+          setLineItems([emptyLineItem()]);
           toast({ title: `${biz.companyName} ${t('common.created', 'created')}` });
         }}
       />
@@ -310,33 +477,76 @@ export default function FeedOrderSheet({ open, onClose, batchId, editData }) {
   );
 }
 
-function FeedLineItemCard({ index, item, count, feedTypeOptions, fieldErrors, t, onUpdate, onRemove }) {
+function FeedLineItemCard({
+  index,
+  item,
+  count,
+  feedTypeOptions,
+  companyFeedItems,
+  currency,
+  fieldErrors,
+  t,
+  onFeedTypeChange,
+  onProductChange,
+  onUpdate,
+  onRemove,
+}) {
   const tokens = useHeroSheetTokens();
   const isRTL = useIsRTL();
-  const { dark, mutedColor, errorColor } = tokens;
+  const { dark, mutedColor, errorColor, textColor, accentColor, borderColor } = tokens;
+
+  // SlidingSegmentedControl always shows a pill on the first option, so make
+  // the stored value match what's visually highlighted.
+  useEffect(() => {
+    if (!item.feedType && feedTypeOptions[0]) {
+      onFeedTypeChange(index, feedTypeOptions[0].value);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const matchingItems = companyFeedItems.filter((fi) =>
+    !item.feedType || fi.feedType === item.feedType
+  );
+  const productOptions = matchingItems.map((fi) => ({
+    value: fi._id,
+    label: fi.feedDescription || '—',
+    description: `${fi.quantitySize ?? ''}${fi.quantityUnit || ''} — ${currency} ${Number(fi.pricePerQty || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+  }));
+
+  const singleProduct = item.feedType && matchingItems.length === 1 ? matchingItems[0] : null;
+  const showProductSelect = item.feedType && matchingItems.length > 1;
+  const showSingleSummary = item.feedType && matchingItems.length === 1;
+  const showNoProducts = item.feedType && matchingItems.length === 0;
+
+  const labelStyle = {
+    fontSize: 13,
+    fontFamily: 'Poppins-Medium',
+    color: textColor,
+    textAlign: isRTL ? 'right' : 'left',
+  };
 
   return (
     <View
-      style={[
-        lineItemStyles.card,
-        {
-          backgroundColor: dark ? 'rgba(255,255,255,0.03)' : 'hsl(148, 22%, 96%)',
-          borderColor: dark ? 'hsl(150, 12%, 28%)' : 'hsl(148, 16%, 88%)',
-        },
-      ]}
+      style={{
+        paddingTop: index === 0 ? 2 : 18,
+        borderTopWidth: index === 0 ? 0 : StyleSheet.hairlineWidth,
+        borderTopColor: borderColor,
+      }}
     >
       <View
-        style={[
-          lineItemStyles.headerRow,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
-        ]}
+        style={{
+          flexDirection: isRTL ? 'row-reverse' : 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 12,
+        }}
       >
         <Text
           style={{
-            fontSize: 11,
+            fontSize: 12,
             fontFamily: 'Poppins-SemiBold',
             color: mutedColor,
-            letterSpacing: 1.2,
+            letterSpacing: 0.8,
             textTransform: 'uppercase',
           }}
         >
@@ -346,86 +556,143 @@ function FeedLineItemCard({ index, item, count, feedTypeOptions, fieldErrors, t,
           <Pressable
             onPress={() => onRemove(index)}
             hitSlop={8}
-            style={lineItemStyles.removeBtn}
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 16,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+            }}
             accessibilityRole="button"
             accessibilityLabel={t('common.delete', 'Delete')}
           >
-            <Trash2 size={14} color={errorColor} />
+            <Trash2 size={16} color={errorColor} strokeWidth={2.2} />
           </Pressable>
         ) : null}
       </View>
 
-      <View style={{ gap: 12 }}>
+      <View style={{ gap: 14 }}>
         <FormField
           label={t('batches.selectFeedType')}
           required
           error={fieldErrors[`line_${index}_feedType`]}
         >
-          <EnumButtonSelect
+          <SlidingSegmentedControl
             value={item.feedType}
-            onChange={(v) => onUpdate(index, 'feedType', v)}
+            onChange={(v) => onFeedTypeChange(index, v)}
             options={feedTypeOptions}
-            columns={4}
-            compact
+            bordered={false}
           />
         </FormField>
 
-        <SheetInput
-          label={t('feed.feedDescription')}
-          value={item.feedDescription}
-          onChangeText={(v) => onUpdate(index, 'feedDescription', v)}
-          placeholder={t('feed.feedDescriptionPlaceholder')}
-        />
+        {showNoProducts ? (
+          <Text style={{ fontSize: 14, fontFamily: 'Poppins-Regular', color: mutedColor }}>
+            {t('batches.noFeedProducts')}
+          </Text>
+        ) : null}
 
-        <View
-          style={{
-            flexDirection: isRTL ? 'row-reverse' : 'row',
-            gap: 12,
-          }}
-        >
-          <View style={{ flex: 1 }}>
-            <SheetInput
-              label={t('batches.bagsQuantity')}
-              value={item.bags}
-              onChangeText={(v) => onUpdate(index, 'bags', v)}
-              keyboardType="number-pad"
-              placeholder="0"
-            />
+        {showSingleSummary && singleProduct ? (
+          <View
+            style={{
+              paddingVertical: 10,
+              paddingHorizontal: 12,
+              borderStartWidth: 3,
+              borderStartColor: accentColor,
+              backgroundColor: dark ? 'rgba(148,210,165,0.08)' : 'hsl(148, 40%, 97%)',
+              borderRadius: 10,
+            }}
+          >
+            <Text style={{ fontSize: 15, fontFamily: 'Poppins-SemiBold', color: textColor }} numberOfLines={2}>
+              {singleProduct.feedDescription}
+            </Text>
+            <Text style={{ fontSize: 13, fontFamily: 'Poppins-Regular', color: mutedColor, marginTop: 4 }} numberOfLines={2}>
+              {`${singleProduct.quantitySize ?? ''}${singleProduct.quantityUnit || ''} · ${currency} ${Number(singleProduct.pricePerQty || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            </Text>
           </View>
-          <View style={{ flex: 1 }}>
-            <SheetInput
-              label={t('batches.pricePerBag')}
-              value={item.pricePerBag}
-              onChangeText={(v) => onUpdate(index, 'pricePerBag', v)}
-              keyboardType="decimal-pad"
-              placeholder="0.00"
+        ) : null}
+
+        {showProductSelect ? (
+          <FormField label={t('feed.feedDescription', 'Product')} error={fieldErrors[`line_${index}_feedItem`]}>
+            <Select
+              value={item.feedItem}
+              onValueChange={(v) => onProductChange(index, v)}
+              options={productOptions}
+              placeholder={t('batches.selectFeedProduct')}
+              label={t('batches.selectFeedProduct')}
+              searchPlaceholder={t('batches.searchFeedProduct', 'Search…')}
+              forceSearchable={productOptions.length > 5}
             />
+          </FormField>
+        ) : null}
+
+        {item.feedItem ? (
+          <View style={{ gap: 8 }}>
+            <View
+              style={{
+                flexDirection: isRTL ? 'row-reverse' : 'row',
+                gap: 12,
+                alignItems: 'stretch',
+              }}
+            >
+              <View style={{ flex: 1, minWidth: 0, minHeight: 44, justifyContent: 'flex-end' }}>
+                <Text style={[labelStyle, { marginHorizontal: 4 }]}>
+                  {t('batches.bagsQuantity')}
+                  <Text style={{ color: errorColor }}> *</Text>
+                </Text>
+                <View style={{ height: 16 }} />
+              </View>
+              <View style={{ flex: 1, minWidth: 0, minHeight: 44, justifyContent: 'flex-end' }}>
+                <Text style={[labelStyle, { marginHorizontal: 4 }]}>
+                  {t('batches.pricePerBag')}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontFamily: 'Poppins-Regular',
+                    color: mutedColor,
+                    marginHorizontal: 4,
+                    marginTop: 2,
+                    textAlign: isRTL ? 'right' : 'left',
+                  }}
+                >
+                  {t('batches.exVat')}
+                </Text>
+              </View>
+            </View>
+            <View
+              style={{
+                flexDirection: isRTL ? 'row-reverse' : 'row',
+                gap: 12,
+                alignItems: 'flex-start',
+              }}
+            >
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <SheetInput
+                  label={null}
+                  value={item.bags}
+                  onChangeText={(v) => onUpdate(index, 'bags', v)}
+                  keyboardType="number-pad"
+                  placeholder="0"
+                  error={fieldErrors[`line_${index}_bags`]}
+                />
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <SheetInput
+                  label={null}
+                  value={item.pricePerBag}
+                  onChangeText={(v) => onUpdate(index, 'pricePerBag', v)}
+                  keyboardType="decimal-pad"
+                  placeholder="0.00"
+                />
+              </View>
+            </View>
           </View>
-        </View>
+        ) : null}
       </View>
     </View>
   );
 }
-
-const lineItemStyles = StyleSheet.create({
-  card: {
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 14,
-    gap: 14,
-  },
-  headerRow: {
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  removeBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
 
 function CurrencyTag({ label }) {
   const { mutedColor, dark } = useHeroSheetTokens();

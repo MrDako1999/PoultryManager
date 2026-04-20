@@ -484,6 +484,46 @@ Use `Select` when you're inside a form (the form shows the user's current select
 
 `Select`'s public API is unchanged from before the `BottomPickerSheet` extraction. All 12 existing form callers (`ContactSheet`, `ExpenseSheet`, `SaleOrderSheet`, etc.) work without modification and inherit the new icon-tile header automatically.
 
+### `DatePicker` (form-grade single-date picker)
+
+Single-day version of `DateRangePicker`. Same compact trigger as `Select`, same `BottomPickerSheet`-style modal chrome (drag pill, header with title + Today / Clear pills + close X, calendar grid).
+
+```jsx
+import DatePicker from '@/components/ui/DatePicker';
+
+<DatePicker
+  value={startDate}                          // 'YYYY-MM-DD' or '' / null
+  onChange={setStartDate}                    // called with ISO string, or '' on Clear
+  label={t('batches.startDate')}             // shown as the modal header
+  placeholder={t('common.selectDate')}       // optional; defaults to translated "Select date…"
+/>
+```
+
+Public API: `value`, `onChange`, `placeholder`, `label`, `onOpen`, plus a forwarded ref with `open()` / `close()`.
+
+### Form-grade trigger sizing — KEEP IT COMPACT
+
+> **Triggers like `Select` and `DatePicker` live INSIDE a `FormSection` card, NEXT TO `SheetInput`s. They must NOT shout.**
+
+The compact recipe both components share:
+
+| Property | Value | Rationale |
+|---|---|---|
+| `height` | `48` | One step *shorter* than `SheetInput` (52). Keeps the row dense; the FormField label above does the heavy lifting. |
+| `borderWidth` | `1` | Hairline outline, not the 1.5pt focus-grade border `SheetInput` uses. |
+| `borderRadius` | `10` | Slightly tighter than `SheetInput`'s 14pt. |
+| `paddingHorizontal` | `12` | Matches `SheetInput`'s breathing room. |
+| `backgroundColor` | `inputBg` | One step *lighter* than `sectionBg` so the trigger reads as a tap target on the card. |
+| `borderColor` | `inputBorderIdle` | Same idle border as `SheetInput`. Avoid an "active" focus border on the trigger — there's no focus state, only "open or not." |
+| Text | `14pt Poppins-Regular` | Matches the SheetInput value text size. Use `textColor` when filled, `mutedColor` for the placeholder. |
+| Trailing affordance | `16pt` chevron / icon | `iconColor`, `strokeWidth: 2.2`. |
+
+❌ **Do not** scale form triggers up to 52pt height + 1.5pt borders + 14pt radius "to match `SheetInput`". They are deliberately one notch lighter so a stack of `[ Farm ▾ ] [ Date 📅 ] [ Status • • • ]` doesn't look like three competing buttons.
+
+❌ **Do not** add an icon tile inside the trigger or its modal sheet header. The `BottomPickerSheet` icon tile is for *picker sheets that don't have any other visual identity*. `DatePicker`'s calendar grid IS the identity — doubling it up with a green calendar tile in the header is redundant chrome.
+
+✅ **Do** route the trigger Pressable through the §9 recipe: STATIC style array on the Pressable, layout (`flexDirection`, `alignItems`, `gap`) on a plain inner `<View>`. Without this, NativeWind's css-interop strips `flexDirection` and the chevron stacks below the label. This is exactly the bug the trigger has shipped with twice — once with the className-based version, once with the functional-style refactor.
+
 ### `useHeroSheetTokens()`
 Hook returning all the color tokens for the current theme. Use it in any custom row/widget so you stay on-palette.
 
@@ -1225,6 +1265,8 @@ Look at these files first when building a new screen:
 | `mobile/components/SheetInput.js` | Input + currency input primitive |
 | `mobile/components/BottomPickerSheet.js` | Swipeable bottom-sheet primitive (search, animations, pan responder, ref API) |
 | `mobile/components/ui/Select.js` | Form-grade thin wrapper over `BottomPickerSheet` (default trigger + Add New + Clear) |
+| `mobile/components/ui/DatePicker.js` | Form-grade single-date picker (compact trigger + bottom-sheet calendar) |
+| `mobile/components/ui/DateRangePicker.js` | Bottom-sheet contiguous start→end range picker with quick-range chips |
 | `mobile/components/LanguageSelector.js` | Hero-pill trigger + `BottomPickerSheet` with custom flag-based `renderItem` — canonical "non-form picker" example |
 | `mobile/components/flags/index.js` | `FlagTile` component + `getFlagComponent(code)` resolver; how to add a new locale flag |
 | `mobile/components/SyncIconButton.js` | Canonical **hero-icon popout floater** (§8.h.1) — translucent trigger + Modal-anchored popover with `measureInWindow` + spring `Easing.back(1.4)` animation. Use this exact pattern for any future "hero icon → quick panel" flow |

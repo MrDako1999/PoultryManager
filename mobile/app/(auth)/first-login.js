@@ -71,6 +71,7 @@ export default function FirstLoginScreen() {
       subtitle={t('auth.firstLoginSubtitle', 'For security, please change the temporary password you received before continuing.')}
       showBack={false}
       headerRight={<AuthHeroToolbar />}
+      heroComfort="relaxed"
       heroExtra={
         <Image
           source={banner}

@@ -34,19 +34,14 @@ export default function FarmDetailHeader({
 
   const initial = (farm.nickname || farm.farmName || '?')[0].toUpperCase();
 
-  // Build a meta line by stacking the most useful identifiers in order
-  // of specificity: explicit nickname → translated farm type → linked
-  // business name. We join with ` · ` so the gradient strip carries some
-  // density without competing with the title.
-  const metaPieces = [];
-  if (farm.nickname) metaPieces.push(farm.nickname);
-  if (farm.farmType) {
-    metaPieces.push(t(`farms.farmTypes.${farm.farmType}`, farm.farmType));
-  }
-  if (typeof farm.business === 'object' && farm.business?.companyName) {
-    metaPieces.push(farm.business.companyName);
-  }
-  const meta = metaPieces.join('  ·  ');
+  // Single classifier — keeps the header strip uncluttered. Nickname
+  // is already telegraphed by the avatar tile letter, and the linked
+  // business name was getting truncated next to long farm names. The
+  // farm type (Broiler / Layer / …) is the one piece of context worth
+  // surfacing right under the title.
+  const meta = farm.farmType
+    ? t(`farms.farmTypes.${farm.farmType}`, farm.farmType)
+    : '';
 
   const BackIcon = isRTL ? ChevronRight : ChevronLeft;
 

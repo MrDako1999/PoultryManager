@@ -4,7 +4,6 @@ import {
   ActivityIndicator, Dimensions, PanResponder, Animated,
   Platform, Linking, StyleSheet,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
 import {
   X, Share2, ExternalLink, FileText, File as FileIcon,
@@ -51,7 +50,7 @@ function formatSize(bytes) {
 /**
  * Sheet-from-bottom file preview matching the design language.
  *
- * - Brand-tinted backdrop per DL §8.h.3 (gradient + 55% dim).
+ * - Neutral dimmed backdrop so the screen behind stays visible (tap to close).
  * - Single sheet size; drag down on the chrome to dismiss with spring
  *   snap-back if released early. Drag pill scales up while the gesture is
  *   active for visual feedback.
@@ -73,7 +72,7 @@ export default function FileViewer({ visible, media, onClose }) {
   const isRTL = useIsRTL();
   const tokens = useHeroSheetTokens();
   const {
-    heroGradient, sheetBg, accentColor, textColor, mutedColor,
+    sheetBg, accentColor, textColor, mutedColor,
     borderColor, dark,
   } = tokens;
 
@@ -266,22 +265,22 @@ export default function FileViewer({ visible, media, onClose }) {
   const iconTileBg = dark ? 'rgba(148,210,165,0.16)' : 'hsl(148, 35%, 92%)';
 
   return (
-    <Modal transparent visible={open} animationType="none" statusBarTranslucent onRequestClose={slideOut}>
+    <Modal
+      transparent
+      visible={open}
+      animationType="none"
+      statusBarTranslucent
+      presentationStyle={Platform.OS === 'ios' ? 'overFullScreen' : undefined}
+      onRequestClose={slideOut}
+    >
       {/* Wrap everything in a single flex:1 View — this matches the
           structure of the original (working) FileViewer; React Native's
           touch system seems to behave more reliably with a real flex
           parent than with two absolute-positioned siblings of Modal. */}
       <View style={{ flex: 1 }}>
-        {/* Brand-tinted backdrop — LinearGradient + 55% dim layer +
-            tap-to-close press surface. */}
+        {/* Dim only — no brand gradient — so the route underneath stays visible. */}
         <Animated.View style={[StyleSheet.absoluteFill, { opacity: backdropAnim }]}>
-          <LinearGradient
-            colors={heroGradient}
-            start={isRTL ? { x: 1, y: 0 } : { x: 0, y: 0 }}
-            end={isRTL ? { x: 0, y: 1 } : { x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.55)' }]} />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]} />
           <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
         </Animated.View>
 
