@@ -26,7 +26,7 @@ module.exports = {
   expo: {
     name: 'PoultryManager',
     slug: 'poultrymanager',
-    version: '1.0.1',
+    version: '1.0.2',
     orientation: 'portrait',
     icon: './assets/images/icon.png',
     scheme: 'poultrymanager',
@@ -70,13 +70,20 @@ module.exports = {
       [
         'expo-splash-screen',
         {
-          image: './assets/images/splash-icon.png',
-          imageWidth: 200,
+          // splash-light.png / splash-dark.png are 1024×1024 PNGs that
+          // bake in the gear-and-chicken logo + "PoultryManager.io"
+          // wordmark. `imageWidth: 280` gives the wordmark room to
+          // breathe at standard phone widths without dominating the
+          // canvas. Dark variant is a near-white silhouette designed to
+          // sit on the brand dark-green background (#0d3b22 ≈ the top
+          // colour of the hero gradient, hsl(148, 65%, 14%)).
+          image: './assets/images/splash-light.png',
+          imageWidth: 280,
           resizeMode: 'contain',
           backgroundColor: '#f5f8f5',
           dark: {
-            image: './assets/images/splash-icon.png',
-            backgroundColor: '#0b0f0b',
+            image: './assets/images/splash-dark.png',
+            backgroundColor: '#0d3b22',
           },
         },
       ],

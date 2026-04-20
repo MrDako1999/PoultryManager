@@ -146,19 +146,20 @@ export default function HeroSheetScreen({
   const heroTitleBlockGap = relaxedHero ? 4 : 6;
   const BackIcon = isRTL ? ChevronRight : ChevronLeft;
 
-  // The hero rendered as a content block — used both as the fixed hero (default)
-  // and as the first item inside the ScrollView when `scrollableHero` is on.
-  const HeroBlock = (
-    <LinearGradient
-      colors={heroGradient}
-      start={isRTL ? { x: 1, y: 0 } : { x: 0, y: 0 }}
-      end={isRTL ? { x: 0, y: 1 } : { x: 1, y: 1 }}
-      style={{
-        paddingTop: heroPaddingTop,
-        paddingBottom: heroGradientPaddingBottom,
-        paddingHorizontal: 20,
-      }}
-    >
+  // The hero is built as two pieces:
+  //   1. `heroInner` — the toolbar + heroExtra + title block + heroBelow
+  //      content. Always the same regardless of mode.
+  //   2. `HeroBlock` — wraps `heroInner` in either a LinearGradient
+  //      (default fixed-hero mode) or a transparent View
+  //      (scrollableHero mode). In scrollableHero mode the gradient is
+  //      drawn ONCE by a static layer behind the ScrollView, sized to
+  //      extend above and across the hero content. The hero text then
+  //      floats on top of that single gradient. With only one gradient
+  //      surface in play, overscroll-bouncing reveals the same gradient
+  //      continuously instead of stitching two differently-projected
+  //      LinearGradients together at a visible seam.
+  const heroInner = (
+    <>
       {heroExtraHeaderMerged ? (
         <View
           style={{
@@ -260,6 +261,27 @@ export default function HeroSheetScreen({
       </View>
 
       {heroBelow && <View style={{ marginTop: 18 }}>{heroBelow}</View>}
+    </>
+  );
+
+  const heroPadding = {
+    paddingTop: heroPaddingTop,
+    paddingBottom: heroGradientPaddingBottom,
+    paddingHorizontal: 20,
+  };
+
+  const HeroBlock = scrollableHero ? (
+    <View style={[heroPadding, { backgroundColor: 'transparent' }]}>
+      {heroInner}
+    </View>
+  ) : (
+    <LinearGradient
+      colors={heroGradient}
+      start={isRTL ? { x: 1, y: 0 } : { x: 0, y: 0 }}
+      end={isRTL ? { x: 0, y: 1 } : { x: 1, y: 1 }}
+      style={heroPadding}
+    >
+      {heroInner}
     </LinearGradient>
   );
 
@@ -322,24 +344,31 @@ export default function HeroSheetScreen({
       extrapolate: 'clamp',
     });
 
-    // Two stacked backgrounds behind the ScrollView so each bounce edge
-    // continues the colour of the layer the user is looking at:
-    //   - top bounce reveals the gradient overlay (matches the hero)
-    //   - bottom bounce reveals the wrapper (matches the sheet)
-    // Without this split, bouncing past the end of the content exposes a
-    // strip of brand green below the white/dark sheet, which reads as a
-    // broken background. Both colours are theme-aware via tokens.
+    // Single gradient layer behind the ScrollView. It serves THREE
+    // purposes simultaneously:
+    //   1. Paints the visual hero (the in-flow HeroBlock above is now
+    //      transparent in scrollableHero mode — the text floats on this
+    //      layer).
+    //   2. Fills any overscroll-bounce pull-down area with the same
+    //      gradient continuously (no seam — there's only one gradient).
+    //   3. Covered by the sheet's solid `sheetBg` once the user scrolls
+    //      past the hero, so it never bleeds into the page below.
+    // The layer covers the top ~65% of the parent so a hard pull-down
+    // never reveals the bare sheet colour underneath, even on smaller
+    // viewports.
     const Body = (
       <View style={{ flex: 1, backgroundColor: sheetBg }}>
-        <View
+        <LinearGradient
           pointerEvents="none"
+          colors={heroGradient}
+          start={isRTL ? { x: 1, y: 0 } : { x: 0, y: 0 }}
+          end={isRTL ? { x: 0, y: 1 } : { x: 1, y: 1 }}
           style={{
             position: 'absolute',
             top: 0,
             left: 0,
             right: 0,
-            bottom: '50%',
-            backgroundColor: heroGradient[0],
+            bottom: '25%',
           }}
         />
         <AnimatedScrollView
