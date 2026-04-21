@@ -584,7 +584,7 @@
     "hero": {
       "eyebrow": "Centralized poultry industry management",
       "title": "One platform for every link in your poultry chain.",
-      "subtitle": "Run your entire poultry operation from one workspace — online or off.",
+      "subtitle": "From the chick to the customer — your entire poultry chain, on one workspace.",
       "ctaPrimary": "Get started",
       "ctaSecondary": "Talk to sales",
       "trustLine": "Built in the UAE for poultry operators across the Middle East."
@@ -597,7 +597,7 @@
     },
     "modules": {
       "eyebrow": "Modules",
-      "title": "Everything you need, under one roof",
+      "title": "The whole poultry chain, in one workspace",
       "subtitle": "Activate what you need today and add the rest as your operation grows. Every module shares the same workspace, team and finance — so you never duplicate data.",
       "learnMore": "Learn more",
       "tapToExplore": "Tap any module to explore",
@@ -804,7 +804,7 @@
       ]
     },
     "ctaFooter": {
-      "title": "Ready to run your operation from one screen?",
+      "title": "Ready to put your whole poultry chain on one screen?",
       "body": "Join the early-access workspaces already using PoultryManager to track every flock, every kilo, every dirham.",
       "ctaPrimary": "Get started",
       "ctaWhatsapp": "WhatsApp",
