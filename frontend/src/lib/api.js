@@ -10,13 +10,26 @@ const api = axios.create({
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const status = error.response?.status;
+    const code = error.response?.data?.code;
+
+    if (status === 401) {
       const isAuthRoute = window.location.pathname.startsWith('/login') ||
         window.location.pathname.startsWith('/register');
       if (!isAuthRoute) {
         window.location.href = '/login';
       }
     }
+
+    if (status === 402 && code === 'SUBSCRIPTION_INACTIVE') {
+      // Workspace got blocked mid-session. Refresh /auth/me so the
+      // gate hook flips and BillingLockScreen takes over without a
+      // page reload. Dynamic import to dodge the cycle (api <-> store).
+      import('@/stores/authStore')
+        .then((mod) => mod.default.getState().refreshUser?.())
+        .catch(() => {});
+    }
+
     return Promise.reject(error);
   }
 );

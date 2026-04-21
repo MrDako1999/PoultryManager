@@ -341,7 +341,12 @@ function WorkerRow({
   const initials = `${worker.firstName?.[0] || ''}${worker.lastName?.[0] || ''}`.toUpperCase();
   const fullName = `${worker.firstName || ''} ${worker.lastName || ''}`.trim() || t('common.unnamed', 'Unnamed');
   const role = worker.role || 'labourer';
-  const housesCount = (worker.houseAssignments || []).length;
+  // Farms is the primary scope axis; we keep the legacy houseAssignments
+  // count as a fallback for any pre-migration workers whose scope hasn't
+  // been re-set.
+  const farmsCount = (worker.farmAssignments || []).length;
+  const legacyHousesCount = (worker.houseAssignments || []).length;
+  const housesCount = farmsCount || legacyHousesCount;
 
   const handleEdit = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});

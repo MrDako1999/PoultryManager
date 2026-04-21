@@ -49,6 +49,16 @@ const workerSchema = new mongoose.Schema(
       default: null,
       index: true,
     },
+    // Primary data-scope axis (see WORKERS.md). When the linked User
+    // logs in, list endpoints filter records to farms in this array.
+    farmAssignments: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Farm' }],
+      default: [],
+    },
+    // Legacy explicit-house picks. Retained on the schema for backward
+    // compat with workers seeded before farm-level scoping; new flows
+    // never write to this and the UI does not expose it. The scope
+    // helper still unions both so any old data keeps working.
     houseAssignments: {
       type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'House' }],
       default: [],

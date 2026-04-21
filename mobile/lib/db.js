@@ -33,6 +33,7 @@ const BASE_MIGRATIONS = [
         CREATE TABLE IF NOT EXISTS transfers (_id TEXT PRIMARY KEY, data TEXT, business TEXT, updatedAt TEXT, deletedAt TEXT);
         CREATE TABLE IF NOT EXISTS dailyLogs (_id TEXT PRIMARY KEY, data TEXT, batch TEXT, house TEXT, updatedAt TEXT, deletedAt TEXT);
         CREATE TABLE IF NOT EXISTS media (_id TEXT PRIMARY KEY, data TEXT, updatedAt TEXT);
+        CREATE TABLE IF NOT EXISTS users (_id TEXT PRIMARY KEY, data TEXT, updatedAt TEXT, deletedAt TEXT);
 
         CREATE TABLE IF NOT EXISTS mutation_queue (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -123,11 +124,12 @@ export async function rerunMigrations() {
 export const ENTITY_TABLES = [
   'batches', 'sources', 'expenses', 'feedOrders', 'feedOrderItems',
   'saleOrders', 'businesses', 'contacts', 'workers', 'farms', 'houses',
-  'feedItems', 'transfers', 'dailyLogs', 'media',
+  'feedItems', 'transfers', 'dailyLogs', 'media', 'users',
 ];
 
 export const SOFT_DELETE_TABLES = [
-  'businesses', 'contacts', 'workers', 'farms', 'houses', 'feedItems', 'transfers', 'dailyLogs',
+  'businesses', 'contacts', 'workers', 'farms', 'houses', 'feedItems',
+  'transfers', 'dailyLogs', 'users',
 ];
 
 export const ENTITY_API_MAP = {
@@ -146,10 +148,11 @@ export const ENTITY_API_MAP = {
   transfers: '/transfers',
   dailyLogs: '/daily-logs',
   media: '/media',
+  users: '/users',
 };
 
 export const SYNC_ORDER = [
-  'businesses', 'contacts', 'farms', 'houses', 'workers', 'feedItems',
+  'businesses', 'contacts', 'farms', 'houses', 'workers', 'users', 'feedItems',
   'transfers',
   'batches', 'sources', 'feedOrders', 'feedOrderItems', 'saleOrders',
   'expenses', 'dailyLogs', 'media',

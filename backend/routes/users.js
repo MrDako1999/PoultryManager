@@ -1,17 +1,23 @@
 import express from 'express';
 import User from '../models/User.js';
 import Contact from '../models/Contact.js';
-import Business from '../models/Business.js';
 import Worker from '../models/Worker.js';
 import { protect, requireOwner } from '../middleware/auth.js';
 import { sendCredentials } from '../services/emailService.js';
-import { invalidateOwnerModulesCache } from '../middleware/modules.js';
+import { inviteWorker, softDeleteUser } from '../services/inviteService.js';
+import { logDeletion } from '../middleware/deletionTracker.js';
 
 const router = express.Router();
 
+// GET /api/users — list sub-accounts of the current owner.
+// By default hides soft-deleted members; pass ?includeDeleted=true for
+// the audit view (read-only — removed members can't be edited from UI).
 router.get('/', protect, requireOwner, async (req, res) => {
   try {
-    const users = await User.find({ createdBy: req.user._id }).sort({ createdAt: -1 });
+    const includeDeleted = req.query.includeDeleted === 'true';
+    const filter = { createdBy: req.user._id };
+    if (!includeDeleted) filter.deletedAt = null;
+    const users = await User.find(filter).sort({ createdAt: -1 });
     res.json(users);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -20,7 +26,10 @@ router.get('/', protect, requireOwner, async (req, res) => {
 
 router.get('/:id', protect, requireOwner, async (req, res) => {
   try {
-    const user = await User.findOne({ _id: req.params.id, createdBy: req.user._id });
+    const includeDeleted = req.query.includeDeleted === 'true';
+    const filter = { _id: req.params.id, createdBy: req.user._id };
+    if (!includeDeleted) filter.deletedAt = null;
+    const user = await User.findOne(filter);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -30,96 +39,67 @@ router.get('/:id', protect, requireOwner, async (req, res) => {
   }
 });
 
+// POST /api/users — invite a sub-account with app access. Thin wrapper
+// over the shared inviteService so the same logic powers /api/workers
+// (HR-only) and the eventual /api/workers/:id/grant-access (upgrade).
 router.post('/', protect, requireOwner, async (req, res) => {
   try {
-    const { firstName, lastName, email, phone, accountRole, permissions, houseAssignments } = req.body;
-
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: 'Email already in use' });
-    }
-
-    if (accountRole === 'owner') {
-      return res.status(400).json({ message: 'Cannot create another owner' });
-    }
-
-    const tempPassword = Math.random().toString(36).slice(-10) + 'A1!';
-
-    const user = await User.create({
+    const {
       firstName,
       lastName,
       email,
-      phone: phone || '',
-      password: tempPassword,
-      companyName: req.user.companyName,
-      modules: req.user.modules,
-      accountRole: accountRole || 'viewer',
-      permissions: permissions || {},
-      createdBy: req.user._id,
-      mustChangePassword: true,
-    });
+      phone,
+      photo,
+      accountRole,
+      permissions,
+      farmAssignments,
+      // legacy alias from older mobile clients
+      houseAssignments: _legacyHouseAssignments,
+    } = req.body;
 
-    const ownerId = req.user.createdBy || req.user._id;
-    const owner = String(ownerId) === String(req.user._id)
-      ? req.user
-      : await User.findById(ownerId);
-
-    const accountBizId = owner?.accountBusiness || null;
-    const contact = await Contact.create({
-      user_id: ownerId,
-      createdBy: req.user._id,
+    const result = await inviteWorker({
+      ownerId: req.user._id,
+      invitedBy: req.user._id,
       firstName,
       lastName,
-      email: email || '',
-      phone: phone || '',
-      jobTitle: accountRole ? accountRole.replace('_', ' ') : '',
-      linkedUser: user._id,
-      businesses: accountBizId ? [accountBizId] : [],
+      email,
+      phone,
+      photo,
+      grantAppAccess: true,
+      accountRole,
+      permissions,
+      farmAssignments,
     });
 
-    if (accountBizId) {
-      await Business.findByIdAndUpdate(accountBizId, {
-        $addToSet: { contacts: contact._id },
-      });
-    }
-
-    const shouldCreateWorker = accountRole === 'ground_staff' || Array.isArray(houseAssignments);
-    if (shouldCreateWorker) {
-      await Worker.create({
-        user_id: ownerId,
-        createdBy: req.user._id,
-        firstName,
-        lastName,
-        phone: phone || '',
-        role: accountRole === 'ground_staff' ? 'labourer' : 'other',
-        linkedUser: user._id,
-        houseAssignments: Array.isArray(houseAssignments) ? houseAssignments : [],
-        contact: contact._id,
-      });
-    }
-
-    try {
-      await sendCredentials(user, tempPassword, {
-        ownerName: [req.user.firstName, req.user.lastName].filter(Boolean).join(' ') || req.user.email,
-      });
-    } catch (err) {
-      console.warn('[users] sendCredentials failed:', err?.message);
-    }
-
-    res.status(201).json({ user, tempPassword });
+    res.status(201).json({ user: result.user, tempPassword: result.tempPassword });
   } catch (err) {
+    if (err.code === 'EMAIL_IN_USE') {
+      return res.status(400).json({ message: err.message });
+    }
     res.status(500).json({ message: err.message });
   }
 });
 
 router.put('/:id', protect, requireOwner, async (req, res) => {
   try {
-    const user = await User.findOne({ _id: req.params.id, createdBy: req.user._id });
+    const user = await User.findOne({
+      _id: req.params.id,
+      createdBy: req.user._id,
+      deletedAt: null,
+    });
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const { firstName, lastName, phone, accountRole, permissions, isActive, houseAssignments } = req.body;
+    const {
+      firstName,
+      lastName,
+      phone,
+      accountRole,
+      permissions,
+      isActive,
+      farmAssignments,
+    } = req.body;
 
     if (accountRole === 'owner') {
       return res.status(400).json({ message: 'Cannot promote to owner' });
@@ -134,10 +114,10 @@ router.put('/:id', protect, requireOwner, async (req, res) => {
 
     await user.save();
 
-    if (Array.isArray(houseAssignments)) {
+    if (Array.isArray(farmAssignments)) {
       await Worker.findOneAndUpdate(
         { linkedUser: user._id, user_id: req.user._id, deletedAt: null },
-        { houseAssignments }
+        { farmAssignments }
       );
     }
 
@@ -158,7 +138,11 @@ router.put('/:id', protect, requireOwner, async (req, res) => {
 
 router.post('/:id/reset-password', protect, requireOwner, async (req, res) => {
   try {
-    const user = await User.findOne({ _id: req.params.id, createdBy: req.user._id });
+    const user = await User.findOne({
+      _id: req.params.id,
+      createdBy: req.user._id,
+      deletedAt: null,
+    });
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -182,17 +166,26 @@ router.post('/:id/reset-password', protect, requireOwner, async (req, res) => {
   }
 });
 
+// DELETE /api/users/:id — soft-delete with cascading timestamps.
+//
+// IMPORTANT: never hard-delete. Sub-users author records (DailyLog,
+// Media, etc.) and removing them would break those references and lose
+// audit history. See WORKERS.md and DATA_OWNERSHIP.md Invariant 6.
 router.delete('/:id', protect, requireOwner, async (req, res) => {
   try {
-    const user = await User.findOne({ _id: req.params.id, createdBy: req.user._id });
-    if (!user) {
+    const result = await softDeleteUser({
+      ownerId: req.user._id,
+      userId: req.params.id,
+      logDeletion,
+    });
+    res.json({
+      message: 'User removed',
+      cascaded: result.deletions.length,
+    });
+  } catch (err) {
+    if (err.message?.includes('not found')) {
       return res.status(404).json({ message: 'User not found' });
     }
-
-    await Contact.findOneAndDelete({ linkedUser: user._id });
-    await User.findByIdAndDelete(user._id);
-    res.json({ message: 'User removed' });
-  } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });

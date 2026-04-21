@@ -1,4 +1,5 @@
 import { Bird, Layers } from 'lucide-react';
+import { broilerCapabilities } from '@poultrymanager/shared/module-capabilities/broiler';
 
 import BatchesPage from './pages/BatchesPage';
 import BatchDetailLayout from './pages/BatchDetailLayout';
@@ -140,33 +141,10 @@ const broilerModule = {
     ground_staff: WorkerHome,
   },
 
-  capabilities: {
-    owner: ['*'],
-    manager: [
-      'batch:*', 'source:*', 'feedOrder:*', 'saleOrder:*', 'expense:*',
-      'dailyLog:*', 'house:*', 'farm:*', 'worker:*', 'contact:*',
-      'business:*', 'feedItem:*', 'transfer:*',
-    ],
-    accountant: [
-      'batch:read', 'source:read', 'feedOrder:*', 'saleOrder:*', 'expense:*',
-      'business:read', 'contact:read', 'transfer:*',
-    ],
-    veterinarian: [
-      'batch:read', 'house:read', 'farm:read', 'worker:read', 'contact:read',
-      'business:read', 'dailyLog:read', 'dailyLog:create:WEIGHT',
-      'dailyLog:create:ENVIRONMENT', 'dailyLog:update:own',
-    ],
-    ground_staff: [
-      'batch:read', 'house:read:assigned', 'dailyLog:create',
-      'dailyLog:read:own', 'dailyLog:update:own', 'farm:read',
-    ],
-    viewer: [
-      'batch:read', 'source:read', 'feedOrder:read', 'saleOrder:read',
-      'expense:read', 'dailyLog:read', 'house:read', 'farm:read',
-      'worker:read', 'contact:read', 'business:read', 'feedItem:read',
-      'transfer:read',
-    ],
-  },
+  // Capability matrix is the single source of truth at
+  // shared/modules/broiler/capabilities.js so the backend
+  // (userCan / protect) and both clients see identical actions.
+  capabilities: broilerCapabilities,
 
   i18n: {
     en: broilerI18nEn,

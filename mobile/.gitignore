@@ -12,3 +12,5 @@ ios/
 android/
 .env
 .env.local
+google-play-service-account.json
+google-play-*.json

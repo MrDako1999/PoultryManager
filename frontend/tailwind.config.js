@@ -38,6 +38,13 @@ export default {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
+        // Marketing / design-language additions — see frontend/src/index.css.
+        sheet: 'hsl(var(--sheet-bg))',
+        sectionBorder: 'hsl(var(--section-border))',
+        elevatedCard: {
+          DEFAULT: 'hsl(var(--elevated-card-bg))',
+          border: 'hsl(var(--elevated-card-border))',
+        },
       },
       borderRadius: {
         lg: 'var(--radius)',
@@ -47,6 +54,7 @@ export default {
       fontFamily: {
         sans: ['Poppins', 'sans-serif'],
         heading: ['Poppins', 'sans-serif'],
+        cairo: ['Cairo', 'Poppins', 'system-ui', 'sans-serif'],
       },
       keyframes: {
         'accordion-down': {

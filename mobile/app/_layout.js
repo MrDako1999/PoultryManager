@@ -16,6 +16,10 @@ import LanguageChangeOverlay from '@/components/LanguageChangeOverlay';
 import '../i18n';
 
 SplashScreen.preventAutoHideAsync();
+// Smooth crossfade (instead of a hard pop) when the splash hides. This
+// is a JS-side API in expo-splash-screen v31+ — no EAS / plugin config
+// needed. The duration applies on the next `hideAsync()` call.
+SplashScreen.setOptions({ duration: 400, fade: true });
 
 export default function RootLayout() {
   const { resolvedTheme } = useThemeStore();

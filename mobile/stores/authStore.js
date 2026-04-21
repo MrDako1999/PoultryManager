@@ -1,7 +1,10 @@
 import { create } from 'zustand';
 import api from '@/lib/api';
 import { getToken, setToken, clearToken } from '@/lib/storage';
-import { fullSync, deltaSync, clearAll, startPeriodicSync, stopPeriodicSync } from '@/lib/syncEngine';
+import {
+  fullSync, deltaSync, clearAll, startPeriodicSync, stopPeriodicSync,
+  stopBillingHeartbeat,
+} from '@/lib/syncEngine';
 import { getSyncMetaCount } from '@/lib/db';
 import useModuleStore from '@/stores/moduleStore';
 import useSyncStore from '@/stores/syncStore';
@@ -90,6 +93,7 @@ const useAuthStore = create((set) => ({
 
   logout: async () => {
     stopPeriodicSync();
+    stopBillingHeartbeat();
     await clearAll();
     try {
       await api.post('/auth/logout');

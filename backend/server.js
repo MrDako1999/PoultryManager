@@ -22,6 +22,7 @@ import transferRoutes from './routes/transfers.js';
 import dailyLogRoutes from './routes/dailyLogs.js';
 import syncRoutes from './routes/sync.js';
 import devRoutes from './routes/dev.js';
+import billingRoutes from './routes/billing.js';
 
 const app = express();
 
@@ -51,6 +52,7 @@ app.use('/api/transfers', transferRoutes);
 app.use('/api/daily-logs', dailyLogRoutes);
 app.use('/api/sync', syncRoutes);
 app.use('/api/dev', devRoutes);
+app.use('/api/billing', billingRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

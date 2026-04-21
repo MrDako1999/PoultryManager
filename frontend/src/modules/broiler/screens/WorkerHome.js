@@ -29,14 +29,31 @@ export default function WorkerHome() {
     [workers, user?._id],
   );
 
+  // Derive accessible houses from farmAssignments (primary) and union
+  // with any legacy explicit houseAssignments. Mirrors the backend
+  // helper getAssignedHouseIds in backend/services/workerScope.js so
+  // the worker dashboard never shows houses they can't actually log.
   const assignedHouseIds = useMemo(() => {
-    const arr = Array.isArray(worker?.houseAssignments) ? worker.houseAssignments : [];
-    return arr.map((h) => (typeof h === 'object' ? h._id : h));
-  }, [worker]);
+    const farmIds = Array.isArray(worker?.farmAssignments)
+      ? worker.farmAssignments.map((f) => String(typeof f === 'object' ? f._id : f))
+      : [];
+    const legacyHouseIds = Array.isArray(worker?.houseAssignments)
+      ? worker.houseAssignments.map((h) => String(typeof h === 'object' ? h._id : h))
+      : [];
+    const farmHouseIds = farmIds.length
+      ? houses
+          .filter((h) => {
+            const fid = String(typeof h.farm === 'object' ? h.farm?._id : h.farm || '');
+            return farmIds.includes(fid);
+          })
+          .map((h) => String(h._id))
+      : [];
+    return [...new Set([...legacyHouseIds, ...farmHouseIds])];
+  }, [worker, houses]);
 
   const myHouses = useMemo(() => {
     if (assignedHouseIds.length === 0) return [];
-    return houses.filter((h) => assignedHouseIds.includes(h._id));
+    return houses.filter((h) => assignedHouseIds.includes(String(h._id)));
   }, [houses, assignedHouseIds]);
 
   const activeBatchByHouse = useMemo(() => {

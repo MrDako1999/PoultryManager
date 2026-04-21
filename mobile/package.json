@@ -11,7 +11,6 @@
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
     "@poultrymanager/shared": "file:../shared",
-    "@react-native-async-storage/async-storage": "^3.0.2",
     "@react-native-community/netinfo": "11.4.1",
     "axios": "^1.15.0",
     "babel-preset-expo": "^55.0.17",

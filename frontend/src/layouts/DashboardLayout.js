@@ -5,6 +5,8 @@ import { cn } from '@/lib/utils';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import useAuthStore from '@/stores/authStore';
 import useThemeStore from '@/stores/themeStore';
+import useSubscriptionGate from '@/hooks/useSubscriptionGate';
+import BillingLockScreen from '@/components/BillingLockScreen';
 import { isRTL } from '@/i18n/languages';
 import useSidebar from '@/hooks/useSidebar';
 import Sidebar from './sidebar/Sidebar';
@@ -16,12 +18,21 @@ export default function DashboardLayout() {
   const { setTheme, resolvedTheme } = useThemeStore();
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  const gate = useSubscriptionGate();
 
   const rtl = isRTL(i18n.language);
 
   useEffect(() => {
     document.documentElement.setAttribute('dir', rtl ? 'rtl' : 'ltr');
   }, [rtl]);
+
+  // Subscription gate: when the workspace is blocked, the lock screen
+  // takes over the entire viewport. No sidebar, no topbar, no data.
+  // The owner can still hit /api/billing/* (when wired up) and /auth/me
+  // because those routes use protectBillingExempt on the backend.
+  if (gate.policy === 'block') {
+    return <BillingLockScreen isOwner={gate.isOwner} reason={gate.reason} />;
+  }
 
   const handleLogout = async () => {
     await logout();

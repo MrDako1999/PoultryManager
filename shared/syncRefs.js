@@ -20,6 +20,8 @@ export const REF_FIELDS = {
 export const ARRAY_REF_FIELDS = {
   contacts: 'contacts',
   businesses: 'businesses',
+  farmAssignments: 'farms',
+  houseAssignments: 'houses',
 };
 
 export const SINGLE_MEDIA_FIELDS = [

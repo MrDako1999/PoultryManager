@@ -1,22 +1,16 @@
 import express from 'express';
 import House from '../models/House.js';
 import Farm from '../models/Farm.js';
-import Worker from '../models/Worker.js';
 import { protect } from '../middleware/auth.js';
 import { requireModule } from '../middleware/modules.js';
 import { logDeletion } from '../middleware/deletionTracker.js';
+import { getAssignedHouseIds } from '../services/workerScope.js';
 
 const router = express.Router();
 
 router.use(protect, requireModule('broiler'));
 
 const getOwnerId = (user) => user.createdBy || user._id;
-
-async function resolveGroundStaffHouses(user) {
-  if (user.accountRole !== 'ground_staff') return null;
-  const worker = await Worker.findOne({ linkedUser: user._id, deletedAt: null }).select('houseAssignments');
-  return Array.isArray(worker?.houseAssignments) ? worker.houseAssignments : [];
-}
 
 router.get('/', async (req, res) => {
   try {
@@ -35,7 +29,9 @@ router.get('/', async (req, res) => {
       query.deletedAt = null;
     }
 
-    const scoped = await resolveGroundStaffHouses(req.user);
+    // Sub-users with farm assignments only see houses on those farms
+    // (plus any legacy explicit house picks). Owners get null = no scope.
+    const scoped = await getAssignedHouseIds(req.user);
     if (scoped !== null) {
       if (scoped.length === 0) return res.json([]);
       query._id = { $in: scoped };

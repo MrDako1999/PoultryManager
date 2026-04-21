@@ -97,6 +97,51 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // Soft-delete marker. Sub-users author records (DailyLog.createdBy,
+    // Media.createdBy, etc.) so we never hard-delete them. See
+    // DATA_OWNERSHIP.md Invariant 6 and WORKERS.md.
+    //
+    // - isActive:false  -> deactivated (login blocked, still listed,
+    //   reversible)
+    // - deletedAt:Date  -> soft-deleted (login blocked, hidden from
+    //   default lists, NOT re-activatable from normal UI, all
+    //   createdBy references still resolve)
+    deletedAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+    // Subscription state — only meaningful for owners (createdBy === null).
+    // Sub-users inherit access via their owner's subscription. See
+    // SUBSCRIPTION.md for the full design and Stripe integration plan.
+    //
+    // Today every owner defaults to status:'active' so the gate is a
+    // no-op until Stripe is wired in.
+    subscription: {
+      status: {
+        type: String,
+        enum: [
+          'active',
+          'trialing',
+          'past_due',
+          'unpaid',
+          'canceled',
+          'incomplete',
+          'incomplete_expired',
+          'paused',
+        ],
+        default: 'active',
+      },
+      plan: { type: String, default: null },
+      priceIds: { type: [String], default: [] },
+      currentPeriodEnd: { type: Date, default: null },
+      cancelAt: { type: Date, default: null },
+      trialEnd: { type: Date, default: null },
+      stripeCustomerId: { type: String, default: null, index: true, sparse: true },
+      stripeSubscriptionId: { type: String, default: null, index: true, sparse: true },
+      lastWebhookAt: { type: Date, default: null },
+      lastFailureReason: { type: String, default: null },
+    },
   },
   { timestamps: true }
 );

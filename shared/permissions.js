@@ -1,3 +1,5 @@
+import { actionsForRoleAcrossModules } from './modules/index.js';
+
 export const WILDCARD = '*';
 
 export const DEFAULT_ROLE_ACTIONS = {
@@ -116,22 +118,44 @@ export function actionsForRole(role) {
   return DEFAULT_ROLE_ACTIONS[role] || [];
 }
 
-export function userCan(user, requestedAction) {
+// Computes the full effective action list for a user. The list is the
+// union of (a) the user's explicit allows, (b) the global role defaults,
+// and (c) the per-module role capabilities for every module currently
+// active for the user. The user's deny list is applied at check time
+// in `userCan`.
+//
+// `effectiveModules` is optional. When omitted, the function falls back
+// to user.modules (which on owners is the source of truth and on
+// sub-users may be stale; resolveModules() in backend/middleware/modules
+// is the canonical resolver).
+export function effectiveActionsForUser(user, effectiveModules) {
+  if (!user) return [];
+  const explicit = Array.isArray(user.permissions?.allow) ? user.permissions.allow : [];
+  const roleDefaults = actionsForRole(user.accountRole);
+  const modules = Array.isArray(effectiveModules)
+    ? effectiveModules
+    : (Array.isArray(user.modules) ? user.modules : []);
+  const moduleActions = actionsForRoleAcrossModules(user.accountRole, modules);
+  return [...new Set([...explicit, ...roleDefaults, ...moduleActions])];
+}
+
+export function userCan(user, requestedAction, effectiveModules) {
   if (!user || !requestedAction) return false;
 
-  const explicit = Array.isArray(user.permissions?.allow)
-    ? user.permissions.allow
-    : [];
   const denies = Array.isArray(user.permissions?.deny)
     ? user.permissions.deny
     : [];
-  const roleDefaults = actionsForRole(user.accountRole);
 
   for (const denied of denies) {
     if (actionMatches(denied, requestedAction)) return false;
   }
 
-  const granted = [...explicit, ...roleDefaults];
+  // Fast path: protect middleware attaches `effectiveActions` to the
+  // user once per request so we don't re-walk the tree on every check.
+  const granted = Array.isArray(user.effectiveActions)
+    ? user.effectiveActions
+    : effectiveActionsForUser(user, effectiveModules);
+
   for (const g of granted) {
     if (actionMatches(g, requestedAction)) return true;
   }

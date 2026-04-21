@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Cairo:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -26,6 +26,24 @@
     --input: 148 14% 87%;
     --ring: 148 60% 20%;
     --radius: 0.5rem;
+
+    /*
+     * Marketing / design-language tokens — translated from
+     * mobile/docs/DESIGN_LANGUAGE.md §2 to the web. The lightness ladder is the
+     * load-bearing rule:
+     *   screen 97% -> sheet 100% -> section card 100% (1px sectionBorder + soft shadow)
+     *                            -> elevated card 95%
+     * Each layer is at least 2L points above the one beneath it so depth reads
+     * without relying on heavy shadows.
+     */
+    --hero-gradient-from: 148 60% 22%;
+    --hero-gradient-mid:  148 55% 28%;
+    --hero-gradient-to:   148 48% 36%;
+
+    --sheet-bg: 0 0% 100%;
+    --section-border: 148 14% 88%;
+    --elevated-card-bg: 148 22% 95%;
+    --elevated-card-border: 148 16% 84%;
   }
 
   .dark {
@@ -48,6 +66,21 @@
     --border: 150 14% 15%;
     --input: 150 14% 15%;
     --ring: 148 48% 38%;
+
+    /*
+     * Dark mode: gradient stops are SATURATED HIGHER than light mode so the
+     * brand still reads on a near-black backdrop. Section + elevated borders
+     * are mandatory in dark mode — without them the card bleeds into the page
+     * because the lightness gap from screen to sheet is only ~5%.
+     */
+    --hero-gradient-from: 148 65% 14%;
+    --hero-gradient-mid:  148 55% 22%;
+    --hero-gradient-to:   148 48% 30%;
+
+    --sheet-bg: 150 18% 14%;
+    --section-border: 150 12% 28%;
+    --elevated-card-bg: 150 14% 22%;
+    --elevated-card-border: 150 12% 30%;
   }
 }
 
@@ -56,13 +89,35 @@
     @apply border-border;
   }
 
+  /*
+   * Always reserve a slot for the vertical scrollbar so the layout never
+   * shifts when we lock body scroll (mobile drawer, modal). Without this,
+   * locking body overflow removes the scrollbar -> content jumps ~15px to
+   * the right and the user sees the page move on every modal open.
+   * Modern browsers (Chrome 94+, Firefox 97+, Safari 16+) all support this.
+   */
+  html {
+    scrollbar-gutter: stable;
+  }
+
   body {
     @apply bg-background text-foreground;
     font-family: 'Poppins', sans-serif;
   }
 
+  /*
+   * Cairo for Arabic and Urdu so the script doesn't fall back to the system
+   * font and clash with the rest of the brand. Poppins remains the Latin
+   * default; Cairo only kicks in for [lang="ar"] / [lang^="ar"] / [lang^="ur"].
+   * See DESIGN_LANGUAGE.md §12.7.
+   */
+  [lang^='ar'],
+  [lang^='ur'] {
+    font-family: 'Cairo', 'Poppins', system-ui, sans-serif;
+  }
+
   [dir='rtl'] {
-    font-family: 'Poppins', 'Noto Sans Arabic', sans-serif;
+    font-family: 'Poppins', 'Cairo', 'Noto Sans Arabic', sans-serif;
   }
 }
 
@@ -77,5 +132,99 @@
   }
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
+  }
+
+  /*
+   * Brand hero gradient — rich 3-stop diagonal.
+   * Uses vivid brand greens that pop against both light and dark content.
+   */
+  .hero-gradient {
+    background: linear-gradient(
+      160deg,
+      hsl(148 65% 18%) 0%,
+      hsl(148 60% 26%) 45%,
+      hsl(148 55% 34%) 100%
+    );
+  }
+  [dir='rtl'] .hero-gradient {
+    background: linear-gradient(
+      200deg,
+      hsl(148 65% 18%) 0%,
+      hsl(148 60% 26%) 45%,
+      hsl(148 55% 34%) 100%
+    );
+  }
+  .dark .hero-gradient {
+    background: linear-gradient(
+      160deg,
+      hsl(148 70% 10%) 0%,
+      hsl(148 60% 18%) 45%,
+      hsl(148 50% 26%) 100%
+    );
+  }
+  [dir='rtl'] .dark .hero-gradient,
+  .dark [dir='rtl'] .hero-gradient {
+    background: linear-gradient(
+      200deg,
+      hsl(148 70% 10%) 0%,
+      hsl(148 60% 18%) 45%,
+      hsl(148 50% 26%) 100%
+    );
+  }
+
+  /*
+   * Hero spotlight — a soft radial highlight centred over where the radial
+   * hub diagram sits. Pulls the eye into the diagram on first load without
+   * adding extra DOM for a backdrop. Sized so it's a noticeable but subtle
+   * lift, never a hard ring.
+   */
+  .hero-spotlight {
+    background: radial-gradient(
+      ellipse 70% 50% at 50% 75%,
+      rgba(255, 255, 255, 0.10) 0%,
+      transparent 65%
+    );
+  }
+
+  /*
+   * Radial hub diagram animations. Spoke lines are drawn outward from the
+   * center logo via stroke-dashoffset; coming-soon spokes use a simple fade
+   * because they're already dashed and a draw-in over dashes looks chaotic.
+   * Module nodes rise in with a small scale/translate to feel like they
+   * "bloom" out of the spokes.
+   */
+  @keyframes pmSpokeDraw {
+    to { stroke-dashoffset: 0; }
+  }
+  @keyframes pmSpokeFade {
+    to { opacity: 1; }
+  }
+
+  @keyframes pill-rise {
+    from { opacity: 0; transform: translate(-50%, calc(-50% + 8px)) scale(0.94); }
+    to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  }
+  /* The radial nodes use position:absolute + transform:translate(-50%,-50%)
+     to anchor on their polar coords; the keyframe above preserves that
+     translate on the way in. The mobile-grid + features-grid pill-rise just
+     needs a vertical fade — handled by a second keyframe. */
+  @keyframes pill-rise-flat {
+    from { opacity: 0; transform: translateY(10px) scale(0.96); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .animate-pill-rise {
+    animation: pill-rise-flat 0.45s ease-out forwards;
+  }
+  /* Radial nodes opt into the translate-preserving variant via this class. */
+  .animate-pill-rise-radial {
+    animation: pill-rise 0.5s ease-out forwards;
+  }
+
+  @keyframes hub-pulse {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.025); }
+  }
+  .animate-hub-pulse {
+    animation: hub-pulse 4.5s ease-in-out infinite;
   }
 }

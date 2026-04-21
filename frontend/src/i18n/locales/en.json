@@ -552,5 +552,522 @@
     "discard": "Discard",
     "confirmDelete": "Delete",
     "expandMap": "Expand map"
+  },
+  "marketing": {
+    "nav": {
+      "features": "Features",
+      "modules": "Modules",
+      "howItWorks": "How it works",
+      "pricing": "Pricing",
+      "faq": "FAQ",
+      "contact": "Contact",
+      "signIn": "Sign in",
+      "getStarted": "Get started",
+      "dashboard": "Open dashboard",
+      "openMenu": "Open menu",
+      "closeMenu": "Close menu",
+      "language": "Language"
+    },
+    "hero": {
+      "eyebrow": "Centralized poultry industry management",
+      "title": "One platform for every link in your poultry chain.",
+      "subtitle": "Run your entire poultry operation from one workspace — online or off.",
+      "ctaPrimary": "Get started",
+      "ctaSecondary": "Talk to sales",
+      "trustLine": "Built in the UAE for poultry operators across the Middle East."
+    },
+    "modulesHub": {
+      "title": "All the modules of the poultry industry, in one workspace",
+      "subtitle": "Activate only what you need. Add more whenever your operation grows.",
+      "comingSoon": "Coming soon",
+      "live": "Live"
+    },
+    "modules": {
+      "eyebrow": "Modules",
+      "title": "Everything you need, under one roof",
+      "subtitle": "Activate what you need today and add the rest as your operation grows. Every module shares the same workspace, team and finance — so you never duplicate data.",
+      "learnMore": "Learn more",
+      "tapToExplore": "Tap any module to explore",
+      "detail": {
+        "whoFor": "Who it's for",
+        "whoHelps": "How it helps",
+        "features": "What's inside",
+        "close": "Close",
+        "getStarted": "Get started",
+        "talkToUs": "Talk to us"
+      },
+      "info": {
+        "broiler": {
+          "whoFor": "Owners and managers running broiler chicken farms — from a single house with a few thousand birds to multi-site operations with hundreds of thousands.",
+          "whoHelps": "Cuts mortality through faster reaction time, drives feed conversion ratio down with daily logging, and gives you a per-batch P&L the moment the cycle ends.",
+          "features": [
+            "Batches, cycles and houses with full history",
+            "Daily logs: mortality, feed, water, weights, temperature, humidity",
+            "Live FCR and mortality KPIs at the workspace and batch level",
+            "Per-batch profitability — every kilo sold versus every dirham spent",
+            "Worker-friendly mobile forms designed for one-handed use"
+          ]
+        },
+        "hatchery": {
+          "whoFor": "Hatchery operators incubating their own eggs or running custom hatch contracts for growers.",
+          "whoHelps": "Tracks every set, every transfer, every pull — so you know hatchability and chick quality by flock, by hen age, by season.",
+          "features": [
+            "Set, transfer and pull tracking",
+            "Hatchability and fertility by source flock",
+            "Chick quality grading and traceability",
+            "Customer order book with delivery scheduling"
+          ]
+        },
+        "freeRange": {
+          "whoFor": "Pasture-raised and free-range producers who need to prove welfare and traceability to retail and export buyers.",
+          "whoHelps": "Logs flock movement, range time and welfare checks alongside the same daily-log discipline as broiler — without the cage-bird assumptions.",
+          "features": [
+            "Range and rotation tracking",
+            "Flock movement and welfare logs",
+            "Mixed-age flock support",
+            "Buyer-facing traceability records"
+          ]
+        },
+        "eggProduction": {
+          "whoFor": "Layer farm operators — caged, barn or free-range — who need to manage flock production curves and grading throughput.",
+          "whoHelps": "Replaces the spreadsheet stack with a real production curve per flock, daily egg counts by grade, and feed efficiency that adjusts as the flock ages.",
+          "features": [
+            "Daily egg counts by grade and house",
+            "Production curve per flock against your target",
+            "Feed and water consumption per dozen",
+            "Grading and packing throughput"
+          ]
+        },
+        "slaughterhouse": {
+          "whoFor": "Processing plants — your own or contract — handling live receipt through to packed product dispatch.",
+          "whoHelps": "Connects what was raised on the farm to what was processed and shipped, so yields, condemnation rates and per-bird value finally line up across the operation.",
+          "features": [
+            "Live bird receipt and lairage",
+            "Line throughput and yield tracking",
+            "Condemnation and downgrade reasons",
+            "Cut-up, pack and dispatch records"
+          ]
+        },
+        "marketing": {
+          "whoFor": "Distribution and retail teams selling the bird — wholesale, retail, food service or export.",
+          "whoHelps": "Closes the loop between what you raised, what you processed and what was actually sold, so pricing decisions sit on real margin data instead of gut feel.",
+          "features": [
+            "Customer and route management",
+            "Per-product pricing and discount rules",
+            "Order book and dispatch scheduling",
+            "Margin reporting tied back to feed and processing cost"
+          ]
+        },
+        "equipment": {
+          "whoFor": "Equipment suppliers and farm operators sourcing feeders, drinkers, ventilation, brooders, scales and more.",
+          "whoHelps": "A shared catalogue and quote workflow so suppliers and farms talk in the same item codes, and farms know exactly what's installed in each house.",
+          "features": [
+            "Shared equipment catalogue",
+            "Per-house equipment register",
+            "Maintenance and replacement schedule",
+            "Supplier RFQs and quote history"
+          ]
+        }
+      }
+    },
+    "theme": {
+      "label": "Theme",
+      "light": "Light",
+      "dark": "Dark",
+      "switchToLight": "Switch to light mode",
+      "switchToDark": "Switch to dark mode"
+    },
+    "features": {
+      "eyebrow": "Why PoultryManager",
+      "title": "Built for the realities of poultry operations",
+      "subtitle": "Every feature is shaped by what actually happens in the houses, not what looks good in a slide deck.",
+      "items": {
+        "offline": {
+          "title": "Offline-first mobile",
+          "body": "Workers in the houses keep logging — mortality, feed, weights, water — even with no signal. Everything syncs the moment they're back on Wi-Fi."
+        },
+        "team": {
+          "title": "Owner, managers, workers",
+          "body": "Invite your whole team with scoped permissions. Workers see only their assigned farms and houses; managers see your whole operation."
+        },
+        "directory": {
+          "title": "Multi-business directory",
+          "body": "Run multiple farms, shareholders or trading entities under one workspace. Switch between them in a tap."
+        },
+        "logs": {
+          "title": "Daily logs that drive KPIs",
+          "body": "Mortality, feed, water, weights, temperature and humidity feed straight into per-batch performance, FCR and profitability."
+        },
+        "accounting": {
+          "title": "Sales, expenses and invoices",
+          "body": "Track every kilo sold and every bag of feed bought. Export a clean ledger when your accountant asks."
+        },
+        "modules": {
+          "title": "Pay only for what you run",
+          "body": "Activate Broiler today, add Hatchery or Layer when you're ready. Each module is its own dashboard, with shared finance and directory underneath."
+        }
+      }
+    },
+    "howItWorks": {
+      "eyebrow": "How it works",
+      "title": "One workspace, two perspectives",
+      "subtitle": "Owners see the whole operation. Workers see only what they need to do their job.",
+      "owner": {
+        "eyebrow": "For owners",
+        "title": "What an owner sees",
+        "steps": [
+          { "title": "Create your workspace", "body": "Sign up, name your business, pick the modules you operate." },
+          { "title": "Add farms, houses and stock", "body": "Set up your sites and starting flock. Takes minutes, not days." },
+          { "title": "Invite your workers", "body": "Generate access codes for each worker. They install the mobile app and log in — no email or password needed." },
+          { "title": "See everything live", "body": "Mortality, feed and FCR roll up from the houses to your dashboard in real time." }
+        ]
+      },
+      "worker": {
+        "eyebrow": "For workers",
+        "title": "What a worker sees",
+        "steps": [
+          { "title": "Log in with their access code", "body": "No email, no password, no shared owner login." },
+          { "title": "Only their assigned farm", "body": "Workers see only the houses they're scoped to — nothing else." },
+          { "title": "Log the day's numbers", "body": "Mortality, feed, weights, water, temperature — fast forms designed for one-handed use." },
+          { "title": "Keeps working offline", "body": "Even with no signal in the houses. Syncs automatically when they're back online." }
+        ]
+      }
+    },
+    "pricing": {
+      "eyebrow": "Pricing",
+      "title": "Simple pricing, coming soon",
+      "body": "We're finalizing our subscription plans. PoultryManager is free for early-access workspaces while we shape the right tiers with our first customers. Contact us for a custom quote.",
+      "ctaContact": "Contact sales",
+      "ctaWhatsapp": "Chat on WhatsApp"
+    },
+    "mobileApps": {
+      "eyebrow": "Mobile apps",
+      "title": "Native apps, built for the working day",
+      "body": "Fast one-handed forms, large tap targets that work with gloves, and an offline-first sync engine that keeps logging the moment reception drops. Available on iOS and Android.",
+      "comingSoonIos": "Coming soon to App Store",
+      "comingSoonAndroid": "Coming soon to Google Play",
+      "iosTagline": "Download on the",
+      "iosStore": "App Store",
+      "androidTagline": "Get it on",
+      "androidStore": "Google Play"
+    },
+    "faq": {
+      "eyebrow": "FAQ",
+      "title": "Straight answers for owners and managers",
+      "subtitle": "The questions every poultry operator asks before they sign up. If yours isn't here, send us a message — we answer personally.",
+      "items": [
+        {
+          "q": "How long does it take to get my farm set up?",
+          "a": "Most workspaces are operational the same day. You sign up, name your business, add your farms and houses, generate access codes for your workers, and you're logging that evening's mortality. There is no installation, no on-site visit, no months-long onboarding. For larger operations with several sites we'll do a 30-minute kick-off call to set you up properly — that's the longest it ever takes."
+        },
+        {
+          "q": "My workers aren't tech-savvy. Will they actually use this?",
+          "a": "We designed the worker app for exactly that reality. There's no email or password — workers log in with a short access code you generate. The forms are big-tap, one-handed, and only show the farm they're assigned to. Most workers are logging mortality and feed by the second day without any training. If they can use WhatsApp, they can use PoultryManager."
+        },
+        {
+          "q": "Can I run multiple farms, or different businesses, from one account?",
+          "a": "Yes. One workspace can hold multiple businesses (separate legal entities, partners, brands), and each business can hold multiple farms with their own houses, flocks and finance. You switch between them in a tap. Workers stay scoped to whichever sites you've assigned them, even when they sit inside the same workspace as your other operations."
+        },
+        {
+          "q": "What if my internet drops in the houses?",
+          "a": "The mobile app is built offline-first. Workers keep logging mortality, feed, weights, water and environment readings even with zero signal. Everything queues locally on their phone and syncs automatically the moment they walk back into Wi-Fi range. No data is ever lost to a dropped connection."
+        },
+        {
+          "q": "What does it cost?",
+          "a": "PoultryManager is currently free for early-access workspaces while we shape the right plans with our first customers. Paid tiers will launch later this year; existing early-access workspaces will get written notice and a transition window before any billing begins. Talk to us for a custom quote if you have a larger operation."
+        },
+        {
+          "q": "Who owns my data, and can I get it out if I ever stop using PoultryManager?",
+          "a": "You own your data, full stop. Every record you create — flocks, daily logs, sales, expenses, photos — belongs to your workspace. You can request a full export in JSON or CSV at any time, no questions asked. We retain your data for 90 days after cancellation in case you change your mind, then permanently delete it. Full details are in our Privacy Policy."
+        },
+        {
+          "q": "Can I export to my accountant or pull this data into other tools?",
+          "a": "Yes. Sales, expenses and invoices export to clean CSV files your accountant can open in Excel or import into Xero, Zoho Books, Tally or QuickBooks. A read-only API is on the roadmap for direct integrations — message us if you have a specific tool you need to connect."
+        },
+        {
+          "q": "My operation works a bit differently. Can PoultryManager handle it?",
+          "a": "Probably yes — and if not yet, tell us. PoultryManager is built in the UAE and shaped by working with real poultry operators on the ground, so the defaults already reflect a wide range of how farms actually run. If you have a workflow we haven't covered, send us a note. Real customer requirements drive every release."
+        }
+      ]
+    },
+    "ctaFooter": {
+      "title": "Ready to run your operation from one screen?",
+      "body": "Join the early-access workspaces already using PoultryManager to track every flock, every kilo, every dirham.",
+      "ctaPrimary": "Get started",
+      "ctaWhatsapp": "WhatsApp",
+      "ctaEmail": "Email"
+    },
+    "footer": {
+      "tagline": "Centralized poultry industry management.",
+      "operatedBy": "Operated by Estera Tech LLC, Dubai, UAE.",
+      "rights": "© 2026 Estera Tech LLC. All rights reserved.",
+      "product": {
+        "title": "Product",
+        "features": "Features",
+        "modules": "Modules",
+        "pricing": "Pricing",
+        "mobileApps": "Mobile apps"
+      },
+      "company": {
+        "title": "Company",
+        "contact": "Contact"
+      },
+      "legal": {
+        "title": "Legal",
+        "privacy": "Privacy",
+        "terms": "Terms"
+      }
+    },
+    "contact": {
+      "eyebrow": "Contact",
+      "title": "Contact us",
+      "subtitle": "Have questions about PoultryManager? We're here to help — reach out directly.",
+      "infoTitle": "Contact information",
+      "phoneLabel": "Phone",
+      "companyLabel": "Company",
+      "locationLabel": "Location",
+      "emailLabel": "Email",
+      "supportLabel": "Product support",
+      "phone": "+971 52 244 4195",
+      "company": "Estera Tech LLC",
+      "location": "Dubai, UAE",
+      "email": "info@esteratech.com",
+      "support": "support@poultrymanager.io",
+      "whatsapp": "Chat on WhatsApp"
+    },
+    "privacy": {
+      "title": "Privacy Policy",
+      "lastUpdated": "Last updated: April 21, 2026",
+      "intro": "This policy explains what PoultryManager collects, what we deliberately do not collect, how we use your data, and the rights you have over it.",
+      "body": [
+        {
+          "heading": "1. Who we are",
+          "paragraphs": [
+            "PoultryManager is operated by Estera Tech LLC, a company based in Dubai, United Arab Emirates.",
+            "For any privacy question or request, write to info@esteratech.com or support@poultrymanager.io. You can also reach us on WhatsApp at +971 52 244 4195."
+          ]
+        },
+        {
+          "heading": "2. What we collect — and what we do not",
+          "paragraphs": [
+            "We are deliberate about what we collect. The lists below are exhaustive."
+          ],
+          "subgroups": [
+            {
+              "subheading": "What we collect",
+              "list": [
+                "Account data — your first name, last name, email, optional phone number, and an account password stored only as a salted hash.",
+                "Workspace data you create — businesses, farms, houses, contacts, workers, and the operational records you log: batches, cycles, daily logs (mortality, feed, water, weights, temperature, humidity), sales, expenses and invoices.",
+                "Photos and documents you upload — receipts, documents, and any photos you choose to attach to records. Captured from your device camera or selected from your photo library only when you tap the attach action. We never browse your photo library or take photos in the background.",
+                "Coarse location — only when you use the Farm Location Picker to set a farm's coordinates. Captured once per save, never in the background.",
+                "Diagnostic data — basic crash logs and minimal usage events (which screens loaded, did the request succeed) so we can fix bugs."
+              ]
+            },
+            {
+              "subheading": "What we do NOT collect",
+              "list": [
+                "Your phone book contacts. We never access your contact list.",
+                "Microphone or audio. The microphone is explicitly disabled in our mobile app build.",
+                "Background location. We never track your location while the app is closed.",
+                "Advertising identifiers. We do not run ads and do not share data with ad networks.",
+                "Biometric data, health data, or financial account credentials.",
+                "Browsing history outside the app."
+              ]
+            }
+          ]
+        },
+        {
+          "heading": "3. How we use your data",
+          "paragraphs": [
+            "We use the data above to run the service for you: render your dashboards, sync your workers' logs, generate invoices and reports, send transactional email, fix crashes, and respond when you contact support. That's it."
+          ]
+        },
+        {
+          "heading": "4. Research use of operational data",
+          "paragraphs": [
+            "Aggregated and anonymized operational data — including mortality counts, feed conversion rates, growth performance, environmental readings, and similar production metrics — may be used by Estera Tech to produce industry research, benchmarks, and product improvements.",
+            "No personal information, no business name, no farm name, and no individual workspace is identifiable in any research output. Research aggregates always involve large pools of workspaces and never single you out.",
+            "If you would prefer your workspace's operational data to be excluded entirely from research aggregates, email support@poultrymanager.io and we will tag your workspace research-opt-out. We will honor that flag from the next aggregation cycle onward."
+          ]
+        },
+        {
+          "heading": "5. Sharing",
+          "paragraphs": [
+            "We do not sell your data. We share it only with the subprocessors we need to run the service:"
+          ],
+          "list": [
+            "Cloud hosting and database hosting (managed providers in the EU and US).",
+            "Transactional email delivery.",
+            "Crash and error monitoring.",
+            "Payment processing — when paid plans launch. No payment data is currently collected."
+          ],
+          "trailingParagraph": "A current list of subprocessors is available on request."
+        },
+        {
+          "heading": "6. Where your data is stored",
+          "paragraphs": [
+            "Servers are located in the EU and US, depending on subprocessor. Data in transit is encrypted via HTTPS / TLS. Account passwords are stored only as bcrypt hashes — even we cannot read them."
+          ]
+        },
+        {
+          "heading": "7. Retention",
+          "paragraphs": [
+            "We keep your workspace data while your account is active and for up to 90 days after cancellation, then permanently delete it. You can request earlier deletion at any time by emailing support."
+          ]
+        },
+        {
+          "heading": "8. Your rights",
+          "paragraphs": [
+            "You can ask us to:"
+          ],
+          "list": [
+            "Access the data we hold about your workspace.",
+            "Export your data — we provide a JSON or CSV export on request.",
+            "Correct inaccurate data.",
+            "Delete your account and data.",
+            "Opt out of research aggregation (see section 4)."
+          ],
+          "trailingParagraph": "To exercise any of these rights, email support@poultrymanager.io from the email address on your account."
+        },
+        {
+          "heading": "9. Children",
+          "paragraphs": [
+            "PoultryManager is a business application and is not intended for users under 16."
+          ]
+        },
+        {
+          "heading": "10. Device permissions, explained",
+          "paragraphs": [
+            "Our mobile app asks for the smallest set of device permissions needed to do its job. Each one is requested only when you use the feature that needs it:"
+          ],
+          "list": [
+            "Camera — to take a photo of a receipt or document and attach it to a record.",
+            "Photo library — to pick an existing photo to attach.",
+            "Location (foreground only) — to drop a pin for the farm location, once, when you save the farm.",
+            "Network access — to sync your data with our servers."
+          ]
+        },
+        {
+          "heading": "11. Changes to this policy",
+          "paragraphs": [
+            "We post any change to this policy at this URL and notify workspace owners by email for material changes."
+          ]
+        },
+        {
+          "heading": "12. Contact",
+          "paragraphs": [
+            "Estera Tech LLC, Dubai, United Arab Emirates.",
+            "Email: info@esteratech.com or support@poultrymanager.io.",
+            "WhatsApp: +971 52 244 4195."
+          ]
+        }
+      ]
+    },
+    "terms": {
+      "title": "Terms & Conditions",
+      "lastUpdated": "Last updated: April 21, 2026",
+      "intro": "These terms govern your use of PoultryManager, a software service operated by Estera Tech LLC.",
+      "body": [
+        {
+          "heading": "1. Acceptance",
+          "paragraphs": [
+            "By creating an account or installing the PoultryManager mobile app, you agree to these terms. If you do not agree, do not use the service."
+          ]
+        },
+        {
+          "heading": "2. The service",
+          "paragraphs": [
+            "PoultryManager is a software-as-a-service platform operated by Estera Tech LLC. It provides tools for managing poultry industry operations across broiler raising, hatchery, free-range, egg production, slaughterhouse, marketing and equipment trading."
+          ]
+        },
+        {
+          "heading": "3. Workspace and account model",
+          "paragraphs": [
+            "Every workspace has one owner. The owner can invite sub-users (managers, workers, accountants). Sub-users inherit access from the owner and never have a separate subscription.",
+            "The owner is responsible for what their team does in the workspace, including any data their sub-users enter."
+          ]
+        },
+        {
+          "heading": "4. Acceptable use",
+          "paragraphs": [
+            "You agree not to:"
+          ],
+          "list": [
+            "Reverse engineer, scrape, or otherwise abuse the service.",
+            "Resell or sublicense access to the service without a written agreement with Estera Tech.",
+            "Use the service to violate any law in your jurisdiction.",
+            "Attempt to access workspaces, accounts, or data that are not yours."
+          ]
+        },
+        {
+          "heading": "5. Your data",
+          "paragraphs": [
+            "Your workspace data — the records you create, photos you upload, contacts you store — belongs to you. You can export it on request.",
+            "You grant Estera Tech a limited license to host, transmit and back up that data solely to operate the service for you. We do not claim ownership of your data and we do not sell it."
+          ]
+        },
+        {
+          "heading": "6. Aggregated research data",
+          "paragraphs": [
+            "You agree that Estera Tech may use aggregated and anonymized operational data — including mortality counts, feed conversion rates, growth performance, environmental readings and similar production metrics — for industry research, benchmarks, and product improvement.",
+            "No personal information, no business name, and no individual workspace is identifiable in any research output. You may opt your workspace out of research aggregation by emailing support@poultrymanager.io. See Privacy Policy section 4 for details."
+          ]
+        },
+        {
+          "heading": "7. Subscriptions and billing",
+          "paragraphs": [
+            "PoultryManager is currently free for early-access workspaces. Paid subscription tiers are in development.",
+            "When paid plans launch we will give existing early-access workspaces written notice and a transition window before any billing begins."
+          ]
+        },
+        {
+          "heading": "8. Service availability",
+          "paragraphs": [
+            "We aim to keep the service available 24/7 but do not guarantee uninterrupted operation. The mobile app continues to work offline and queues your data locally; nothing on your device is lost during a temporary outage. Once connectivity returns, queued data syncs automatically."
+          ]
+        },
+        {
+          "heading": "9. Disclaimers",
+          "paragraphs": [
+            "The service is provided \"as is\" and \"as available\" without warranties of any kind, express or implied, including merchantability, fitness for a particular purpose, and non-infringement.",
+            "PoultryManager is a record-keeping and analytics tool. It does not replace veterinary, financial, or legal advice."
+          ]
+        },
+        {
+          "heading": "10. Limitation of liability",
+          "paragraphs": [
+            "To the maximum extent permitted by applicable law, Estera Tech LLC's aggregate liability for any claim arising out of or related to the service is limited to the amount you paid for the service in the 12 months preceding the claim, or USD 100, whichever is greater.",
+            "We are not liable for indirect, incidental, special, consequential, or punitive damages, or for loss of profits, revenue, data, or business."
+          ]
+        },
+        {
+          "heading": "11. Termination",
+          "paragraphs": [
+            "You can stop using the service at any time. We can suspend or terminate accounts that violate these terms.",
+            "On termination we delete your data per the Privacy Policy retention schedule."
+          ]
+        },
+        {
+          "heading": "12. Changes to these terms",
+          "paragraphs": [
+            "We may update these terms. Material changes will be notified to workspace owners by email. Continued use of the service after a change constitutes acceptance of the updated terms."
+          ]
+        },
+        {
+          "heading": "13. Governing law and jurisdiction",
+          "paragraphs": [
+            "These terms are governed by the laws of the United Arab Emirates. Any dispute arising out of or related to these terms or the service will be resolved exclusively in the courts of Dubai, UAE."
+          ]
+        },
+        {
+          "heading": "14. Contact",
+          "paragraphs": [
+            "Estera Tech LLC, Dubai, United Arab Emirates.",
+            "Email: info@esteratech.com or support@poultrymanager.io.",
+            "WhatsApp: +971 52 244 4195."
+          ]
+        }
+      ]
+    }
   }
 }

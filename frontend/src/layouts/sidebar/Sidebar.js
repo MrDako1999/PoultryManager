@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -55,7 +56,22 @@ export default function Sidebar({
       )}>
         {isExpanded ? (
           <>
-            <img src={bannerSrc} alt="PoultryManager" className="h-11 object-contain object-left" />
+            {/* Logo doubles as a "back to marketing site" link. Closes the
+                mobile drawer first so the user doesn't land on / with the
+                drawer still open behind the page. */}
+            <Link
+              to="/"
+              onClick={closeMobileDrawer}
+              className="inline-flex items-center transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-md"
+              aria-label="PoultryManager — go to home"
+            >
+              <img
+                src={bannerSrc}
+                alt="PoultryManager"
+                className="h-11 object-contain object-left"
+                draggable={false}
+              />
+            </Link>
             {!isDesktop && sidebarOpen && (
               <Button
                 variant="ghost"
@@ -68,7 +84,19 @@ export default function Sidebar({
             )}
           </>
         ) : (
-          <img src={iconSrc} alt="PoultryManager" className="h-10 w-10 rounded-lg shrink-0 object-contain" />
+          <Link
+            to="/"
+            onClick={closeMobileDrawer}
+            className="inline-flex items-center transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-lg"
+            aria-label="PoultryManager — go to home"
+          >
+            <img
+              src={iconSrc}
+              alt="PoultryManager"
+              className="h-10 w-10 rounded-lg shrink-0 object-contain"
+              draggable={false}
+            />
+          </Link>
         )}
 
         {/* Collapse/expand toggle */}

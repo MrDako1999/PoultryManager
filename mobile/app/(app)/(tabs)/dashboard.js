@@ -9,6 +9,7 @@ import ModuleSwitcher from '@/shared/components/ModuleSwitcher';
 import HeroSheetScreen, { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import SheetSection from '@/components/SheetSection';
 import { MODULES } from '@/modules/registry';
+import { resolveRoleDashboard } from '@/modules/_shared/RoleDashboardRouter';
 import { deltaSync } from '@/lib/syncEngine';
 
 function getGreetingBucket(hour) {
@@ -47,10 +48,10 @@ export default function DashboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const { mutedColor, accentColor, dark } = useHeroSheetTokens();
 
-  const RoleDashboard = useMemo(() => {
-    const mod = activeModule ? MODULES[activeModule] : null;
-    return mod?.roleDashboards?.[role] || null;
-  }, [activeModule, role]);
+  const RoleDashboard = useMemo(
+    () => resolveRoleDashboard(activeModule, role),
+    [activeModule, role]
+  );
 
   const widgets = useMemo(() => {
     const out = [];

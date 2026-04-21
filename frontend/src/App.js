@@ -3,11 +3,17 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import useAuthStore from '@/stores/authStore';
 import useThemeStore from '@/stores/themeStore';
 import useCapabilities from '@/hooks/useCapabilities';
+import useDocumentDir from '@/hooks/useDocumentDir';
 import AuthLayout from '@/layouts/AuthLayout';
 import DashboardLayout from '@/layouts/DashboardLayout';
+import MarketingLayout from '@/layouts/MarketingLayout';
 import LoginPage from '@/pages/auth/LoginPage';
 import RegisterPage from '@/pages/auth/RegisterPage';
 import FirstLoginPage from '@/pages/auth/FirstLoginPage';
+import LandingPage from '@/pages/marketing/LandingPage';
+import PrivacyPage from '@/pages/marketing/PrivacyPage';
+import TermsPage from '@/pages/marketing/TermsPage';
+import ContactPage from '@/pages/marketing/ContactPage';
 import DashboardPage from '@/pages/dashboard/DashboardPage';
 import AccountingShell from '@/pages/dashboard/AccountingShell';
 import SettingsPage from '@/pages/dashboard/settings/SettingsPage';
@@ -135,6 +141,8 @@ export default function App() {
   const { initTheme } = useThemeStore();
   const { topLevel: moduleTopLevelRoutes, businessScoped: moduleBusinessScopedRoutes } = useModuleRouteTree();
 
+  useDocumentDir();
+
   useEffect(() => {
     initTheme();
     checkAuth();
@@ -143,6 +151,17 @@ export default function App() {
   return (
     <>
       <Routes>
+        {/* Public marketing routes — no PublicRoute wrapper because landing,
+            privacy, terms and contact must be reachable for both anonymous
+            users AND authenticated users (so they can read the policy or jump
+            to the home page from inside the dashboard). */}
+        <Route element={<MarketingLayout />}>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/contact" element={<ContactPage />} />
+        </Route>
+
         {/* Public auth routes */}
         <Route
           element={
@@ -224,8 +243,8 @@ export default function App() {
           <Route path="/dashboard/invoices" element={<Navigate to="/dashboard/accounting/sales" replace />} />
         </Route>
 
-        {/* Catch-all */}
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        {/* Catch-all — unknown URLs land on the marketing site, not /login */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <Toaster />
     </>

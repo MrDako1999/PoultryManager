@@ -26,10 +26,27 @@ api.interceptors.request.use(async (config) => {
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401) {
+    const status = error.response?.status;
+    const code = error.response?.data?.code;
+
+    if (status === 401) {
+      // USER_DELETED comes from the backend protect middleware after a
+      // soft-delete cascade. Force-logout exactly the same way as a
+      // generic 401 — the user can't do anything anyway.
       await clearToken();
       router.replace('/(auth)/login');
     }
+
+    if (status === 402 && code === 'SUBSCRIPTION_INACTIVE') {
+      // Workspace got locked mid-session. Refresh /auth/me so the gate
+      // hook flips to 'block' and the BillingLockScreen takes over.
+      // Lazy require to avoid a circular import (syncEngine -> api -> ...).
+      try {
+        const { refreshAuthAndSubscription } = require('./syncEngine');
+        refreshAuthAndSubscription().catch(() => {});
+      } catch {}
+    }
+
     return Promise.reject(error);
   }
 );

@@ -3,7 +3,7 @@ import { View, Text, Pressable, Alert, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { router } from 'expo-router';
 import {
-  User, Shield, Puzzle, Calculator, ShoppingCart,
+  User, Shield, Puzzle, Users, Calculator, ShoppingCart,
   ChevronRight, LogOut, Moon, Sun, Monitor, Languages,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
@@ -283,6 +283,13 @@ export default function SettingsScreen() {
           onPress={() => router.push('/(app)/settings-security')}
           isLast={!isOwner}
         />
+        {isOwner && (
+          <SettingsRow
+            icon={Users}
+            label={t('settings.team', 'Team')}
+            onPress={() => router.push('/(app)/settings-team')}
+          />
+        )}
         {isOwner && (
           <SettingsRow
             icon={Puzzle}

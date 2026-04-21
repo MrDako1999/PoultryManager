@@ -3,6 +3,7 @@ import Farm from '../models/Farm.js';
 import Business from '../models/Business.js';
 import { protect } from '../middleware/auth.js';
 import { logDeletion } from '../middleware/deletionTracker.js';
+import { getAssignedFarmIds } from '../services/workerScope.js';
 
 const router = express.Router();
 
@@ -26,6 +27,13 @@ router.get('/', protect, async (req, res) => {
         { farmName: regex },
         { nickname: regex },
       ];
+    }
+
+    // Sub-users see only farms in their assignment list. Owner = unscoped.
+    const scoped = await getAssignedFarmIds(req.user);
+    if (scoped !== null) {
+      if (scoped.length === 0) return res.json([]);
+      query._id = { $in: scoped };
     }
 
     const farms = await Farm.find(query)

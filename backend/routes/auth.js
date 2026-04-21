@@ -2,9 +2,15 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import Business from '../models/Business.js';
-import { protect } from '../middleware/auth.js';
+import { protectBillingExempt } from '../middleware/auth.js';
 import { resolveModules } from '../middleware/modules.js';
-import { actionsForRole } from '@poultrymanager/shared';
+import {
+  actionsForRole,
+  subscriptionStatus,
+  billingBlockReason,
+  MODULE_CAPABILITIES,
+} from '@poultrymanager/shared';
+import { getAssignedFarmIds, getAssignedHouseIds } from '../services/workerScope.js';
 
 const router = express.Router();
 
@@ -14,7 +20,9 @@ async function buildAuthPayload(user) {
 
   let owner = user;
   if (!isOwner) {
-    owner = await User.findById(ownerId).select('firstName lastName accountBusiness modules country vatRate currency invoiceLanguage moduleSettings companyName');
+    owner = await User.findById(ownerId).select(
+      'firstName lastName accountBusiness modules country vatRate currency invoiceLanguage moduleSettings companyName subscription'
+    );
   }
 
   const modules = await resolveModules(user);
@@ -22,6 +30,37 @@ async function buildAuthPayload(user) {
   const explicitAllow = Array.isArray(user.permissions?.allow) ? user.permissions.allow : [];
   const explicitDeny = Array.isArray(user.permissions?.deny) ? user.permissions.deny : [];
   const roleDefaults = actionsForRole(user.accountRole);
+
+  // Per-module role capability matrix for the modules this user can see.
+  // Clients use this to render the role-aware UI (button enable/disable,
+  // PermissionEditor checkbox grid) without their own copy of the matrix.
+  const moduleCapabilities = {};
+  for (const moduleId of modules) {
+    const map = MODULE_CAPABILITIES[moduleId];
+    if (map && Array.isArray(map[user.accountRole])) {
+      moduleCapabilities[moduleId] = map[user.accountRole];
+    }
+  }
+
+  // Data scope. Farm-level only for this iteration (see WORKERS.md).
+  // assignedFarmIds drives the scope picker / summary; assignedHouseIds
+  // is the derived union (farms -> houses, plus any legacy explicit
+  // house picks) that house-keyed list filters consume client-side.
+  const [assignedFarmIds, assignedHouseIds] = await Promise.all([
+    getAssignedFarmIds(user),
+    getAssignedHouseIds(user),
+  ]);
+
+  // Subscription state. Always sourced from the OWNER doc; sub-users
+  // inherit their owner's status. See SUBSCRIPTION.md.
+  const subscriptionPolicy = subscriptionStatus(owner);
+  const subscriptionPayload = {
+    status: owner?.subscription?.status || 'active',
+    policy: subscriptionPolicy,
+    reason: billingBlockReason(owner),
+    currentPeriodEnd: owner?.subscription?.currentPeriodEnd || null,
+    verifiedAt: new Date().toISOString(),
+  };
 
   return {
     _id: user._id,
@@ -32,16 +71,23 @@ async function buildAuthPayload(user) {
     companyName: user.companyName,
     accountRole: user.accountRole,
     modules,
+    moduleCapabilities,
     permissions: {
       allow: explicitAllow,
       deny: explicitDeny,
       defaults: roleDefaults,
+    },
+    scope: {
+      isOwner,
+      assignedFarmIds,
+      assignedHouseIds,
     },
     workspace: {
       ownerId,
       ownerName: owner ? `${owner.firstName || ''} ${owner.lastName || ''}`.trim() : '',
       ownerBusiness: owner?.accountBusiness || null,
       isOwner,
+      subscription: subscriptionPayload,
     },
     accountBusiness: user.accountBusiness,
     country: owner?.country ?? user.country ?? null,
@@ -130,6 +176,10 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
+    if (user.deletedAt) {
+      return res.status(401).json({ code: 'USER_DELETED', message: 'Account has been removed' });
+    }
+
     if (!user.isActive) {
       return res.status(403).json({ message: 'Account is deactivated' });
     }
@@ -148,7 +198,11 @@ router.post('/logout', (req, res) => {
   res.json({ message: 'Logged out' });
 });
 
-router.get('/me', protect, async (req, res) => {
+// /auth/me uses protectBillingExempt so a workspace whose subscription
+// is blocked can still hydrate the BillingLockScreen and let the owner
+// open the billing portal. Every other route uses standard `protect`
+// which 402s out the moment subscription is non-active.
+router.get('/me', protectBillingExempt, async (req, res) => {
   const user = req.user;
 
   if (user.accountRole === 'owner' && !user.accountBusiness) {

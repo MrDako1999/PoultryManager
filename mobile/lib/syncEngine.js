@@ -29,12 +29,21 @@ import {
 } from '@poultrymanager/shared';
 
 const SYNC_INTERVAL_MS = 60_000;
+const BILLING_HEARTBEAT_MS = 30_000;
 let intervalId = null;
+let billingHeartbeatId = null;
 let _queueProcessing = false;
 let _rerunRequested = false;
+let _billingPaused = false;
 
 const SHARED_TABLES = new Set([
   'businesses', 'contacts', 'workers', 'farms', 'media',
+]);
+
+// Tables that only owners are allowed to sync. Sub-users would get 403
+// from the backend; we just skip the fetch entirely for them.
+const OWNER_ONLY_TABLES = new Set([
+  'users',
 ]);
 
 // Lazy-load the registry and authStore to break the require cycle:
@@ -67,6 +76,14 @@ function resolveAllowedTables() {
     for (const t of mod.sync.tables || []) allowed.add(t);
     for (const t of mod.sync.dependsOn || []) allowed.add(t);
   }
+  // Owner-only tables (e.g. users / team members) are added only when
+  // the current user is the workspace owner. Sub-users would otherwise
+  // hammer 403s on every sync tick.
+  const user = getAuthStore().getState().user;
+  const isOwner = !!user && !user.createdBy;
+  if (isOwner) {
+    for (const t of OWNER_ONLY_TABLES) allowed.add(t);
+  }
   return allowed;
 }
 
@@ -89,6 +106,114 @@ function filteredSyncOrder() {
 async function getServerTime() {
   const { data } = await api.get('/sync/status');
   return data.serverTime;
+}
+
+/**
+ * Refresh /auth/me and persist the workspace.subscription block to
+ * sync_meta so the BillingLockScreen has the latest policy without
+ * blocking the UI on a network round-trip.
+ *
+ * Returns the latest subscription payload (`{ status, policy, reason,
+ * verifiedAt, ... }`) so callers can branch on `policy === 'block'`
+ * before kicking off a heavy sync.
+ *
+ * Updates the auth store as a side-effect — the store is the single
+ * source of truth for the user/workspace blob; useSubscriptionGate
+ * reads from it.
+ */
+export async function refreshAuthAndSubscription() {
+  try {
+    const { data } = await api.get('/auth/me');
+    const subscription = data?.workspace?.subscription || null;
+
+    // Push the fresh user blob into the auth store so capability
+    // checks, scope, and subscription gate all see the latest state
+    // without a re-mount.
+    try {
+      const authStore = getAuthStore();
+      authStore.setState({ user: data });
+    } catch (err) {
+      console.warn('[syncEngine] failed to update authStore from /auth/me', err?.message);
+    }
+
+    if (subscription) {
+      await upsertSyncMeta([
+        {
+          entityType: '__subscription__',
+          lastSyncAt: JSON.stringify(subscription),
+        },
+      ]);
+    }
+    return subscription;
+  } catch (err) {
+    // 402 SUBSCRIPTION_INACTIVE shouldn't reach here because /auth/me
+    // is exempt from the subscription gate on the backend. A 401 means
+    // the token is gone — let the existing axios interceptor handle it.
+    console.warn('[syncEngine] refreshAuthAndSubscription failed:', err?.message);
+    return null;
+  }
+}
+
+export async function getCachedSubscription() {
+  const meta = await getSyncMeta('__subscription__');
+  if (!meta?.lastSyncAt) return null;
+  try {
+    return JSON.parse(meta.lastSyncAt);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Start a lightweight 30s /auth/me poll that runs ONLY while the
+ * workspace is blocked. Heavy entity sync stays paused; this loop just
+ * watches for the owner to fix billing. The moment the subscription
+ * flips back to 'allow' it flips heavy sync back on.
+ */
+export function startBillingHeartbeat() {
+  if (billingHeartbeatId) return;
+  billingHeartbeatId = setInterval(async () => {
+    const sub = await refreshAuthAndSubscription();
+    if (sub?.policy === 'allow') {
+      stopBillingHeartbeat();
+      _billingPaused = false;
+      startPeriodicSync();
+      // Trigger an immediate catch-up sync + queue flush so any work
+      // queued during the lock surfaces right away.
+      deltaSync().catch(() => {});
+      processQueue().catch(() => {});
+    }
+  }, BILLING_HEARTBEAT_MS);
+}
+
+export function stopBillingHeartbeat() {
+  if (billingHeartbeatId) {
+    clearInterval(billingHeartbeatId);
+    billingHeartbeatId = null;
+  }
+}
+
+/**
+ * Manual retry from the BillingLockScreen "Retry" button. Same code
+ * path as the heartbeat — single /auth/me, unlock if 'allow'.
+ */
+export async function retrySubscription() {
+  const sub = await refreshAuthAndSubscription();
+  if (sub?.policy === 'allow') {
+    stopBillingHeartbeat();
+    _billingPaused = false;
+    startPeriodicSync();
+    deltaSync().catch(() => {});
+    processQueue().catch(() => {});
+  }
+  return sub;
+}
+
+function pauseHeavySyncForBilling() {
+  if (_billingPaused) return;
+  _billingPaused = true;
+  stopPeriodicSync();
+  startBillingHeartbeat();
 }
 
 async function fetchAllForEntity(entityType, updatedSince, batchScoped) {
@@ -212,6 +337,21 @@ export async function deltaSync() {
   store.setSyncing(true);
 
   try {
+    // Refresh /auth/me first so we know the owner's subscription state
+    // before doing anything expensive. If the workspace is blocked we
+    // pause heavy sync, start the billing heartbeat, and bail.
+    const subscription = await refreshAuthAndSubscription();
+    if (subscription?.policy === 'block') {
+      pauseHeavySyncForBilling();
+      return;
+    }
+    if (_billingPaused && subscription?.policy === 'allow') {
+      // Edge: heartbeat already detected the unlock and switched things
+      // back on. Continue with the sync as normal.
+      _billingPaused = false;
+      stopBillingHeartbeat();
+    }
+
     const metaCount = await getSyncMetaCount();
     if (metaCount === 0) {
       await fullSync();
@@ -306,6 +446,10 @@ function isTransientError(err) {
 export async function processQueue() {
   const store = useSyncStore.getState();
   if (!store.isOnline) return;
+  // Don't drain the queue while the workspace is locked. Mutations stay
+  // in `pending` and flush automatically when the gate flips back to
+  // 'allow' via the heartbeat or manual retry.
+  if (_billingPaused) return;
 
   if (_queueProcessing) {
     _rerunRequested = true;

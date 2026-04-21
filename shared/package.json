@@ -9,7 +9,10 @@
     "./modules": "./modules.js",
     "./roles": "./roles.js",
     "./permissions": "./permissions.js",
-    "./syncRefs": "./syncRefs.js"
+    "./syncRefs": "./syncRefs.js",
+    "./billing": "./billing.js",
+    "./module-capabilities": "./modules/index.js",
+    "./module-capabilities/*": "./modules/*/capabilities.js"
   },
   "private": true
 }

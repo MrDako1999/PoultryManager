@@ -2,11 +2,14 @@ import { View, ActivityIndicator } from 'react-native';
 import { Redirect, Stack } from 'expo-router';
 import useAuthStore from '@/stores/authStore';
 import useThemeStore from '@/stores/themeStore';
+import useSubscriptionGate from '@/hooks/useSubscriptionGate';
+import BillingLockScreen from '@/components/BillingLockScreen';
 
 export default function AppLayout() {
   const { user, isLoading } = useAuthStore();
   const { resolvedTheme } = useThemeStore();
   const spinnerColor = resolvedTheme === 'dark' ? 'hsl(148, 48%, 38%)' : 'hsl(148, 60%, 20%)';
+  const gate = useSubscriptionGate();
 
   if (isLoading) {
     return (
@@ -22,6 +25,10 @@ export default function AppLayout() {
 
   if (user.mustChangePassword) {
     return <Redirect href="/(auth)/first-login" />;
+  }
+
+  if (gate.policy === 'block') {
+    return <BillingLockScreen isOwner={gate.isOwner} reason={gate.reason} />;
   }
 
   return (
@@ -51,6 +58,7 @@ export default function AppLayout() {
         <Stack.Screen name="feed-catalogue" />
         <Stack.Screen name="settings-profile" />
         <Stack.Screen name="settings-security" />
+        <Stack.Screen name="settings-team" />
         <Stack.Screen name="settings-modules" />
         <Stack.Screen name="settings-accounting" />
         <Stack.Screen name="settings-sale-defaults" />

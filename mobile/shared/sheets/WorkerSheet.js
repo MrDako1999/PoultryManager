@@ -4,7 +4,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useTranslation } from 'react-i18next';
-import { Users, Home, Check } from 'lucide-react-native';
+import { Users, Warehouse, Check } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import useOfflineMutation from '@/hooks/useOfflineMutation';
 import useLocalQuery from '@/hooks/useLocalQuery';
@@ -62,8 +62,7 @@ export default function WorkerSheet({
   const isEditing = !!editData?._id;
 
   const [farms] = useLocalQuery('farms');
-  const [houses] = useLocalQuery('houses');
-  const [assignedHouseIds, setAssignedHouseIds] = useState([]);
+  const [assignedFarmIds, setAssignedFarmIds] = useState([]);
 
   const { control, handleSubmit, reset, formState: { errors } } = useForm({
     resolver: zodResolver(schema),
@@ -89,11 +88,11 @@ export default function WorkerSheet({
           ? new Date(editData.passportExpiry).toISOString().slice(0, 10)
           : '',
       });
-      const initial = Array.isArray(editData.houseAssignments) ? editData.houseAssignments : [];
-      setAssignedHouseIds(initial.map((h) => (typeof h === 'object' ? h._id : h)));
+      const initial = Array.isArray(editData.farmAssignments) ? editData.farmAssignments : [];
+      setAssignedFarmIds(initial.map((f) => (typeof f === 'object' ? f._id : f)));
     } else {
       reset(defaultValues);
-      setAssignedHouseIds([]);
+      setAssignedFarmIds([]);
     }
   }, [open, editData, reset]);
 
@@ -105,21 +104,10 @@ export default function WorkerSheet({
     [t]
   );
 
-  const housesByFarm = useMemo(() => {
-    const farmById = Object.fromEntries(farms.map((f) => [f._id, f]));
-    const map = new Map();
-    for (const h of houses) {
-      const fid = String(typeof h.farm === 'object' ? h.farm?._id : h.farm || '');
-      if (!map.has(fid)) map.set(fid, { farm: farmById[fid] || null, houses: [] });
-      map.get(fid).houses.push(h);
-    }
-    return [...map.entries()];
-  }, [farms, houses]);
-
-  const toggleHouse = (houseId) => {
+  const toggleFarm = (farmId) => {
     Haptics.selectionAsync().catch(() => {});
-    setAssignedHouseIds((prev) =>
-      prev.includes(houseId) ? prev.filter((id) => id !== houseId) : [...prev, houseId]
+    setAssignedFarmIds((prev) =>
+      prev.includes(farmId) ? prev.filter((id) => id !== farmId) : [...prev, farmId]
     );
   };
 
@@ -137,7 +125,7 @@ export default function WorkerSheet({
         passportNumber: data.passportNumber || '',
         passportCountry: data.passportCountry || '',
         passportExpiry: data.passportExpiry || null,
-        houseAssignments: assignedHouseIds,
+        farmAssignments: assignedFarmIds,
       };
 
       let savedId;
@@ -150,17 +138,17 @@ export default function WorkerSheet({
         savedId = tempId;
       }
 
-      // Mirror house assignments to the linked user account when present
-      // (matches the legacy WorkerEditSheet behaviour so ground-staff scoping
-      // stays in sync immediately, before the next deltaSync pulls it back).
+      // Mirror farm assignments to the linked user account when present
+      // so ground-staff data scoping stays in sync immediately, before
+      // the next deltaSync pulls it back.
       if (editData?.linkedUser) {
         try {
           const linkedUserId = typeof editData.linkedUser === 'object'
             ? editData.linkedUser._id
             : editData.linkedUser;
-          await api.put(`/users/${linkedUserId}`, { houseAssignments: assignedHouseIds });
+          await api.put(`/users/${linkedUserId}`, { farmAssignments: assignedFarmIds });
         } catch (err) {
-          console.warn('[WorkerSheet] failed to sync user houseAssignments', err?.message);
+          console.warn('[WorkerSheet] failed to sync user farmAssignments', err?.message);
         }
       }
 
@@ -376,80 +364,48 @@ export default function WorkerSheet({
         </FormField>
       </FormSection>
 
-      {housesByFarm.length > 0 ? (
+      {farms.length > 0 ? (
         <FormSection
-          title={t('workers.assignedHouses', 'House Assignments')}
+          title={t('workers.assignedFarms', 'Farm Assignments')}
           description={t(
-            'workers.editAssignmentsHelp',
-            'Select the houses this worker is responsible for.'
+            'workers.editFarmAssignmentsHelp',
+            'Pick the farms this worker is responsible for. They will only see data for those farms.'
           )}
           padded={false}
-          style={{ padding: 12, gap: 14 }}
+          style={{ padding: 12, gap: 12 }}
         >
-          {housesByFarm.map(([farmId, { farm, houses: list }]) => (
-            <FarmHouseGroup
-              key={farmId}
-              farmName={farm?.farmName || t('farms.unknownFarm', 'Farm')}
-              houses={list}
-              assignedHouseIds={assignedHouseIds}
-              onToggle={toggleHouse}
-              tokens={tokens}
-              isRTL={isRTL}
-            />
-          ))}
+          <View
+            style={{
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: tokens.borderColor,
+              overflow: 'hidden',
+              backgroundColor: tokens.dark ? 'rgba(255,255,255,0.03)' : 'hsl(148, 22%, 96%)',
+            }}
+          >
+            {farms.map((farm, idx) => {
+              const isLast = idx === farms.length - 1;
+              const checked = assignedFarmIds.map(String).includes(String(farm._id));
+              return (
+                <FarmRow
+                  key={farm._id}
+                  farm={farm}
+                  checked={checked}
+                  isLast={isLast}
+                  onToggle={() => toggleFarm(farm._id)}
+                  tokens={tokens}
+                  isRTL={isRTL}
+                />
+              );
+            })}
+          </View>
         </FormSection>
       ) : null}
     </FormSheet>
   );
 }
 
-function FarmHouseGroup({ farmName, houses, assignedHouseIds, onToggle, tokens, isRTL }) {
-  const { mutedColor, dark, borderColor } = tokens;
-  return (
-    <View style={{ gap: 8 }}>
-      <Text
-        style={{
-          fontSize: 11,
-          fontFamily: 'Poppins-SemiBold',
-          color: mutedColor,
-          letterSpacing: 1.2,
-          textTransform: 'uppercase',
-          textAlign: isRTL ? 'right' : 'left',
-        }}
-        numberOfLines={1}
-      >
-        {farmName}
-      </Text>
-      <View
-        style={{
-          borderRadius: 12,
-          borderWidth: 1,
-          borderColor,
-          overflow: 'hidden',
-          backgroundColor: dark ? 'rgba(255,255,255,0.03)' : 'hsl(148, 22%, 96%)',
-        }}
-      >
-        {houses.map((house, idx) => {
-          const checked = assignedHouseIds.includes(house._id);
-          const isLast = idx === houses.length - 1;
-          return (
-            <HouseRow
-              key={house._id}
-              house={house}
-              checked={checked}
-              isLast={isLast}
-              onToggle={() => onToggle(house._id)}
-              tokens={tokens}
-              isRTL={isRTL}
-            />
-          );
-        })}
-      </View>
-    </View>
-  );
-}
-
-function HouseRow({ house, checked, isLast, onToggle, tokens, isRTL }) {
+function FarmRow({ farm, checked, isLast, onToggle, tokens, isRTL }) {
   const { textColor, accentColor, mutedColor, dark, borderColor } = tokens;
   return (
     <Pressable
@@ -486,20 +442,35 @@ function HouseRow({ house, checked, isLast, onToggle, tokens, isRTL }) {
           ? (dark ? 'rgba(148,210,165,0.18)' : 'hsl(148, 35%, 92%)')
           : (dark ? 'rgba(255,255,255,0.05)' : 'hsl(148, 18%, 95%)'),
       }]}>
-        <Home size={14} color={checked ? accentColor : mutedColor} strokeWidth={2.2} />
+        <Warehouse size={14} color={checked ? accentColor : mutedColor} strokeWidth={2.2} />
       </View>
-      <Text
-        style={{
-          flex: 1,
-          fontSize: 14,
-          fontFamily: checked ? 'Poppins-SemiBold' : 'Poppins-Medium',
-          color: textColor,
-          textAlign: isRTL ? 'right' : 'left',
-        }}
-        numberOfLines={1}
-      >
-        {house.name}
-      </Text>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text
+          style={{
+            fontSize: 14,
+            fontFamily: checked ? 'Poppins-SemiBold' : 'Poppins-Medium',
+            color: textColor,
+            textAlign: isRTL ? 'right' : 'left',
+          }}
+          numberOfLines={1}
+        >
+          {farm.farmName}
+        </Text>
+        {farm.nickname ? (
+          <Text
+            style={{
+              fontSize: 11,
+              fontFamily: 'Poppins-Regular',
+              color: mutedColor,
+              textAlign: isRTL ? 'right' : 'left',
+              marginTop: 2,
+            }}
+            numberOfLines={1}
+          >
+            {farm.nickname}
+          </Text>
+        ) : null}
+      </View>
     </Pressable>
   );
 }

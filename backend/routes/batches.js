@@ -6,6 +6,7 @@ import Expense from '../models/Expense.js';
 import { protect } from '../middleware/auth.js';
 import { requireModule } from '../middleware/modules.js';
 import { logDeletion, logDeletions } from '../middleware/deletionTracker.js';
+import { getAssignedFarmIds, getAssignedHouseIds } from '../services/workerScope.js';
 
 const router = express.Router();
 
@@ -40,6 +41,25 @@ router.get('/', async (req, res) => {
 
     if (updatedSince) {
       query.updatedAt = { $gte: new Date(updatedSince) };
+    }
+
+    // Sub-users with farm assignments see only batches whose farm is in
+    // their scope. We also union by houses (batches reference houses
+    // explicitly in `houses.house`) to cover any legacy explicit-house
+    // workers — getAssignedHouseIds resolves both axes.
+    const [scopedFarms, scopedHouses] = await Promise.all([
+      getAssignedFarmIds(req.user),
+      getAssignedHouseIds(req.user),
+    ]);
+    if (scopedFarms !== null) {
+      if (scopedFarms.length === 0 && (scopedHouses?.length ?? 0) === 0) {
+        return res.json([]);
+      }
+      const orClauses = [];
+      if (scopedFarms.length) orClauses.push({ farm: { $in: scopedFarms } });
+      if (scopedHouses?.length) orClauses.push({ 'houses.house': { $in: scopedHouses } });
+      if (orClauses.length === 1) Object.assign(query, orClauses[0]);
+      else if (orClauses.length > 1) query.$and = [{ $or: orClauses }];
     }
 
     const batches = await Batch.find(query)
