@@ -873,7 +873,7 @@
                 "Account data — your first name, last name, email, optional phone number, and an account password stored only as a salted hash.",
                 "Workspace data you create — businesses, farms, houses, contacts, workers, and the operational records you log: batches, cycles, daily logs (mortality, feed, water, weights, temperature, humidity), sales, expenses and invoices.",
                 "Photos and documents you upload — receipts, documents, and any photos you choose to attach to records. Captured from your device camera or selected from your photo library only when you tap the attach action. We never browse your photo library or take photos in the background.",
-                "Coarse location — only when you use the Farm Location Picker to set a farm's coordinates. Captured once per save, never in the background.",
+                "Precise location — only when you use the Farm Location Picker to set a farm's coordinates. Captured once per save when you tap the map, never in the background.",
                 "Diagnostic data — basic crash logs and minimal usage events (which screens loaded, did the request succeed) so we can fix bugs."
               ]
             },
@@ -957,7 +957,7 @@
           "list": [
             "Camera — to take a photo of a receipt or document and attach it to a record.",
             "Photo library — to pick an existing photo to attach.",
-            "Location (foreground only) — to drop a pin for the farm location, once, when you save the farm.",
+            "Location — precise GPS coordinates, foreground only, captured once when you drop a pin on the Farm Location Picker. Never used in the background.",
             "Network access — to sync your data with our servers."
           ]
         },
