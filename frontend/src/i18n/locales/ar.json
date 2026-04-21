@@ -261,7 +261,8 @@
       "legal": {
         "title": "قانوني",
         "privacy": "الخصوصية",
-        "terms": "الشروط"
+        "terms": "الشروط",
+        "accountDeletion": "حذف الحساب"
       }
     },
     "contact": {
@@ -287,6 +288,10 @@
     },
     "terms": {
       "title": "الشروط والأحكام",
+      "lastUpdated": "آخر تحديث: 21 أبريل 2026"
+    },
+    "accountDeletion": {
+      "title": "حذف حسابك",
       "lastUpdated": "آخر تحديث: 21 أبريل 2026"
     }
   }

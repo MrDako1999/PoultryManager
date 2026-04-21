@@ -14,9 +14,16 @@ api.interceptors.response.use(
     const code = error.response?.data?.code;
 
     if (status === 401) {
-      const isAuthRoute = window.location.pathname.startsWith('/login') ||
-        window.location.pathname.startsWith('/register');
-      if (!isAuthRoute) {
+      // Only force-redirect to /login when the user is actually inside the
+      // protected app shell (`/dashboard/*` or `/first-login`). Marketing
+      // routes (/, /privacy, /terms, /contact, /account-deletion) and the
+      // public auth routes (/login, /register) all silently tolerate a 401
+      // — anonymous visitors hitting the landing page get a 401 from the
+      // initial /auth/me probe in authStore.checkAuth() and that's normal,
+      // not a reason to bounce them to /login.
+      const path = window.location.pathname;
+      const insideAppShell = path.startsWith('/dashboard') || path.startsWith('/first-login');
+      if (insideAppShell) {
         window.location.href = '/login';
       }
     }

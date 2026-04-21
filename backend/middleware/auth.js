@@ -69,6 +69,21 @@ export const protect = async (req, res, next) => {
     req.user = user;
 
     const owner = await loadWorkspaceOwner(user);
+
+    // Defense-in-depth: if the workspace owner has been soft-deleted, no
+    // sub-user under that workspace should be able to act on it. The
+    // owner-self-delete cascade in services/accountDeletion.js already
+    // marks every sub-user with `deletedAt`, but in the unlikely event a
+    // sub-user slipped through that loop we still block them here. Also
+    // covers the manual case where a support engineer flips just the
+    // owner's deletedAt without running the full cascade.
+    if (user.createdBy && owner?.deletedAt) {
+      return res.status(401).json({
+        code: 'USER_DELETED',
+        message: 'Workspace has been removed',
+      });
+    }
+
     req.workspaceOwner = owner;
 
     if (subscriptionStatus(owner) === 'block') {

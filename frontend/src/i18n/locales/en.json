@@ -161,6 +161,19 @@
     "changePassword": "Update Password",
     "passwordUpdated": "Password updated successfully",
     "passwordUpdateError": "Failed to update password",
+    "deleteAccountTitle": "Delete account",
+    "deleteAccountOwnerDesc": "Permanently delete your PoultryManager account and the entire workspace. Every farm, batch, daily log, sale, expense, photo and sub-user inside this workspace will be removed. This cannot be undone after the 30-day grace window.",
+    "deleteAccountSubuserDesc": "Permanently delete your access to this workspace. Records you authored (daily logs, photos) stay in the workspace as audit history; you'll lose the ability to log in.",
+    "deleteAccountButton": "Delete my account",
+    "deleteAccountConfirmTitle": "Delete this account?",
+    "deleteAccountConfirmOwnerWarning": "This will soft-delete your account, every sub-user under your workspace, and every record they created. After 30 days the deletion is irreversible.",
+    "deleteAccountConfirmSubuserWarning": "Your access to {{workspace}} will be revoked. Records you authored will remain in the workspace as audit history.",
+    "deleteAccountConfirmInputLabel": "Type your email to confirm",
+    "deleteAccountConfirmInputPlaceholder": "you@example.com",
+    "deleteAccountConfirmInputHelp": "Enter {{email}} to enable the delete button.",
+    "deleteAccountConfirmCta": "Permanently delete",
+    "deleteAccountSuccess": "Account deleted",
+    "deleteAccountError": "Failed to delete account",
     "teamTitle": "Team Members",
     "teamDesc": "Manage who has access to your account",
     "addUser": "Add User",
@@ -815,7 +828,8 @@
       "legal": {
         "title": "Legal",
         "privacy": "Privacy",
-        "terms": "Terms"
+        "terms": "Terms",
+        "accountDeletion": "Delete account"
       }
     },
     "contact": {
@@ -1064,6 +1078,97 @@
           "paragraphs": [
             "Estera Tech LLC, Dubai, United Arab Emirates.",
             "Email: info@esteratech.com or support@poultrymanager.io.",
+            "WhatsApp: +971 52 244 4195."
+          ]
+        }
+      ]
+    },
+    "accountDeletion": {
+      "title": "Delete your account",
+      "lastUpdated": "Last updated: April 21, 2026",
+      "intro": "This page explains exactly how to request that we delete your PoultryManager account and the data associated with it. We honor every request — no questions asked.",
+      "summary": {
+        "label": "Quick summary",
+        "body": "Email support@poultrymanager.io from the email address on your account, with the subject \"Delete account\". We confirm receipt within 5 business days and complete the deletion within 30 days.",
+        "ctaLabel": "Email support to delete",
+        "ctaHref": "mailto:support@poultrymanager.io?subject=Delete%20account&body=I%20would%20like%20to%20request%20deletion%20of%20my%20PoultryManager%20account%20and%20all%20associated%20data."
+      },
+      "body": [
+        {
+          "heading": "1. Who can request deletion",
+          "paragraphs": [
+            "Account owners can request deletion of their own account at any time, which removes the entire workspace including all sub-users, farms, batches, daily logs, sales, expenses, photos and any other data tied to that workspace.",
+            "Sub-users (workers, managers, accountants invited by an owner) do not have their own deletable account — they exist inside an owner's workspace. To remove a sub-user, the workspace owner can revoke their access from inside the app at any time, or contact support and we'll remove them on the owner's behalf."
+          ]
+        },
+        {
+          "heading": "2. How to request deletion",
+          "paragraphs": [
+            "Send an email to support@poultrymanager.io from the email address registered on your account, with the following details:"
+          ],
+          "list": [
+            "Subject line: \"Delete account\"",
+            "Confirmation that you want your account and all associated data permanently deleted",
+            "Optional: a short reason (helps us improve the product, but not required)"
+          ],
+          "trailingParagraph": "We confirm receipt within 5 business days and complete the deletion within 30 days. You will receive a final email when the deletion is complete."
+        },
+        {
+          "heading": "3. What gets deleted",
+          "paragraphs": [
+            "When we delete your account, the following is permanently removed from our systems:"
+          ],
+          "list": [
+            "Your account profile (name, email, phone, password hash)",
+            "Your entire workspace and every record inside it: businesses, farms, houses, contacts, workers, batches, cycles",
+            "All daily logs (mortality, feed, water, weights, temperature, humidity)",
+            "All sales, expenses, invoices, and other accounting records",
+            "All photos and documents you uploaded",
+            "All sub-user accounts you created inside your workspace",
+            "Cached copies on our backup systems (within 30 days of the deletion confirmation)"
+          ]
+        },
+        {
+          "heading": "4. What we may retain — and why",
+          "paragraphs": [
+            "A small set of records may be retained even after account deletion, strictly to meet legal, security, or accounting obligations:"
+          ],
+          "list": [
+            "Anonymized aggregate operational metrics that have already been folded into industry research aggregates (these contain no personal information, no business name, and cannot be linked back to you — see Privacy Policy section 4). If you opted out of research aggregation before requesting deletion, this does not apply.",
+            "Financial records (invoices, payment receipts) for the period required by United Arab Emirates VAT and corporate tax law — typically 5 years from the end of the relevant tax period. These records do not include your operational data.",
+            "Security and abuse-investigation logs for up to 90 days (IP addresses tied to login attempts, anti-fraud signals).",
+            "Records of your deletion request itself, so we can prove to regulators and to you that the deletion was honored."
+          ],
+          "trailingParagraph": "Nothing in this retained set is used for marketing, profiling, or any purpose other than legal compliance and security."
+        },
+        {
+          "heading": "5. Timeline",
+          "paragraphs": [
+            "Day 0 — You email support@poultrymanager.io requesting deletion. Your access to the account is revoked immediately so no one can log in.",
+            "Within 5 business days — We email you to confirm we received the request and have started the removal process.",
+            "Within 30 days — Your account, workspace and all the data listed in section 3 are permanently deleted from our production systems.",
+            "Within 30 days of the production deletion — Backups containing the data are rotated out of our retention window. Nothing remains."
+          ],
+          "trailingParagraph": "During the 30-day window your data is held in a soft-deleted state — invisible to everyone, but recoverable if you change your mind and email us before the window closes. After day 30 the deletion is irreversible."
+        },
+        {
+          "heading": "6. Cancellation vs deletion",
+          "paragraphs": [
+            "If you simply want to stop paying for the service but keep your data accessible in case you return, that's a cancellation, not a deletion. Cancellations keep your data intact for 90 days, then auto-delete unless you reactivate. To cancel, email support@poultrymanager.io with the subject \"Cancel subscription\".",
+            "Deletion is irreversible. Once we have deleted your account, we cannot restore it from backups."
+          ]
+        },
+        {
+          "heading": "7. Export your data first",
+          "paragraphs": [
+            "If you want a copy of your data before we delete it, request an export in the same email — we provide a JSON or CSV bundle of your workspace at no charge before processing the deletion."
+          ]
+        },
+        {
+          "heading": "8. Contact",
+          "paragraphs": [
+            "Estera Tech LLC, Dubai, United Arab Emirates.",
+            "Email: support@poultrymanager.io (preferred for deletion requests) or info@esteratech.com.",
             "WhatsApp: +971 52 244 4195."
           ]
         }

@@ -14,6 +14,7 @@ import LandingPage from '@/pages/marketing/LandingPage';
 import PrivacyPage from '@/pages/marketing/PrivacyPage';
 import TermsPage from '@/pages/marketing/TermsPage';
 import ContactPage from '@/pages/marketing/ContactPage';
+import AccountDeletionPage from '@/pages/marketing/AccountDeletionPage';
 import DashboardPage from '@/pages/dashboard/DashboardPage';
 import AccountingShell from '@/pages/dashboard/AccountingShell';
 import SettingsPage from '@/pages/dashboard/settings/SettingsPage';
@@ -160,6 +161,7 @@ export default function App() {
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/contact" element={<ContactPage />} />
+          <Route path="/account-deletion" element={<AccountDeletionPage />} />
         </Route>
 
         {/* Public auth routes */}

@@ -72,6 +72,7 @@ export default function MarketingFooter() {
           <FooterColumn title={t('marketing.footer.legal.title')}>
             <FooterLink to="/privacy">{t('marketing.footer.legal.privacy')}</FooterLink>
             <FooterLink to="/terms">{t('marketing.footer.legal.terms')}</FooterLink>
+            <FooterLink to="/account-deletion">{t('marketing.footer.legal.accountDeletion')}</FooterLink>
           </FooterColumn>
         </div>
 

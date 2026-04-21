@@ -2,8 +2,10 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import Business from '../models/Business.js';
-import { protectBillingExempt } from '../middleware/auth.js';
+import { protect, protectBillingExempt } from '../middleware/auth.js';
 import { resolveModules } from '../middleware/modules.js';
+import { logDeletion } from '../middleware/deletionTracker.js';
+import { softDeleteAccount } from '../services/accountDeletion.js';
 import {
   actionsForRole,
   subscriptionStatus,
@@ -221,5 +223,35 @@ router.get('/me', protectBillingExempt, async (req, res) => {
 });
 
 export { sendTokenResponse, buildAuthPayload };
+
+// DELETE /api/auth/me — self-service account deletion. Soft-deletes the
+// caller and (if they're an owner) cascade-soft-deletes the entire
+// workspace. Authored records keep their authorship reference for audit
+// purposes; nothing is hard-deleted from the database.
+//
+// After this returns, every subsequent authenticated request will be
+// blocked by `protect` with 401 USER_DELETED, so the client just needs to
+// clear its local state and route to /login.
+//
+// Mirrors the policy at /account-deletion: the public page tells users we
+// honor every request via support@poultrymanager.io for now; this endpoint
+// powers the in-app self-service "Delete account" button when we add it.
+router.delete('/me', protect, async (req, res) => {
+  try {
+    const result = await softDeleteAccount({
+      user: req.user,
+      logDeletion,
+    });
+    // Clear the auth cookie so a subsequent request without explicit
+    // logout flow lands the user back at /login cleanly.
+    res.clearCookie('token');
+    res.json({
+      message: 'Account deleted',
+      cascaded: result.deletions.length,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 
 export default router;
