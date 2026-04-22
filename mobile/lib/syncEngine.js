@@ -413,6 +413,15 @@ export async function deltaSync() {
     await upsertSyncMeta(metaEntries);
     store.setLastSyncAt(serverTime);
   } catch (err) {
+    // 401 means the token is gone — either the user just logged out
+    // (in which case the api interceptor already cleared the token
+    // and bounced them to /login) or the session expired server-side.
+    // Either way the running deltaSync is the loser of the race; this
+    // is expected noise, not a real failure. Swallow it so logout
+    // doesn't surface a red error in the dev console.
+    if (err?.response?.status === 401) {
+      return;
+    }
     console.error('Delta sync failed:', err);
     const transient = isTransientError(err);
     store.addSyncError({
@@ -536,6 +545,14 @@ export async function processQueue() {
 
         await db.runAsync(`UPDATE mutation_queue SET status = 'synced' WHERE id = ?`, [entry.id]);
       } catch (err) {
+        // Same logout-race rule as deltaSync: if the token is gone the
+        // remaining mutations will all hit 401 and there's nothing
+        // useful to surface. Bail out of the queue silently — the api
+        // interceptor already handled the redirect to /login.
+        if (err?.response?.status === 401) {
+          break;
+        }
+
         const transient = isTransientError(err);
         console.error(
           `Mutation ${transient ? 'pending (transient error)' : 'failed'} ` +

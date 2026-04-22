@@ -187,10 +187,11 @@ function LanguageRow({ item, isSelected, onPress, dark, accentColor, textColor, 
       <View style={[rowStyles.row, { flexDirection: rowDirection(isRTL) }]}>
         {/* Leading: flag tile (preferred) or letter-code fallback. All tiles
             share a uniform 42×28 footprint so the column is perfectly aligned
-            regardless of each flag's native aspect ratio. `marginEnd` flips
-            with writing direction so the gap stays on the inner side of the
-            row regardless of LTR/RTL. */}
-        <View style={[rowStyles.leading, { marginEnd: 14 }]}>
+            regardless of each flag's native aspect ratio. Spacing comes from
+            the parent's `gap` (set via rowStyles.row) — `marginEnd` here
+            collapsed against the platform RTL flag mid-session and left the
+            flag jammed against the script label. */}
+        <View style={rowStyles.leading}>
           {flagAvailable ? (
             <FlagTile code={item.code} size={28} width={42} radius={6} />
           ) : (
@@ -280,6 +281,7 @@ const rowStyles = StyleSheet.create({
   },
   row: {
     alignItems: 'center',
+    gap: 14,
   },
   leading: {
     width: 44,

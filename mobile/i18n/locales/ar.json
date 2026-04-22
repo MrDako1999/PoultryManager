@@ -128,7 +128,6 @@
   "nav": {
     "dashboard": "اللوحة الرئيسية",
     "today": "اليوم",
-    "tasks": "المهام",
     "batches": "الدفعات",
     "cycles": "الدورات",
     "farms": "المزارع",
@@ -499,6 +498,10 @@
     "cumulativeMortality": "النفوق التراكمي",
     "dailyDeaths": "النفوق اليومي",
     "consumption": "اتجاه الاستهلاك"
+  },
+  "datepicker": {
+    "legendSubmitted": "مُسجَّل",
+    "legendMissing": "ناقص"
   },
   "sync": {
     "title": "حالة المزامنة",

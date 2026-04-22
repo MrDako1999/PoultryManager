@@ -52,6 +52,16 @@ function SettingsRow({ icon: Icon, label, value, valueAccessory, onPress, destru
           alignItems: 'center',
           paddingHorizontal: 14,
           paddingVertical: 14,
+          // `gap` instead of per-child `marginStart`/`marginEnd`
+          // because logical margins resolve against `I18nManager.isRTL`
+          // (the platform flag), which lags one cold-start behind the
+          // JS locale. After switching from Arabic back to English the
+          // marginEnds collapsed to the wrong side and the icon ended
+          // up flush against the label with no breathing room. `gap`
+          // is direction-agnostic — it produces the same visual spacing
+          // regardless of which way the row flows or what the platform
+          // flag thinks.
+          gap: 14,
         }}
       >
         {Icon && (
@@ -63,10 +73,6 @@ function SettingsRow({ icon: Icon, label, value, valueAccessory, onPress, destru
               backgroundColor: iconBg,
               alignItems: 'center',
               justifyContent: 'center',
-              // marginEnd is direction-aware: in LTR it's marginRight, in RTL
-              // it's marginLeft. Hardcoded marginRight would leave a gap on
-              // the wrong side after the row reverses.
-              marginEnd: 14,
               flexShrink: 0,
             }}
           >
@@ -93,8 +99,6 @@ function SettingsRow({ icon: Icon, label, value, valueAccessory, onPress, destru
               flexDirection: rowDirection(isRTL),
               alignItems: 'center',
               gap: 8,
-              marginStart: 8,
-              marginEnd: 8,
               flexShrink: 1,
               minWidth: 0,
             }}

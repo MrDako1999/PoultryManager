@@ -1360,6 +1360,10 @@
     "openInBrowser": "Open in Browser",
     "cannotPreview": "Cannot preview this file type"
   },
+  "datepicker": {
+    "legendSubmitted": "Logged",
+    "legendMissing": "Missing"
+  },
   "sync": {
     "title": "Sync Status",
     "offline": "Offline",

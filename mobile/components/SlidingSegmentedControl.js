@@ -1,9 +1,10 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useMemo } from 'react';
 import {
   View, Text, Pressable, StyleSheet, Animated,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
+import { useIsRTL } from '@/stores/localeStore';
 
 const PADDING = 6;
 const GAP = 6;
@@ -29,15 +30,42 @@ function SlidingSegmentedControlImpl({
   bordered = true,
 }) {
   const { dark, accentColor, mutedColor, sectionBg, borderColor } = useHeroSheetTokens();
+  const isRTL = useIsRTL();
+
+  // The control's pill is absolutely positioned with `left: 0` and a
+  // `translateX` driven by an Animated.Value. Both `left` and Yoga's
+  // `flexDirection: 'row'` get auto-flipped by iOS when
+  // `I18nManager.isRTL === true` — and since our store can flip the
+  // locale to LTR (English) without the platform RTL flag catching up
+  // until next cold-start, we end up with: `left: 0` flipping to
+  // `right: 0` (so the pill starts at the wrong edge), and `'row'`
+  // flipping to right-to-left (so the segments render reversed). The
+  // user sees the active pill drift off the right edge as they pick a
+  // higher-index option, plus the icons end up on the wrong side.
+  //
+  // Pinning the entire track to a `direction` derived from the locale
+  // (not the platform flag) makes Yoga ignore the auto-flip — every
+  // child below this wrapper lays out per the locale, period.
+  const layoutDirection = isRTL ? 'rtl' : 'ltr';
+
+  // Reverse the source order in RTL so the pill's `translateX(idx *
+  // segmentWidth)` (LTR coordinate space inside the locked direction)
+  // still lands on the visually-correct option for the current `value`.
+  // Without this the pill would think index 0 is the leftmost cell
+  // even though the user reads the rightmost one as the "first" option.
+  const renderOptions = useMemo(
+    () => (isRTL ? [...options].reverse() : options),
+    [options, isRTL]
+  );
 
   const [containerWidth, setContainerWidth] = useState(0);
   const innerWidth = Math.max(0, containerWidth - PADDING * 2);
   const segmentWidth = innerWidth > 0
-    ? (innerWidth - GAP * (options.length - 1)) / options.length
+    ? (innerWidth - GAP * (renderOptions.length - 1)) / renderOptions.length
     : 0;
 
   const indexFor = (v) => {
-    const i = options.findIndex((o) => o.value === v);
+    const i = renderOptions.findIndex((o) => o.value === v);
     return i < 0 ? 0 : i;
   };
 
@@ -62,15 +90,19 @@ function SlidingSegmentedControlImpl({
   }, [value, segmentWidth]);
 
   const pillTranslateX = slidePos.interpolate({
-    inputRange: options.map((_, i) => i),
-    outputRange: options.map((_, i) => i * (segmentWidth + GAP)),
+    inputRange: renderOptions.map((_, i) => i),
+    outputRange: renderOptions.map((_, i) => i * (segmentWidth + GAP)),
   });
 
   const pillBg = dark ? 'rgba(148,210,165,0.16)' : 'hsl(148, 35%, 92%)';
 
   const track = (
     <View
-      style={{ padding: PADDING }}
+      // Lock the layout direction to the locale (see comment on
+      // `layoutDirection` above) — without this, native RTL state
+      // drift makes the pill auto-flip to the wrong edge and the
+      // segments render in reversed order.
+      style={{ padding: PADDING, direction: layoutDirection }}
       onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
     >
       <View style={{ position: 'relative' }}>
@@ -93,7 +125,7 @@ function SlidingSegmentedControlImpl({
         ) : null}
 
         <View style={{ flexDirection: 'row', gap: GAP }}>
-          {options.map((opt, i) => {
+          {renderOptions.map((opt, i) => {
             const Icon = opt.icon;
             const accentOpacity = slidePos.interpolate({
               inputRange: [i - 1, i, i + 1],

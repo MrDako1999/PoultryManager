@@ -19,18 +19,6 @@ export function resolveRoleDashboard(activeModuleId, role) {
 }
 
 /**
- * Same lookup pattern for the Tasks tab. Each module that ships a
- * worker-style tasks screen declares it under `roleTasks[role]`.
- * Falls back to null when nothing is registered, in which case the
- * Tasks tab itself shouldn't be mounted.
- */
-export function resolveRoleTasks(activeModuleId, role) {
-  if (!activeModuleId || !role) return null;
-  const mod = MODULES[activeModuleId];
-  return mod?.roleTasks?.[role] || null;
-}
-
-/**
  * React component that renders the resolved role dashboard, or null
  * when none applies. Lets the dashboard tab stay declarative:
  *   const Override = useRoleDashboard(activeModule, role);
@@ -38,12 +26,6 @@ export function resolveRoleTasks(activeModuleId, role) {
  */
 export default function RoleDashboardRouter({ activeModule, role, ...props }) {
   const Component = resolveRoleDashboard(activeModule, role);
-  if (!Component) return null;
-  return <Component {...props} />;
-}
-
-export function RoleTasksRouter({ activeModule, role, ...props }) {
-  const Component = resolveRoleTasks(activeModule, role);
   if (!Component) return null;
   return <Component {...props} />;
 }

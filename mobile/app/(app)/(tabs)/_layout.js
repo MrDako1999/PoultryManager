@@ -1,11 +1,10 @@
 import { Tabs } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { LayoutDashboard, Egg, FolderOpen, Calculator, Settings, ListChecks } from 'lucide-react-native';
+import { LayoutDashboard, Egg, FolderOpen, Calculator, Settings } from 'lucide-react-native';
 import useThemeStore from '@/stores/themeStore';
 import useCapabilities from '@/hooks/useCapabilities';
 import useModuleStore from '@/stores/moduleStore';
 import { MODULES } from '@/modules/registry';
-import { resolveRoleTasks } from '@/modules/_shared/RoleDashboardRouter';
 
 export default function TabsLayout() {
   const { t } = useTranslation();
@@ -35,18 +34,11 @@ export default function TabsLayout() {
 
   const accountingVisible = can('expense:read') || can('saleOrder:read');
 
-  // Ground-staff specialised shell: the goal is the four-tab
-  // operational set Today / Tasks / Batches / Settings. We hide the
-  // Directory + Accounting tabs (already gated on capability above for
-  // accounting; directory was always visible) so the worker isn't
-  // distracted by surfaces that aren't theirs.
-  //
-  // Tasks is mounted only when the active module declares a
-  // `roleTasks[role]` screen — keeps non-broiler workers from landing
-  // on an empty tab.
+  // Ground-staff specialised shell: Today / Batches / Settings. The
+  // dashboard for ground_staff already routes to WorkerHome which
+  // surfaces today's house-by-house tasks inline — a separate Tasks
+  // tab was an exact duplicate, so it's been removed.
   const isGroundStaff = role === 'ground_staff';
-  const tasksScreenAvailable = !!resolveRoleTasks(activeModuleId, role);
-  const tasksTabVisible = isGroundStaff && tasksScreenAvailable;
   const directoryHrefVisible = !isGroundStaff;
 
   return (
@@ -70,14 +62,6 @@ export default function TabsLayout() {
         options={{
           title: isGroundStaff ? t('nav.today', 'Today') : t('nav.dashboard'),
           tabBarIcon: ({ color, size }) => <LayoutDashboard size={size - 2} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="tasks"
-        options={{
-          title: t('nav.tasks', 'Tasks'),
-          tabBarIcon: ({ color, size }) => <ListChecks size={size - 2} color={color} />,
-          href: tasksTabVisible ? undefined : null,
         }}
       />
       <Tabs.Screen
