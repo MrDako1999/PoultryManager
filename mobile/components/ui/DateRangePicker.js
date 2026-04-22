@@ -11,6 +11,7 @@ import {
 import * as Haptics from 'expo-haptics';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 /**
  * DateRangePicker — bottom sheet for picking a contiguous start → end date
@@ -274,7 +275,7 @@ const DateRangePicker = forwardRef(function DateRangePicker({
           <View
             style={[
               styles.header,
-              { flexDirection: isRTL ? 'row-reverse' : 'row' },
+              { flexDirection: rowDirection(isRTL) },
             ]}
           >
             <View
@@ -294,7 +295,7 @@ const DateRangePicker = forwardRef(function DateRangePicker({
                   fontFamily: 'Poppins-SemiBold',
                   color: textColor,
                   letterSpacing: -0.2,
-                  textAlign: isRTL ? 'right' : 'left',
+                  textAlign: textAlignStart(isRTL),
                 }}
                 numberOfLines={1}
               >
@@ -307,7 +308,7 @@ const DateRangePicker = forwardRef(function DateRangePicker({
                     fontFamily: 'Poppins-Regular',
                     color: mutedColor,
                     marginTop: 1,
-                    textAlign: isRTL ? 'right' : 'left',
+                    textAlign: textAlignStart(isRTL),
                   }}
                   numberOfLines={1}
                 >
@@ -339,7 +340,7 @@ const DateRangePicker = forwardRef(function DateRangePicker({
             <View
               style={[
                 styles.endpointRow,
-                { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                { flexDirection: rowDirection(isRTL) },
               ]}
             >
               <EndpointChip
@@ -389,14 +390,14 @@ const DateRangePicker = forwardRef(function DateRangePicker({
                   textTransform: 'uppercase',
                   marginStart: 4,
                   marginBottom: 8,
-                  textAlign: isRTL ? 'right' : 'left',
+                  textAlign: textAlignStart(isRTL),
                 }}
               >
                 {t('common.quickRanges', 'Quick ranges')}
               </Text>
               <View
                 style={{
-                  flexDirection: isRTL ? 'row-reverse' : 'row',
+                  flexDirection: rowDirection(isRTL),
                   flexWrap: 'wrap',
                   gap: 8,
                 }}
@@ -443,7 +444,7 @@ const DateRangePicker = forwardRef(function DateRangePicker({
             <View
               style={[
                 styles.monthNav,
-                { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                { flexDirection: rowDirection(isRTL) },
               ]}
             >
               <Pressable
@@ -490,7 +491,7 @@ const DateRangePicker = forwardRef(function DateRangePicker({
             </View>
 
             {/* Weekday headers */}
-            <View style={[styles.weekdayRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <View style={[styles.weekdayRow, { flexDirection: rowDirection(isRTL) }]}>
               {WEEKDAYS.map((wd) => (
                 <View key={wd.key} style={styles.weekdayCell}>
                   <Text
@@ -508,7 +509,7 @@ const DateRangePicker = forwardRef(function DateRangePicker({
             </View>
 
             {/* Calendar grid */}
-            <View style={[styles.calendarGrid, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <View style={[styles.calendarGrid, { flexDirection: rowDirection(isRTL) }]}>
               {calendarDays.map((day, i) => {
                 if (day === null) {
                   return <View key={`e-${i}`} style={styles.cellWrap} />;
@@ -597,7 +598,7 @@ const DateRangePicker = forwardRef(function DateRangePicker({
             style={[
               styles.footer,
               {
-                flexDirection: isRTL ? 'row-reverse' : 'row',
+                flexDirection: rowDirection(isRTL),
                 paddingBottom: insets.bottom + 12,
                 borderTopColor: borderColor,
                 backgroundColor: sheetBg,
@@ -622,7 +623,7 @@ const DateRangePicker = forwardRef(function DateRangePicker({
               <View
                 style={[
                   styles.resetInner,
-                  { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                  { flexDirection: rowDirection(isRTL) },
                 ]}
               >
                 <RotateCcw size={15} color={mutedColor} strokeWidth={2.2} />
@@ -694,7 +695,7 @@ function EndpointChip({ label, date, focused, tokens, onPress, isRTL }) {
             color: focused ? accentColor : mutedColor,
             letterSpacing: 1.2,
             textTransform: 'uppercase',
-            textAlign: isRTL ? 'right' : 'left',
+            textAlign: textAlignStart(isRTL),
           }}
         >
           {label}
@@ -705,7 +706,7 @@ function EndpointChip({ label, date, focused, tokens, onPress, isRTL }) {
             fontFamily: 'Poppins-SemiBold',
             color: dateStr ? textColor : mutedColor,
             marginTop: 2,
-            textAlign: isRTL ? 'right' : 'left',
+            textAlign: textAlignStart(isRTL),
           }}
           numberOfLines={1}
         >

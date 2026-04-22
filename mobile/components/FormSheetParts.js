@@ -2,6 +2,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 /**
  * Grouped section inside FormSheet body. Visually identical to SheetSection
@@ -35,13 +36,13 @@ export function FormSection({
         <View
           style={[
             styles.eyebrowRow,
-            { flexDirection: isRTL ? 'row-reverse' : 'row' },
+            { flexDirection: rowDirection(isRTL) },
           ]}
         >
           <View
             style={[
               styles.eyebrowLabelRow,
-              { flexDirection: isRTL ? 'row-reverse' : 'row' },
+              { flexDirection: rowDirection(isRTL) },
             ]}
           >
             {Icon ? <Icon size={13} color={mutedColor} /> : null}
@@ -53,7 +54,7 @@ export function FormSection({
                   color: mutedColor,
                   letterSpacing: 1.2,
                   textTransform: 'uppercase',
-                  textAlign: isRTL ? 'right' : 'left',
+                  textAlign: textAlignStart(isRTL),
                 }}
               >
                 {title}
@@ -87,7 +88,7 @@ export function FormSection({
             marginTop: 8,
             marginLeft: 6,
             lineHeight: 17,
-            textAlign: isRTL ? 'right' : 'left',
+            textAlign: textAlignStart(isRTL),
           }}
         >
           {description}
@@ -118,7 +119,7 @@ export function FormField({ label, required, error, hint, children }) {
         <View
           style={[
             styles.labelRow,
-            { flexDirection: isRTL ? 'row-reverse' : 'row' },
+            { flexDirection: rowDirection(isRTL) },
           ]}
         >
           <Text
@@ -126,7 +127,7 @@ export function FormField({ label, required, error, hint, children }) {
               fontSize: 13,
               fontFamily: 'Poppins-Medium',
               color: textColor,
-              textAlign: isRTL ? 'right' : 'left',
+              textAlign: textAlignStart(isRTL),
             }}
           >
             {label}
@@ -144,7 +145,7 @@ export function FormField({ label, required, error, hint, children }) {
             fontFamily: 'Poppins-Regular',
             color: errorColor,
             marginHorizontal: 4,
-            textAlign: isRTL ? 'right' : 'left',
+            textAlign: textAlignStart(isRTL),
           }}
         >
           {error}
@@ -156,7 +157,7 @@ export function FormField({ label, required, error, hint, children }) {
             fontFamily: 'Poppins-Regular',
             color: mutedColor,
             marginHorizontal: 4,
-            textAlign: isRTL ? 'right' : 'left',
+            textAlign: textAlignStart(isRTL),
           }}
         >
           {hint}
@@ -180,7 +181,7 @@ export function FormSubheader({ children }) {
         color: mutedColor,
         letterSpacing: 1.2,
         textTransform: 'uppercase',
-        textAlign: isRTL ? 'right' : 'left',
+        textAlign: textAlignStart(isRTL),
       }}
     >
       {children}
@@ -198,7 +199,7 @@ export function SummaryRow({ label, value, emphasis = false, negative = false })
     <View
       style={[
         styles.summaryRow,
-        { flexDirection: isRTL ? 'row-reverse' : 'row' },
+        { flexDirection: rowDirection(isRTL) },
       ]}
     >
       <Text
@@ -288,7 +289,7 @@ export function AddRowButton({ label, onPress, icon: Icon }) {
         styles.addRow,
         {
           alignSelf: isRTL ? 'flex-end' : 'flex-start',
-          flexDirection: isRTL ? 'row-reverse' : 'row',
+          flexDirection: rowDirection(isRTL),
           backgroundColor: dark
             ? 'rgba(148,210,165,0.12)'
             : 'hsl(148, 35%, 92%)',

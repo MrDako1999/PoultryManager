@@ -9,6 +9,7 @@ import {
 import * as Haptics from 'expo-haptics';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 /**
  * Compact brand-gradient header strip for the Business Detail screen.
@@ -62,7 +63,7 @@ export default function BusinessDetailHeader({
       <View
         style={[
           styles.row,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
         <Pressable
@@ -91,7 +92,7 @@ export default function BusinessDetailHeader({
               color: '#ffffff',
               letterSpacing: -0.3,
               lineHeight: 26,
-              textAlign: isRTL ? 'right' : 'left',
+              textAlign: textAlignStart(isRTL),
               writingDirection: isRTL ? 'rtl' : 'ltr',
             }}
             numberOfLines={1}
@@ -101,7 +102,7 @@ export default function BusinessDetailHeader({
           <View
             style={[
               styles.pillsRow,
-              { flexDirection: isRTL ? 'row-reverse' : 'row' },
+              { flexDirection: rowDirection(isRTL) },
             ]}
           >
             <View style={styles.pill}>

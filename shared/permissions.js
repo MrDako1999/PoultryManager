@@ -64,10 +64,17 @@ export const DEFAULT_ROLE_ACTIONS = {
   ground_staff: [
     'batch:read',
     'house:read:assigned',
-    'dailyLog:create',
-    'dailyLog:read:own',
-    'dailyLog:update:own',
     'farm:read',
+    'dailyLog:create',
+    // Read all logs in the (farm-scoped) batches they can access so the
+    // batch detail tabs can show team coverage and missing days. The
+    // backend list filter still scopes to assigned farms via
+    // [backend/services/workerScope.js], so this never leaks data out
+    // of their assignment.
+    'dailyLog:read',
+    // Edit only logs they authored. Detail screens that surface the
+    // edit affordance must check ownership before accepting the cap.
+    'dailyLog:update:own',
     'media:create',
   ],
 

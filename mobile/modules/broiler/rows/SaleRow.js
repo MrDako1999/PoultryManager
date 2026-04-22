@@ -4,6 +4,7 @@ import * as Haptics from 'expo-haptics';
 import { Truck } from 'lucide-react-native';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
+import { rowDirection, trailingAlignment, textAlignStart } from '@/lib/rtl';
 
 const NUMERIC_LOCALE = 'en-US';
 
@@ -54,7 +55,7 @@ export default function SaleRow({ sale, onClick }) {
         <View
           style={[
             styles.row,
-            { flexDirection: isRTL ? 'row-reverse' : 'row' },
+            { flexDirection: rowDirection(isRTL) },
           ]}
         >
           <View style={styles.textCol}>
@@ -64,7 +65,7 @@ export default function SaleRow({ sale, onClick }) {
                 fontFamily: 'Poppins-SemiBold',
                 color: textColor,
                 letterSpacing: -0.1,
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
               }}
               numberOfLines={1}
             >
@@ -73,7 +74,7 @@ export default function SaleRow({ sale, onClick }) {
             <View
               style={[
                 styles.metaRow,
-                { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                { flexDirection: rowDirection(isRTL) },
               ]}
             >
               <View style={[styles.pill, { backgroundColor: pillBg, borderColor: pillBorder }]}>
@@ -107,7 +108,7 @@ export default function SaleRow({ sale, onClick }) {
             </View>
           </View>
 
-          <View style={[styles.rightCol, { alignItems: isRTL ? 'flex-start' : 'flex-end' }]}>
+          <View style={[styles.rightCol, { alignItems: trailingAlignment(isRTL) }]}>
             <Text
               style={{
                 fontSize: 14,
@@ -123,7 +124,7 @@ export default function SaleRow({ sale, onClick }) {
               <View
                 style={[
                   styles.subRow,
-                  { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                  { flexDirection: rowDirection(isRTL) },
                 ]}
               >
                 {chickens > 0 ? (
@@ -142,7 +143,7 @@ export default function SaleRow({ sale, onClick }) {
                   <View
                     style={[
                       styles.truckPiece,
-                      { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                      { flexDirection: rowDirection(isRTL) },
                     ]}
                   >
                     <Truck size={11} color={mutedColor} strokeWidth={2.2} />

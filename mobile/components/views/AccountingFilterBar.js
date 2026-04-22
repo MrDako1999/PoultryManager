@@ -16,6 +16,7 @@ import BottomPickerSheet from '@/components/BottomPickerSheet';
 import DateRangePicker from '@/components/ui/DateRangePicker';
 import BatchKpiCard from '@/modules/broiler/components/BatchKpiCard';
 import { KpiCardSkeleton } from '@/components/skeletons';
+import { rowDirection } from '@/lib/rtl';
 
 const NUMERIC_LOCALE = 'en-US';
 
@@ -162,7 +163,7 @@ export function AccountingToolbar({
         <View
           style={[
             styles.searchRow,
-            { flexDirection: isRTL ? 'row-reverse' : 'row' },
+            { flexDirection: rowDirection(isRTL) },
           ]}
         >
           <View style={{ flex: 1, minWidth: 0 }}>
@@ -208,7 +209,7 @@ export function AccountingToolbar({
               <View
                 style={[
                   styles.resetChipInner,
-                  { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                  { flexDirection: rowDirection(isRTL) },
                 ]}
               >
                 <RotateCcw size={14} color={accentColor} strokeWidth={2.4} />
@@ -234,7 +235,7 @@ export function AccountingToolbar({
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={[
             styles.pillRow,
-            { flexDirection: isRTL ? 'row-reverse' : 'row' },
+            { flexDirection: rowDirection(isRTL) },
           ]}
         >
           <FilterTrigger
@@ -324,7 +325,7 @@ function FilterTrigger({
       <View
         style={[
           styles.triggerInner,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
         <View

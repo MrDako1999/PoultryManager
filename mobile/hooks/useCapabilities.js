@@ -46,11 +46,27 @@ export default function useCapabilities() {
 
   const grantedActions = useMemo(() => {
     const explicit = Array.isArray(user?.permissions?.allow) ? user.permissions.allow : [];
-    const roleDefaults = Array.isArray(user?.permissions?.defaults)
+    // Union the cached `/auth/me` defaults with the LIVE shared role
+    // defaults from the bundled `shared/permissions.js`. Without this
+    // union, a permissions upgrade (e.g. ground_staff gaining
+    // `dailyLog:read` to power the new BatchDetail tabs) wouldn't
+    // take effect for any existing session until the user explicitly
+    // logged out and back in — `/auth/me` only refreshes on
+    // `checkAuth()`/`refreshUser()`, not on a JS hot reload. Unioning
+    // is safe because deny[] is enforced separately and removing a
+    // default cap is something the server should do via deny[]
+    // anyway, not by reducing the role defaults.
+    const cachedDefaults = Array.isArray(user?.permissions?.defaults)
       ? user.permissions.defaults
-      : actionsForRole(role);
+      : [];
+    const liveRoleDefaults = actionsForRole(role);
     const moduleCaps = collectModuleCaps(visibleModules, role);
-    return Array.from(new Set([...explicit, ...roleDefaults, ...moduleCaps]));
+    return Array.from(new Set([
+      ...explicit,
+      ...cachedDefaults,
+      ...liveRoleDefaults,
+      ...moduleCaps,
+    ]));
   }, [user?.permissions?.allow, user?.permissions?.defaults, role, visibleModules.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const denies = useMemo(

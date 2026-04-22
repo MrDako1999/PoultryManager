@@ -18,6 +18,7 @@ import { useToast } from '@/components/ui/Toast';
 import { useIsRTL } from '@/stores/localeStore';
 import { deltaSync } from '@/lib/syncEngine';
 import InviteAccessSheet from '@/shared/sheets/InviteAccessSheet';
+import { rowDirection } from '@/lib/rtl';
 
 const editSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
@@ -184,7 +185,7 @@ export default function TeamMemberSheet({
       disabled={saving}
     >
       <FormSection title={t('settings.personalSection', 'Personal Information')}>
-        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10 }}>
+        <View style={{ flexDirection: rowDirection(isRTL), gap: 10 }}>
           <View style={{ flex: 1 }}>
             <FormField label={t('auth.firstName', 'First Name')} required error={errors.firstName?.message}>
               <Controller

@@ -14,6 +14,7 @@ import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { FormSection, FormField } from '@/components/FormSheetParts';
 import useLocalQuery from '@/hooks/useLocalQuery';
 import { useIsRTL } from '@/stores/localeStore';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 const ASSIGNABLE_ROLES = ALL_ROLES.filter((r) => r !== 'owner');
 
@@ -104,7 +105,7 @@ export default function InviteAccessSheet({
             fontFamily: 'Poppins-Regular',
             color: mutedColor,
             marginTop: 8,
-            textAlign: isRTL ? 'right' : 'left',
+            textAlign: textAlignStart(isRTL),
           }}
         >
           {t(`settings.roleHelp.${accountRole}`, ROLE_HELP[accountRole] || '')}
@@ -196,7 +197,7 @@ export default function InviteAccessSheet({
               fontSize: 12,
               fontFamily: 'Poppins-Regular',
               color: mutedColor,
-              textAlign: isRTL ? 'right' : 'left',
+              textAlign: textAlignStart(isRTL),
             }}
           >
             {t(
@@ -230,7 +231,7 @@ function FarmRow({ farm, checked, isLast, onToggle, tokens, isRTL }) {
       style={({ pressed }) => [
         farmRowStyles.row,
         {
-          flexDirection: isRTL ? 'row-reverse' : 'row',
+          flexDirection: rowDirection(isRTL),
           borderBottomWidth: isLast ? 0 : StyleSheet.hairlineWidth,
           borderBottomColor: borderColor,
           backgroundColor: pressed
@@ -268,7 +269,7 @@ function FarmRow({ farm, checked, isLast, onToggle, tokens, isRTL }) {
             fontSize: 14,
             fontFamily: checked ? 'Poppins-SemiBold' : 'Poppins-Medium',
             color: textColor,
-            textAlign: isRTL ? 'right' : 'left',
+            textAlign: textAlignStart(isRTL),
           }}
           numberOfLines={1}
         >
@@ -280,7 +281,7 @@ function FarmRow({ farm, checked, isLast, onToggle, tokens, isRTL }) {
               fontSize: 11,
               fontFamily: 'Poppins-Regular',
               color: mutedColor,
-              textAlign: isRTL ? 'right' : 'left',
+              textAlign: textAlignStart(isRTL),
               marginTop: 2,
             }}
             numberOfLines={1}

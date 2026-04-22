@@ -1,10 +1,12 @@
 import { useEffect, useRef } from 'react';
 import { View, Text, Modal, Animated, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTranslation } from 'react-i18next';
 import { DatabaseZap, CloudDownload } from 'lucide-react-native';
 import useSyncStore from '@/stores/syncStore';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
+import { rowDirection } from '@/lib/rtl';
 
 /**
  * Full-screen overlay shown during initial sync (after login) and the
@@ -18,6 +20,7 @@ import { useIsRTL } from '@/stores/localeStore';
  * not that an old-fashioned dialog popped up.
  */
 export default function FullResyncOverlay() {
+  const { t } = useTranslation();
   const { isFullResyncing, isInitialSyncing, syncProgress } = useSyncStore();
   const tokens = useHeroSheetTokens();
   const {
@@ -70,10 +73,18 @@ export default function FullResyncOverlay() {
   });
 
   const Icon = isInitial ? CloudDownload : DatabaseZap;
-  const title = isInitial ? 'Setting up your account' : 'Full Resync';
+  const title = isInitial
+    ? t('sync.overlayInitialTitle', 'Setting up your account')
+    : t('sync.overlayResyncTitle', 'Full Resync');
   const subtitle = isInitial
-    ? 'Downloading your data so it works offline. This only happens once.'
-    : 'Clearing local cache and re-downloading from the server.';
+    ? t(
+        'sync.overlayInitialSubtitle',
+        'Downloading your data so it works offline. This only happens once.'
+      )
+    : t(
+        'sync.overlayResyncSubtitle',
+        'Clearing local cache and re-downloading from the server.'
+      );
 
   const textAlign = isRTL ? 'right' : 'left';
 
@@ -213,7 +224,7 @@ export default function FullResyncOverlay() {
           {/* Status row */}
           <View
             style={{
-              flexDirection: isRTL ? 'row-reverse' : 'row',
+              flexDirection: rowDirection(isRTL),
               alignItems: 'center',
               justifyContent: 'space-between',
             }}
@@ -229,8 +240,10 @@ export default function FullResyncOverlay() {
               numberOfLines={1}
             >
               {syncProgress
-                ? `Fetching ${syncProgress.label}\u2026`
-                : 'Preparing\u2026'}
+                ? t('sync.overlayFetching', 'Fetching {{label}}\u2026', {
+                    label: localiseSyncLabel(syncProgress.label, t),
+                  })
+                : t('sync.overlayPreparing', 'Preparing\u2026')}
             </Text>
             {syncProgress ? (
               <Text
@@ -264,7 +277,10 @@ export default function FullResyncOverlay() {
                   letterSpacing: 0.4,
                 }}
               >
-                Step {syncProgress.current} of {syncProgress.total}
+                {t('sync.overlayStep', 'Step {{current}} of {{total}}', {
+                  current: syncProgress.current,
+                  total: syncProgress.total,
+                })}
               </Text>
             </View>
           ) : null}
@@ -272,6 +288,25 @@ export default function FullResyncOverlay() {
       </View>
     </Modal>
   );
+}
+
+/**
+ * Map the raw entity-type identifier the sync engine reports
+ * (e.g. `expenses`, `feedOrders`, `Settings`) to its localised
+ * label via the `sync.entities.*` namespace. Defensive: if a new
+ * entity is added to SYNC_ORDER and we forget to translate it,
+ * the fallback returns the raw identifier so progress text still
+ * renders something legible instead of crashing.
+ *
+ * The sync engine sends `Settings` capitalised (legacy), but
+ * everything else is camelCase exactly as declared in
+ * `mobile/lib/db.js → SYNC_ORDER` — so we lower-case only the
+ * very first character to match our key schema.
+ */
+function localiseSyncLabel(label, t) {
+  if (!label) return '';
+  const key = label.charAt(0).toLowerCase() + label.slice(1);
+  return t(`sync.entities.${key}`, label);
 }
 
 const styles = StyleSheet.create({

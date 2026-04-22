@@ -371,9 +371,21 @@ export async function deltaSync() {
         oldestSyncAt = lastSyncAt;
       }
 
-      const records = await fetchAllForEntity(entityType, lastSyncAt, batchScoped);
-      await upsertEntities(entityType, records);
-      await handleSoftDeletes(entityType, records);
+      try {
+        const records = await fetchAllForEntity(entityType, lastSyncAt, batchScoped);
+        await upsertEntities(entityType, records);
+        await handleSoftDeletes(entityType, records);
+      } catch (err) {
+        // A missing local table (added in a later migration that hasn't
+        // run yet) shouldn't kill the whole delta loop. Log and move on
+        // so other entities still sync; the migration will catch up on
+        // the next app launch.
+        if (/no such table/i.test(String(err?.message || ''))) {
+          console.warn(`[syncEngine] skipping ${entityType}: ${err.message}`);
+          continue;
+        }
+        throw err;
+      }
     }
 
     const settingsMeta = await getSyncMeta('settings');

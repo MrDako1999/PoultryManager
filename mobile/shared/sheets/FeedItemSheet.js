@@ -21,6 +21,7 @@ import { useIsRTL } from '@/stores/localeStore';
 import { useToast } from '@/components/ui/Toast';
 import { FEED_TYPES, FEED_TYPE_ICONS } from '@/lib/constants';
 import QuickAddBusinessSheet from '@/shared/sheets/QuickAddBusinessSheet';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 const QUANTITY_UNITS = ['KG', 'LB', 'G', 'TON'];
 const NUMERIC_LOCALE = 'en-US';
@@ -293,7 +294,7 @@ export default function FeedItemSheet({
           />
         </FormField>
 
-        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10 }}>
+        <View style={{ flexDirection: rowDirection(isRTL), gap: 10 }}>
           <View style={{ flex: 2 }}>
             <FormField label={t('feed.quantitySize', 'Quantity Size')}>
               <Controller
@@ -381,7 +382,7 @@ function ActiveToggleRow({ value, onChange, tokens, isRTL, t }) {
   return (
     <View
       style={{
-        flexDirection: isRTL ? 'row-reverse' : 'row',
+        flexDirection: rowDirection(isRTL),
         alignItems: 'center',
         gap: 12,
       }}
@@ -392,7 +393,7 @@ function ActiveToggleRow({ value, onChange, tokens, isRTL, t }) {
             fontSize: 14,
             fontFamily: 'Poppins-SemiBold',
             color: textColor,
-            textAlign: isRTL ? 'right' : 'left',
+            textAlign: textAlignStart(isRTL),
           }}
           numberOfLines={1}
         >
@@ -404,7 +405,7 @@ function ActiveToggleRow({ value, onChange, tokens, isRTL, t }) {
             fontFamily: 'Poppins-Regular',
             color: mutedColor,
             marginTop: 2,
-            textAlign: isRTL ? 'right' : 'left',
+            textAlign: textAlignStart(isRTL),
             lineHeight: 17,
           }}
         >

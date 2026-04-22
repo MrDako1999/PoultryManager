@@ -31,6 +31,7 @@ import { router } from 'expo-router';
 import { deltaSync } from '@/lib/syncEngine';
 import { FEED_TYPES, FEED_TYPE_ICONS } from '@/lib/constants';
 import FeedItemSheet from '@/shared/sheets/FeedItemSheet';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -340,7 +341,7 @@ function BrandHeader({ title, subtitle, gradient, topInset, isRTL }) {
       <View
         style={[
           headerStyles.row,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
         <Pressable
@@ -359,7 +360,7 @@ function BrandHeader({ title, subtitle, gradient, topInset, isRTL }) {
               color: '#ffffff',
               letterSpacing: -0.4,
               lineHeight: 30,
-              textAlign: isRTL ? 'right' : 'left',
+              textAlign: textAlignStart(isRTL),
               writingDirection: isRTL ? 'rtl' : 'ltr',
             }}
             numberOfLines={1}
@@ -373,7 +374,7 @@ function BrandHeader({ title, subtitle, gradient, topInset, isRTL }) {
                 fontFamily: 'Poppins-Regular',
                 color: 'rgba(255,255,255,0.78)',
                 marginTop: 4,
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
                 writingDirection: isRTL ? 'rtl' : 'ltr',
               }}
               numberOfLines={1}
@@ -428,7 +429,7 @@ function Toolbar({
       <View
         style={[
           toolbarStyles.triggerRow,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
         <FilterTrigger
@@ -461,7 +462,7 @@ function Toolbar({
             <View
               style={[
                 toolbarStyles.resetChipInner,
-                { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                { flexDirection: rowDirection(isRTL) },
               ]}
             >
               <RotateCcw size={14} color={accentColor} strokeWidth={2.4} />
@@ -509,7 +510,7 @@ function FilterTrigger({ icon: Icon, label, active, countBadge, onPress, isRTL, 
       <View
         style={[
           toolbarStyles.triggerInner,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
         <View
@@ -535,7 +536,7 @@ function FilterTrigger({ icon: Icon, label, active, countBadge, onPress, isRTL, 
             fontSize: 13,
             fontFamily: active ? 'Poppins-SemiBold' : 'Poppins-Medium',
             color: active ? accentColor : textColor,
-            textAlign: isRTL ? 'right' : 'left',
+            textAlign: textAlignStart(isRTL),
           }}
           numberOfLines={1}
         >
@@ -582,7 +583,7 @@ function CompanyGroupSection({
         hitSlop={6}
         style={[
           sectionStyles.eyebrow,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
         <Text
@@ -593,7 +594,7 @@ function CompanyGroupSection({
             color: mutedColor,
             letterSpacing: 1.4,
             textTransform: 'uppercase',
-            textAlign: isRTL ? 'right' : 'left',
+            textAlign: textAlignStart(isRTL),
           }}
           numberOfLines={1}
         >
@@ -602,7 +603,7 @@ function CompanyGroupSection({
         <View
           style={[
             sectionStyles.eyebrowTrailing,
-            { flexDirection: isRTL ? 'row-reverse' : 'row' },
+            { flexDirection: rowDirection(isRTL) },
           ]}
         >
           <Text
@@ -750,7 +751,7 @@ function FeedItemRow({
         <View
           style={[
             cardStyles.row,
-            { flexDirection: isRTL ? 'row-reverse' : 'row' },
+            { flexDirection: rowDirection(isRTL) },
           ]}
         >
           <View
@@ -768,7 +769,7 @@ function FeedItemRow({
             <View
               style={[
                 cardStyles.titleRow,
-                { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                { flexDirection: rowDirection(isRTL) },
               ]}
             >
               <Text
@@ -779,7 +780,7 @@ function FeedItemRow({
                   fontFamily: 'Poppins-SemiBold',
                   color: textColor,
                   letterSpacing: -0.1,
-                  textAlign: isRTL ? 'right' : 'left',
+                  textAlign: textAlignStart(isRTL),
                 }}
                 numberOfLines={1}
               >
@@ -810,7 +811,7 @@ function FeedItemRow({
             <View
               style={[
                 cardStyles.metaRow,
-                { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                { flexDirection: rowDirection(isRTL) },
               ]}
             >
               <Text
@@ -819,7 +820,7 @@ function FeedItemRow({
                   fontFamily: 'Poppins-SemiBold',
                   color: accentColor,
                   fontVariant: ['tabular-nums'],
-                  textAlign: isRTL ? 'right' : 'left',
+                  textAlign: textAlignStart(isRTL),
                 }}
                 numberOfLines={1}
               >

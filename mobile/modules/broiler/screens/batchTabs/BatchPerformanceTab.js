@@ -20,6 +20,7 @@ import MortalityChart from '@/modules/broiler/charts/MortalityChart';
 import ConsumptionChart from '@/modules/broiler/charts/ConsumptionChart';
 import { SkeletonBatchPerformance } from '@/components/skeletons';
 import { deltaSync } from '@/lib/syncEngine';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 import BatchKpiCard, {
   mortalityToneColor,
 } from '@/modules/broiler/components/BatchKpiCard';
@@ -89,7 +90,9 @@ export default function BatchPerformanceTab({ batch, batchId }) {
   const housesData = useMemo(() => {
     const meta = houses.map((h, i) => {
       const houseId = (typeof h.house === 'object' ? h.house?._id : h.house) || `h${i}`;
-      const name = (typeof h.house === 'object' ? h.house?.name : null) || h.name || `House ${i + 1}`;
+      const name = (typeof h.house === 'object' ? h.house?.name : null)
+        || h.name
+        || t('farms.houseN', 'House {{n}}', { n: i + 1 });
       return { id: houseId, name, qty: h.quantity || 0 };
     });
     const idIndex = Object.fromEntries(meta.map((m, i) => [m.id, i]));
@@ -129,7 +132,7 @@ export default function BatchPerformanceTab({ batch, batchId }) {
     });
 
     return enriched;
-  }, [dailyLogs, houses]);
+  }, [dailyLogs, houses, t]);
 
   const sortedHousesByMortality = useMemo(
     () => [...housesData].sort((a, b) => b.mortalityPct - a.mortalityPct),
@@ -379,7 +382,7 @@ export default function BatchPerformanceTab({ batch, batchId }) {
                     <View
                       style={[
                         perHouseStyles.headerRow,
-                        { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                        { flexDirection: rowDirection(isRTL) },
                       ]}
                     >
                       <Home size={14} color={mutedColor} strokeWidth={2.2} />
@@ -387,7 +390,7 @@ export default function BatchPerformanceTab({ batch, batchId }) {
                         <View
                           style={[
                             perHouseStyles.titleRow,
-                            { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                            { flexDirection: rowDirection(isRTL) },
                           ]}
                         >
                           <Text
@@ -396,7 +399,7 @@ export default function BatchPerformanceTab({ batch, batchId }) {
                               fontSize: 14,
                               fontFamily: 'Poppins-SemiBold',
                               color: textColor,
-                              textAlign: isRTL ? 'right' : 'left',
+                              textAlign: textAlignStart(isRTL),
                             }}
                             numberOfLines={1}
                           >
@@ -419,7 +422,7 @@ export default function BatchPerformanceTab({ batch, batchId }) {
                             fontFamily: 'Poppins-Medium',
                             color: mutedColor,
                             marginTop: 3,
-                            textAlign: isRTL ? 'right' : 'left',
+                            textAlign: textAlignStart(isRTL),
                           }}
                           numberOfLines={1}
                         >

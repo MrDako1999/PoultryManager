@@ -75,6 +75,19 @@ const BASE_MIGRATIONS = [
       `);
     },
   },
+  {
+    // Backfill for installs that ran v1 before the `users` table was added
+    // to the v1 statement. Those devices have v1 marked applied in
+    // schema_version, so the new CREATE TABLE never executed and any
+    // sync/clear that touches `users` (e.g. logout -> clearAll) explodes
+    // with "no such table: users".
+    id: 'v2_users_table',
+    up: async (db) => {
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS users (_id TEXT PRIMARY KEY, data TEXT, updatedAt TEXT, deletedAt TEXT);
+      `);
+    },
+  },
 ];
 
 const _moduleMigrations = [];
@@ -200,8 +213,20 @@ export async function deleteEntities(tableName, ids) {
 
 export async function clearTable(tableName) {
   const db = await getDb();
-  await db.runAsync(`DELETE FROM ${tableName}`);
-  dbEvents.emit('change', tableName);
+  try {
+    await db.runAsync(`DELETE FROM ${tableName}`);
+    dbEvents.emit('change', tableName);
+  } catch (err) {
+    // A missing table here would cascade and break logout / fullResync,
+    // since callers loop over ENTITY_TABLES. Swallow that specific case
+    // so the rest of the cleanup still runs; surface anything else.
+    const msg = String(err?.message || '');
+    if (/no such table/i.test(msg)) {
+      console.warn(`[db] clearTable skipped (missing table): ${tableName}`);
+      return;
+    }
+    throw err;
+  }
 }
 
 export async function getSyncMeta(entityType) {

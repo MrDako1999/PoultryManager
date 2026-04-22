@@ -9,6 +9,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 const COMPACT_BAR_MIN_HEIGHT = 36;
 
@@ -54,7 +55,7 @@ export default function DetailCompactScreen({
       >
         <View
           style={{
-            flexDirection: isRTL ? 'row-reverse' : 'row',
+            flexDirection: rowDirection(isRTL),
             alignItems: 'center',
             gap: 12,
             minHeight: COMPACT_BAR_MIN_HEIGHT,
@@ -83,7 +84,7 @@ export default function DetailCompactScreen({
               fontFamily: 'Poppins-SemiBold',
               color: '#ffffff',
               letterSpacing: -0.2,
-              textAlign: isRTL ? 'right' : 'left',
+              textAlign: textAlignStart(isRTL),
               writingDirection: isRTL ? 'rtl' : 'ltr',
             }}
             numberOfLines={1}

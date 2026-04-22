@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet } from 'react-native';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 /**
  * Compact KPI hero block used at the top of every accounting list view.
@@ -36,7 +37,7 @@ export default function ListViewHeroKpi({
         <View
           style={[
             styles.eyebrow,
-            { flexDirection: isRTL ? 'row-reverse' : 'row' },
+            { flexDirection: rowDirection(isRTL) },
           ]}
         >
           {Icon ? <Icon size={13} color={mutedColor} strokeWidth={2.2} /> : null}
@@ -78,7 +79,7 @@ export default function ListViewHeroKpi({
           <View
             style={[
               styles.headlineRow,
-              { flexDirection: isRTL ? 'row-reverse' : 'row' },
+              { flexDirection: rowDirection(isRTL) },
             ]}
           >
             {headlinePrefix ? (
@@ -102,7 +103,7 @@ export default function ListViewHeroKpi({
                 fontFamily: 'Poppins-Bold',
                 color: headlineColor || textColor,
                 letterSpacing: -0.4,
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
               }}
               numberOfLines={1}
             >
@@ -119,7 +120,7 @@ export default function ListViewHeroKpi({
               fontFamily: 'Poppins-Medium',
               color: sublineColor || mutedColor,
               marginTop: 4,
-              textAlign: isRTL ? 'right' : 'left',
+              textAlign: textAlignStart(isRTL),
             }}
             numberOfLines={1}
           >
@@ -132,7 +133,7 @@ export default function ListViewHeroKpi({
             style={[
               styles.statsRow,
               {
-                flexDirection: isRTL ? 'row-reverse' : 'row',
+                flexDirection: rowDirection(isRTL),
                 borderTopColor: borderColor,
                 marginTop: (subline || headline != null) ? 16 : 0,
               },
@@ -143,7 +144,7 @@ export default function ListViewHeroKpi({
                 key={stat.label || `s${i}`}
                 style={[
                   styles.cellWrap,
-                  { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                  { flexDirection: rowDirection(isRTL) },
                 ]}
               >
                 {i > 0 ? (
@@ -153,7 +154,7 @@ export default function ListViewHeroKpi({
                   <View
                     style={[
                       styles.cellLabelRow,
-                      { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                      { flexDirection: rowDirection(isRTL) },
                     ]}
                   >
                     {stat.icon ? (
@@ -179,7 +180,7 @@ export default function ListViewHeroKpi({
                       lineHeight: 18,
                       fontFamily: 'Poppins-SemiBold',
                       color: stat.valueColor || textColor,
-                      textAlign: isRTL ? 'right' : 'left',
+                      textAlign: textAlignStart(isRTL),
                     }}
                     numberOfLines={1}
                   >

@@ -9,6 +9,7 @@ import { useIsRTL } from '@/stores/localeStore';
 import { useToast } from '@/components/ui/Toast';
 import GoogleMapsIcon from '@/components/icons/GoogleMapsIcon';
 import WazeIcon from '@/components/icons/WazeIcon';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 /**
  * Build a `https://www.google.com/maps?q=lat,lng` URL — the format every
@@ -191,7 +192,7 @@ function ActionRow({
         style={[
           styles.row,
           {
-            flexDirection: isRTL ? 'row-reverse' : 'row',
+            flexDirection: rowDirection(isRTL),
             borderBottomColor: borderColor,
             borderBottomWidth: isLast ? 0 : StyleSheet.hairlineWidth,
           },
@@ -211,7 +212,7 @@ function ActionRow({
               fontFamily: 'Poppins-SemiBold',
               color: textColor,
               letterSpacing: -0.1,
-              textAlign: isRTL ? 'right' : 'left',
+              textAlign: textAlignStart(isRTL),
             }}
             numberOfLines={1}
           >
@@ -224,7 +225,7 @@ function ActionRow({
                 fontFamily: 'Poppins-Regular',
                 color: mutedColor,
                 marginTop: 1,
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
               }}
               numberOfLines={1}
             >

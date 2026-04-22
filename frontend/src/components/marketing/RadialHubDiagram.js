@@ -40,10 +40,17 @@ function buildNodes(rtl) {
   });
 }
 
-export default function RadialHubDiagram() {
+// `variant` lets a host context request a stripped-down version of the hub.
+//   - 'full'    (default) — large radial with module name labels under each
+//                node; the canonical hero-on-desktop presentation.
+//   - 'compact' — smaller container, NO labels under the nodes. Used inline
+//                in the mobile hero where the full diagram + labels would
+//                dominate the viewport and feel out of place.
+export default function RadialHubDiagram({ variant = 'full' } = {}) {
   const { t, i18n } = useTranslation();
   const rtl = isRTL(i18n.language);
   const nodes = buildNodes(rtl);
+  const isCompact = variant === 'compact';
 
   return (
     <div
@@ -54,19 +61,27 @@ export default function RadialHubDiagram() {
       {/*
         Single radial layout for every breakpoint. The container scales from
         ~360px on a phone to 640px on desktop; geometry is in viewBox units
-        so the spokes always meet the nodes at any size. Mobile gets the
-        radial too — the previous 2-col fallback grid duplicated content
-        the showcase section already covers and pushed the visual story
-        out of the first viewport on a phone.
+        so the spokes always meet the nodes at any size. The compact variant
+        intentionally tops out smaller so it sits neatly between the headline
+        and CTAs in the mobile hero without crowding either.
       */}
-      <div className="relative mx-auto w-full max-w-[360px] sm:max-w-[480px] md:max-w-[640px]">
-        <DesktopRadial nodes={nodes} t={t} />
+      <div
+        className={
+          isCompact
+            // Compact still gets to breathe on tablet — capped smaller than
+            // the full variant but no longer phone-tiny on a 768/900px
+            // viewport where there's plenty of horizontal room.
+            ? 'relative mx-auto w-full max-w-[300px] sm:max-w-[380px] md:max-w-[460px]'
+            : 'relative mx-auto w-full max-w-[360px] sm:max-w-[480px] md:max-w-[640px]'
+        }
+      >
+        <DesktopRadial nodes={nodes} t={t} showLabels={!isCompact} />
       </div>
     </div>
   );
 }
 
-function DesktopRadial({ nodes, t }) {
+function DesktopRadial({ nodes, t, showLabels = true }) {
   // hovered state lives in React because the spoke art (SVG) and the node
   // chrome (HTML overlay) need to react together when the user moves over a
   // node. Setting `hovered` to a moduleId brightens that spoke + speeds up
@@ -257,6 +272,7 @@ function DesktopRadial({ nodes, t }) {
             node={n}
             t={t}
             isHot={hovered === n.id}
+            showLabel={showLabels}
             onEnter={() => setHovered(n.id)}
             onLeave={() => setHovered((cur) => (cur === n.id ? null : cur))}
             onClick={() => selectModule(n.id)}
@@ -273,14 +289,20 @@ function DesktopRadial({ nodes, t }) {
   );
 }
 
-function DesktopNode({ node, t, style, isHot, onEnter, onLeave, onClick }) {
+function DesktopNode({ node, t, style, isHot, showLabel = true, onEnter, onLeave, onClick }) {
   const { meta, id } = node;
   return (
     <div
       className={cn(
         // Width scales down on phones so the labels don't overflow the
-        // ~360px container at the small end of the breakpoint range.
-        'absolute flex flex-col items-center gap-1.5 w-[88px] sm:w-[120px] md:w-[140px]',
+        // ~360px container at the small end of the breakpoint range. When
+        // labels are hidden (compact variant) we shrink the slot down to
+        // just the icon tile so node centers don't drift — but it still
+        // grows at sm/md so it stays proportional to the bigger diagram
+        // on tablet-width viewports.
+        showLabel
+          ? 'absolute flex flex-col items-center gap-1.5 w-[88px] sm:w-[120px] md:w-[140px]'
+          : 'absolute flex flex-col items-center gap-1.5 w-[44px] sm:w-[56px] md:w-[64px]',
         'opacity-0 animate-pill-rise-radial',
       )}
       style={{ ...style, animationFillMode: 'forwards' }}
@@ -293,7 +315,8 @@ function DesktopNode({ node, t, style, isHot, onEnter, onLeave, onClick }) {
         type="button"
         onClick={onClick}
         className={cn(
-          'relative appearance-none border-0 cursor-pointer p-2 sm:p-2.5 rounded-2xl bg-white',
+          'relative appearance-none border-0 cursor-pointer rounded-2xl bg-white',
+          showLabel ? 'p-2 sm:p-2.5' : 'p-1.5 sm:p-2 md:p-2.5',
           'shadow-[0_8px_28px_rgba(0,0,0,0.22)] ring-1 ring-black/5',
           'transition-all duration-300',
           'focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60',
@@ -303,26 +326,28 @@ function DesktopNode({ node, t, style, isHot, onEnter, onLeave, onClick }) {
       >
         <ModuleIconTile moduleId={id} meta={meta} size="md" />
       </button>
-      <button
-        type="button"
-        onClick={onClick}
-        className="text-center cursor-pointer focus:outline-none focus-visible:underline px-1"
-        aria-label={`${t(`modules.${id}`)} — ${t('marketing.modules.learnMore')}`}
-      >
-        <div
-          className={cn(
-            // No nowrap on mobile — long labels (e.g. "Slaughterhouse",
-            // "Equipment Trading") would punch out of the radial otherwise.
-            // From sm: up labels fit on one line at the wider container.
-            'text-[10px] sm:text-[12px] font-semibold leading-tight sm:whitespace-nowrap',
-            'text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.5)]',
-            'transition-all duration-300',
-            isHot && 'scale-105',
-          )}
+      {showLabel && (
+        <button
+          type="button"
+          onClick={onClick}
+          className="text-center cursor-pointer focus:outline-none focus-visible:underline px-1"
+          aria-label={`${t(`modules.${id}`)} — ${t('marketing.modules.learnMore')}`}
         >
-          {t(`modules.${id}`)}
-        </div>
-      </button>
+          <div
+            className={cn(
+              // No nowrap on mobile — long labels (e.g. "Slaughterhouse",
+              // "Equipment Trading") would punch out of the radial otherwise.
+              // From sm: up labels fit on one line at the wider container.
+              'text-[10px] sm:text-[12px] font-semibold leading-tight sm:whitespace-nowrap',
+              'text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.5)]',
+              'transition-all duration-300',
+              isHot && 'scale-105',
+            )}
+          >
+            {t(`modules.${id}`)}
+          </div>
+        </button>
+      )}
     </div>
   );
 }

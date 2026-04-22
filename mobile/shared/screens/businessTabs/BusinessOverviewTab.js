@@ -18,6 +18,7 @@ import { deltaSync } from '@/lib/syncEngine';
 import SheetSection from '@/components/SheetSection';
 import LocationActions from '@/components/LocationActions';
 import BatchKpiCard from '@/modules/broiler/components/BatchKpiCard';
+import { rowDirection, textAlignStart, textAlignEnd } from '@/lib/rtl';
 
 const NUMERIC_LOCALE = 'en-US';
 
@@ -44,7 +45,7 @@ function IdRow({ icon: Icon, label, value, isRTL, tokens, isLast }) {
       style={[
         styles.kvRow,
         {
-          flexDirection: isRTL ? 'row-reverse' : 'row',
+          flexDirection: rowDirection(isRTL),
           borderBottomColor: borderColor,
           borderBottomWidth: isLast ? 0 : StyleSheet.hairlineWidth,
         },
@@ -53,7 +54,7 @@ function IdRow({ icon: Icon, label, value, isRTL, tokens, isLast }) {
       <View
         style={[
           styles.kvLabelCol,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
         <Icon size={14} color={mutedColor} strokeWidth={2.2} />
@@ -77,7 +78,7 @@ function IdRow({ icon: Icon, label, value, isRTL, tokens, isLast }) {
           fontSize: 14,
           fontFamily: 'Poppins-SemiBold',
           color: textColor,
-          textAlign: isRTL ? 'left' : 'right',
+          textAlign: textAlignEnd(isRTL),
           fontVariant: ['tabular-nums'],
         }}
         numberOfLines={1}
@@ -125,7 +126,7 @@ function LinkedItemRow({
         style={[
           styles.linkedRow,
           {
-            flexDirection: isRTL ? 'row-reverse' : 'row',
+            flexDirection: rowDirection(isRTL),
             borderBottomColor: borderColor,
             borderBottomWidth: isLast ? 0 : StyleSheet.hairlineWidth,
           },
@@ -141,7 +142,7 @@ function LinkedItemRow({
               fontFamily: 'Poppins-SemiBold',
               color: textColor,
               letterSpacing: -0.1,
-              textAlign: isRTL ? 'right' : 'left',
+              textAlign: textAlignStart(isRTL),
             }}
             numberOfLines={1}
           >
@@ -154,7 +155,7 @@ function LinkedItemRow({
                 fontFamily: 'Poppins-Regular',
                 color: mutedColor,
                 marginTop: 1,
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
               }}
               numberOfLines={1}
             >
@@ -327,7 +328,7 @@ export default function BusinessOverviewTab({
                     fontFamily: 'Poppins-Regular',
                     color: textColor,
                     lineHeight: 20,
-                    textAlign: isRTL ? 'right' : 'left',
+                    textAlign: textAlignStart(isRTL),
                   }}
                 >
                   {biz.address.formattedAddress}

@@ -18,6 +18,7 @@ import ContactSheet from '@/shared/sheets/ContactSheet';
 import WorkerSheet from '@/shared/sheets/WorkerSheet';
 import { useIsRTL } from '@/stores/localeStore';
 import { deltaSync } from '@/lib/syncEngine';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 const NUMERIC_LOCALE = 'en-US';
 const fmtCount = (val) => Number(val || 0).toLocaleString(NUMERIC_LOCALE);
@@ -273,7 +274,7 @@ function CategoryRow({ meta, count, loading, tokens, t, isRTL }) {
         },
       ]}
     >
-      <View style={[styles.rowInner, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+      <View style={[styles.rowInner, { flexDirection: rowDirection(isRTL) }]}>
         <View style={[styles.iconTile, { backgroundColor: iconTileBg }]}>
           <Icon size={22} color={iconColor} strokeWidth={2} />
         </View>
@@ -285,7 +286,7 @@ function CategoryRow({ meta, count, loading, tokens, t, isRTL }) {
               fontFamily: 'Poppins-SemiBold',
               color: textColor,
               letterSpacing: -0.1,
-              textAlign: isRTL ? 'right' : 'left',
+              textAlign: textAlignStart(isRTL),
             }}
             numberOfLines={1}
           >
@@ -297,7 +298,7 @@ function CategoryRow({ meta, count, loading, tokens, t, isRTL }) {
               fontFamily: 'Poppins-Regular',
               color: mutedColor,
               marginTop: 2,
-              textAlign: isRTL ? 'right' : 'left',
+              textAlign: textAlignStart(isRTL),
             }}
             numberOfLines={1}
           >
@@ -305,7 +306,7 @@ function CategoryRow({ meta, count, loading, tokens, t, isRTL }) {
           </Text>
         </View>
 
-        <View style={[styles.trailing, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+        <View style={[styles.trailing, { flexDirection: rowDirection(isRTL) }]}>
           <View
             style={[
               styles.countChip,

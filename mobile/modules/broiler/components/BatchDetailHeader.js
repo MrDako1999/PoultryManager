@@ -11,6 +11,7 @@ import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
 import BatchAvatar from './BatchAvatar';
 import { getStatusConfig } from '@/modules/broiler/lib/batchStatusConfig';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 const CYCLE_TARGET_DAYS = 35;
 const NUMERIC_LOCALE = 'en-US';
@@ -80,13 +81,13 @@ export default function BatchDetailHeader({
       style={{
         paddingTop: insets.top + 12,
         paddingBottom: 18,
-        paddingHorizontal: 16,
+        paddingHorizontal: 12,
       }}
     >
       <View
         style={[
           styles.row,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
         <Pressable
@@ -104,22 +105,29 @@ export default function BatchDetailHeader({
           letter={avatarLetter}
           sequence={batchNum}
           status={status}
-          size={44}
-          radius={14}
+          size={40}
+          radius={12}
         />
 
         <View style={styles.textCol}>
           <Text
             style={{
-              fontSize: 20,
+              fontSize: 18,
               fontFamily: 'Poppins-Bold',
               color: '#ffffff',
               letterSpacing: -0.3,
-              lineHeight: 26,
-              textAlign: isRTL ? 'right' : 'left',
-              writingDirection: isRTL ? 'rtl' : 'ltr',
+              lineHeight: 24,
+              textAlign: textAlignStart(isRTL),
+              // Don't force `writingDirection: rtl` on the batch name —
+              // batch IDs are Latin codes (e.g. "GOLDEN-09APR26-B10"). In
+              // an RTL paragraph iOS otherwise places the LTR run at the
+              // line's logical end and ellipsizes the wrong half (we lose
+              // the sequence number which is the most identifying part).
+              // Letting the script auto-resolve plus middle-truncation
+              // keeps both ends visible when space is tight.
             }}
             numberOfLines={1}
+            ellipsizeMode="middle"
           >
             {displayName}
           </Text>
@@ -129,7 +137,7 @@ export default function BatchDetailHeader({
                 <View
                   style={[
                     styles.metaRow,
-                    { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                    { flexDirection: rowDirection(isRTL) },
                   ]}
                 >
                   <Calendar size={11} color="rgba(255,255,255,0.78)" strokeWidth={2.4} />
@@ -171,7 +179,7 @@ export default function BatchDetailHeader({
                   fontFamily: 'Poppins-Regular',
                   color: 'rgba(255,255,255,0.78)',
                   marginTop: 4,
-                  textAlign: isRTL ? 'right' : 'left',
+                  textAlign: textAlignStart(isRTL),
                 }}
                 numberOfLines={1}
               >
@@ -187,7 +195,7 @@ export default function BatchDetailHeader({
                 fontFamily: 'Poppins-Regular',
                 color: 'rgba(255,255,255,0.78)',
                 marginTop: 4,
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
               }}
               numberOfLines={1}
             >
@@ -208,7 +216,7 @@ export default function BatchDetailHeader({
             <Pencil size={18} color="#ffffff" strokeWidth={2.4} />
           </Pressable>
         ) : (
-          <View style={{ width: 36 }} />
+          <View style={{ width: 34 }} />
         )}
       </View>
     </LinearGradient>
@@ -218,12 +226,15 @@ export default function BatchDetailHeader({
 const styles = StyleSheet.create({
   row: {
     alignItems: 'center',
-    gap: 12,
+    // Tighter gap (was 12) so the long Latin batch IDs that show up in
+    // most workspaces (FARM-DDMMMYY-Bxx pattern) don't have to ellipsize
+    // in either LTR or RTL on standard 390-414pt phones.
+    gap: 10,
   },
   iconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: 'rgba(255,255,255,0.18)',
     alignItems: 'center',
     justifyContent: 'center',

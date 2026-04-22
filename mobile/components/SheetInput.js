@@ -4,6 +4,7 @@ import { Eye, EyeOff, Lock } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useHeroSheetTokens } from './HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 /**
  * Soft-fill input matching the HeroSheetScreen aesthetic.
@@ -52,7 +53,7 @@ const SheetInput = forwardRef(({
             fontFamily: 'Poppins-Medium',
             color: textColor,
             marginHorizontal: 4,
-            textAlign: isRTL ? 'right' : 'left',
+            textAlign: textAlignStart(isRTL),
           }}
         >
           {label}
@@ -61,7 +62,7 @@ const SheetInput = forwardRef(({
       <View
         style={[
           {
-            flexDirection: isRTL ? 'row-reverse' : 'row',
+            flexDirection: rowDirection(isRTL),
             alignItems: 'center',
             backgroundColor: inputBg,
             borderWidth: 1.5,
@@ -95,7 +96,7 @@ const SheetInput = forwardRef(({
             fontSize: dense ? 14 : 15,
             color: textColor,
             height: '100%',
-            textAlign: isRTL ? 'right' : 'left',
+            textAlign: textAlignStart(isRTL),
             writingDirection: isRTL ? 'rtl' : 'ltr',
           }}
           {...textInputProps}
@@ -109,7 +110,7 @@ const SheetInput = forwardRef(({
             fontFamily: 'Poppins-Regular',
             color: errorColor,
             marginHorizontal: 4,
-            textAlign: isRTL ? 'right' : 'left',
+            textAlign: textAlignStart(isRTL),
           }}
         >
           {error}
@@ -121,7 +122,7 @@ const SheetInput = forwardRef(({
             fontFamily: 'Poppins-Regular',
             color: mutedColor,
             marginHorizontal: 4,
-            textAlign: isRTL ? 'right' : 'left',
+            textAlign: textAlignStart(isRTL),
           }}
         >
           {hint}

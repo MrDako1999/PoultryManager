@@ -9,6 +9,7 @@ import { Check, X, Search, RotateCcw } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 const DISMISS_THRESHOLD = 80;
 
@@ -290,7 +291,7 @@ const BottomPickerSheet = forwardRef(function BottomPickerSheet({
         onPress={onPress}
         style={[defaultRowStyles.outer, { backgroundColor: bg }]}
       >
-        <View style={[defaultRowStyles.row, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+        <View style={[defaultRowStyles.row, { flexDirection: rowDirection(isRTL) }]}>
           {multiple ? (
             <View
               style={{
@@ -314,7 +315,7 @@ const BottomPickerSheet = forwardRef(function BottomPickerSheet({
                 fontSize: 14,
                 fontFamily: isSelected ? 'Poppins-SemiBold' : 'Poppins-Medium',
                 color: isSelected ? accentColor : textColor,
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
               }}
               numberOfLines={1}
             >
@@ -327,7 +328,7 @@ const BottomPickerSheet = forwardRef(function BottomPickerSheet({
                   fontFamily: 'Poppins-Regular',
                   color: mutedColor,
                   marginTop: 2,
-                  textAlign: isRTL ? 'right' : 'left',
+                  textAlign: textAlignStart(isRTL),
                 }}
                 numberOfLines={1}
               >
@@ -425,7 +426,7 @@ const BottomPickerSheet = forwardRef(function BottomPickerSheet({
               Pressables keep receiving their own taps cleanly. */}
           <View
             style={{
-              flexDirection: isRTL ? 'row-reverse' : 'row',
+              flexDirection: rowDirection(isRTL),
               alignItems: 'center',
               gap: 12,
               paddingHorizontal: 20,
@@ -437,7 +438,7 @@ const BottomPickerSheet = forwardRef(function BottomPickerSheet({
               {...panResponder.panHandlers}
               style={{
                 flex: 1,
-                flexDirection: isRTL ? 'row-reverse' : 'row',
+                flexDirection: rowDirection(isRTL),
                 alignItems: 'center',
                 gap: 12,
                 minWidth: 0,
@@ -466,7 +467,7 @@ const BottomPickerSheet = forwardRef(function BottomPickerSheet({
                       fontFamily: 'Poppins-SemiBold',
                       color: textColor,
                       letterSpacing: -0.2,
-                      textAlign: isRTL ? 'right' : 'left',
+                      textAlign: textAlignStart(isRTL),
                     }}
                     numberOfLines={1}
                   >
@@ -480,7 +481,7 @@ const BottomPickerSheet = forwardRef(function BottomPickerSheet({
                       fontFamily: 'Poppins-Regular',
                       color: mutedColor,
                       marginTop: 1,
-                      textAlign: isRTL ? 'right' : 'left',
+                      textAlign: textAlignStart(isRTL),
                     }}
                     numberOfLines={1}
                   >
@@ -491,7 +492,7 @@ const BottomPickerSheet = forwardRef(function BottomPickerSheet({
             </View>
 
             {headerRight ? (
-              <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8 }}>
+              <View style={{ flexDirection: rowDirection(isRTL), alignItems: 'center', gap: 8 }}>
                 {headerRight}
               </View>
             ) : null}
@@ -517,7 +518,7 @@ const BottomPickerSheet = forwardRef(function BottomPickerSheet({
             <View style={{ paddingHorizontal: 20, paddingBottom: 14 }}>
               <View
                 style={{
-                  flexDirection: isRTL ? 'row-reverse' : 'row',
+                  flexDirection: rowDirection(isRTL),
                   alignItems: 'center',
                   backgroundColor: inputBg,
                   borderWidth: 1.5,
@@ -549,7 +550,7 @@ const BottomPickerSheet = forwardRef(function BottomPickerSheet({
                     fontSize: 14,
                     color: textColor,
                     height: '100%',
-                    textAlign: isRTL ? 'right' : 'left',
+                    textAlign: textAlignStart(isRTL),
                     writingDirection: isRTL ? 'rtl' : 'ltr',
                   }}
                 />
@@ -610,7 +611,7 @@ const BottomPickerSheet = forwardRef(function BottomPickerSheet({
                         color: mutedColor,
                         letterSpacing: 1,
                         textTransform: 'uppercase',
-                        textAlign: isRTL ? 'right' : 'left',
+                        textAlign: textAlignStart(isRTL),
                       }}
                     >
                       {item.label}
@@ -663,7 +664,7 @@ const BottomPickerSheet = forwardRef(function BottomPickerSheet({
               style={[
                 footerStyles.bar,
                 {
-                  flexDirection: isRTL ? 'row-reverse' : 'row',
+                  flexDirection: rowDirection(isRTL),
                   paddingBottom: insetsBottom + 12,
                   borderTopColor: borderColor,
                   backgroundColor: sheetBg,
@@ -688,7 +689,7 @@ const BottomPickerSheet = forwardRef(function BottomPickerSheet({
                 <View
                   style={[
                     footerStyles.resetInner,
-                    { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                    { flexDirection: rowDirection(isRTL) },
                   ]}
                 >
                   <RotateCcw size={15} color={mutedColor} strokeWidth={2.2} />

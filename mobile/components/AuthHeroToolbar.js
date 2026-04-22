@@ -4,6 +4,7 @@ import * as Haptics from 'expo-haptics';
 import useThemeStore from '@/stores/themeStore';
 import { useIsRTL } from '@/stores/localeStore';
 import LanguageSelector from '@/components/LanguageSelector';
+import { rowDirection } from '@/lib/rtl';
 
 /**
  * Hero toolbar for auth screens — language selector pill + theme toggle chip.
@@ -14,7 +15,7 @@ export default function AuthHeroToolbar() {
   return (
     <View
       style={{
-        flexDirection: isRTL ? 'row-reverse' : 'row',
+        flexDirection: rowDirection(isRTL),
         alignItems: 'center',
         gap: 8,
       }}

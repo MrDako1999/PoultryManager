@@ -1,6 +1,7 @@
 import { View, TextInput, Text } from 'react-native';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 const COUNTRY_CODE = '+971';
 
@@ -17,7 +18,7 @@ export default function PhoneInput({ value, onChange }) {
   return (
     <View
       style={{
-        flexDirection: isRTL ? 'row-reverse' : 'row',
+        flexDirection: rowDirection(isRTL),
         alignItems: 'stretch',
         backgroundColor: inputBg,
         borderWidth: 1.5,
@@ -62,7 +63,7 @@ export default function PhoneInput({ value, onChange }) {
           fontSize: 15,
           color: textColor,
           height: '100%',
-          textAlign: isRTL ? 'right' : 'left',
+          textAlign: textAlignStart(isRTL),
           writingDirection: 'ltr',
         }}
       />

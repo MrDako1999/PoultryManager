@@ -27,6 +27,7 @@ import { useToast } from '@/components/ui/Toast';
 import { useIsRTL } from '@/stores/localeStore';
 import { deltaSync } from '@/lib/syncEngine';
 import ContactSheet from '@/shared/sheets/ContactSheet';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 const NUMERIC_LOCALE = 'en-US';
 const SWIPE_ACTION_WIDTH = 76;
@@ -279,7 +280,7 @@ function BrandHeader({ title, subtitle, gradient, topInset, isRTL }) {
       <View
         style={[
           headerStyles.row,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
         <Pressable
@@ -298,7 +299,7 @@ function BrandHeader({ title, subtitle, gradient, topInset, isRTL }) {
               color: '#ffffff',
               letterSpacing: -0.4,
               lineHeight: 30,
-              textAlign: isRTL ? 'right' : 'left',
+              textAlign: textAlignStart(isRTL),
               writingDirection: isRTL ? 'rtl' : 'ltr',
             }}
             numberOfLines={1}
@@ -312,7 +313,7 @@ function BrandHeader({ title, subtitle, gradient, topInset, isRTL }) {
                 fontFamily: 'Poppins-Regular',
                 color: 'rgba(255,255,255,0.78)',
                 marginTop: 4,
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
                 writingDirection: isRTL ? 'rtl' : 'ltr',
               }}
               numberOfLines={1}
@@ -415,7 +416,7 @@ function ContactRow({
           <View
             style={[
               cardStyles.row,
-              { flexDirection: isRTL ? 'row-reverse' : 'row' },
+              { flexDirection: rowDirection(isRTL) },
             ]}
           >
           <View
@@ -444,7 +445,7 @@ function ContactRow({
                 fontFamily: 'Poppins-SemiBold',
                 color: textColor,
                 letterSpacing: -0.1,
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
               }}
               numberOfLines={1}
             >
@@ -453,14 +454,14 @@ function ContactRow({
             <View
               style={[
                 cardStyles.metaRow,
-                { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                { flexDirection: rowDirection(isRTL) },
               ]}
             >
               {contact.jobTitle ? (
                 <View
                   style={[
                     cardStyles.metaPiece,
-                    { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                    { flexDirection: rowDirection(isRTL) },
                   ]}
                 >
                   <Briefcase size={11} color={mutedColor} strokeWidth={2.2} />
@@ -481,7 +482,7 @@ function ContactRow({
                 <View
                   style={[
                     cardStyles.metaPiece,
-                    { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                    { flexDirection: rowDirection(isRTL) },
                   ]}
                 >
                   <Phone size={11} color={mutedColor} strokeWidth={2.2} />
@@ -508,7 +509,7 @@ function ContactRow({
                 {
                   backgroundColor: dark ? 'rgba(255,255,255,0.06)' : 'hsl(148, 18%, 96%)',
                   borderColor: dark ? 'rgba(255,255,255,0.10)' : 'hsl(148, 14%, 88%)',
-                  flexDirection: isRTL ? 'row-reverse' : 'row',
+                  flexDirection: rowDirection(isRTL),
                 },
               ]}
             >

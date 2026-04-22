@@ -5,6 +5,7 @@ import * as Haptics from 'expo-haptics';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
 import BottomPickerSheet from '@/components/BottomPickerSheet';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 /**
  * Form-grade Select. Thin wrapper over `BottomPickerSheet` that adds:
@@ -82,7 +83,7 @@ function Select({
           <View
             style={[
               triggerStyles.row,
-              { flexDirection: isRTL ? 'row-reverse' : 'row' },
+              { flexDirection: rowDirection(isRTL) },
             ]}
           >
             <Text
@@ -91,7 +92,7 @@ function Select({
                 fontSize: 14,
                 fontFamily: 'Poppins-Regular',
                 color: selected ? textColor : mutedColor,
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
                 writingDirection: isRTL ? 'rtl' : 'ltr',
               }}
               numberOfLines={1}
@@ -157,7 +158,7 @@ function Select({
         >
           <View
             style={{
-              flexDirection: isRTL ? 'row-reverse' : 'row',
+              flexDirection: rowDirection(isRTL),
               alignItems: 'center',
               gap: 6,
             }}
@@ -216,7 +217,7 @@ function Select({
       >
         <View
           style={{
-            flexDirection: isRTL ? 'row-reverse' : 'row',
+            flexDirection: rowDirection(isRTL),
             alignItems: 'center',
             gap: 8,
           }}

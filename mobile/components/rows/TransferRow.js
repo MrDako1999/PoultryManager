@@ -6,6 +6,7 @@ import {
 } from 'lucide-react-native';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
+import { rowDirection, textAlignStart, textAlignEnd } from '@/lib/rtl';
 
 const NUMERIC_LOCALE = 'en-US';
 
@@ -66,7 +67,7 @@ export default function TransferRow({ transfer, onClick }) {
         <View
           style={[
             styles.row,
-            { flexDirection: isRTL ? 'row-reverse' : 'row' },
+            { flexDirection: rowDirection(isRTL) },
           ]}
         >
           <View style={[styles.iconTile, { backgroundColor: tileBg }]}>
@@ -80,7 +81,7 @@ export default function TransferRow({ transfer, onClick }) {
                 fontFamily: 'Poppins-SemiBold',
                 color: textColor,
                 letterSpacing: -0.1,
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
               }}
               numberOfLines={1}
             >
@@ -89,7 +90,7 @@ export default function TransferRow({ transfer, onClick }) {
             <View
               style={[
                 styles.metaRow,
-                { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                { flexDirection: rowDirection(isRTL) },
               ]}
             >
               <View style={[styles.pill, { backgroundColor: pillBg, borderColor: pillBorder }]}>
@@ -129,7 +130,7 @@ export default function TransferRow({ transfer, onClick }) {
               fontFamily: 'Poppins-SemiBold',
               color: textColor,
               fontVariant: ['tabular-nums'],
-              textAlign: isRTL ? 'left' : 'right',
+              textAlign: textAlignEnd(isRTL),
             }}
             numberOfLines={1}
           >

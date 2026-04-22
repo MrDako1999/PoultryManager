@@ -6,6 +6,7 @@ import * as Haptics from 'expo-haptics';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
 import { detectFileType } from '@/components/FileViewer';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 const TYPE_ICON = { image: ImageIcon, pdf: FileText, file: FileIcon };
 
@@ -68,7 +69,7 @@ export default function DocCard({ doc, label, onPress }) {
       accessibilityRole="button"
       accessibilityLabel={filename}
     >
-      <View style={[styles.row, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+      <View style={[styles.row, { flexDirection: rowDirection(isRTL) }]}>
         <View style={[styles.iconTile, { backgroundColor: iconTileBg }]}>
           <Icon size={20} color={accentColor} strokeWidth={2.2} />
         </View>
@@ -81,7 +82,7 @@ export default function DocCard({ doc, label, onPress }) {
                 color: mutedColor,
                 letterSpacing: 0.6,
                 textTransform: 'uppercase',
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
               }}
               numberOfLines={1}
             >
@@ -94,7 +95,7 @@ export default function DocCard({ doc, label, onPress }) {
                 fontSize: 14,
                 fontFamily: 'Poppins-Medium',
                 color: textColor,
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
               }}
               numberOfLines={1}
             >
@@ -108,7 +109,7 @@ export default function DocCard({ doc, label, onPress }) {
                 fontFamily: 'Poppins-Regular',
                 color: mutedColor,
                 fontVariant: ['tabular-nums'],
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
               }}
               numberOfLines={1}
             >

@@ -15,6 +15,7 @@ import { SkeletonDashboardBatchCard } from '@/components/skeletons';
 import SheetSection from '@/components/SheetSection';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 const CYCLE_TARGET_DAYS = 35;
 
@@ -203,7 +204,7 @@ function BatchCard({ card: b, isRTL, tokens, t, onPress }) {
       ]}
     >
       {/* Header row: avatar + batch name + farm/birds */}
-      <View style={[cardStyles.headerRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+      <View style={[cardStyles.headerRow, { flexDirection: rowDirection(isRTL) }]}>
         <BatchAvatar
           letter={b.avatarLetter}
           sequence={b.batchNum}
@@ -217,7 +218,7 @@ function BatchCard({ card: b, isRTL, tokens, t, onPress }) {
               fontFamily: 'Poppins-SemiBold',
               color: textColor,
               letterSpacing: -0.1,
-              textAlign: isRTL ? 'right' : 'left',
+              textAlign: textAlignStart(isRTL),
             }}
             numberOfLines={1}
           >
@@ -232,10 +233,10 @@ function BatchCard({ card: b, isRTL, tokens, t, onPress }) {
             <View
               style={[
                 cardStyles.metaRow,
-                { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                { flexDirection: rowDirection(isRTL) },
               ]}
             >
-              <View style={[cardStyles.metaPiece, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <View style={[cardStyles.metaPiece, { flexDirection: rowDirection(isRTL) }]}>
                 <Bird size={11} color={mutedColor} strokeWidth={2.2} />
                 <Text style={{ fontSize: 12, fontFamily: 'Poppins-Regular', color: mutedColor }}>
                   {fmtInt(b.remaining)}
@@ -268,8 +269,8 @@ function BatchCard({ card: b, isRTL, tokens, t, onPress }) {
       </View>
 
       {/* Day-of-target progress */}
-      <View style={[cardStyles.progressLabelRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-        <View style={[cardStyles.progressLabelLeft, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+      <View style={[cardStyles.progressLabelRow, { flexDirection: rowDirection(isRTL) }]}>
+        <View style={[cardStyles.progressLabelLeft, { flexDirection: rowDirection(isRTL) }]}>
           <Calendar size={11} color={mutedColor} strokeWidth={2.4} />
           <Text
             style={{

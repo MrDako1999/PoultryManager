@@ -31,31 +31,49 @@ export default function Tabs({
   const containerWidth = useRef(0);
   const internalProgress = useRef(new Animated.Value(0)).current;
 
-  const activeIndex = useMemo(
+  // The strip lays out children in the SAME order they appear in `tabs`,
+  // but we render them in reversed order when the locale is RTL. Why
+  // reverse instead of relying on `flexDirection: row-reverse`?
+  //
+  // Because Yoga reports `onLayout.x` differently in `row-reverse` than
+  // in plain `row`, AND iOS auto-flips `row` when `I18nManager.isRTL`
+  // is true — those two behaviours combined have edge cases where the
+  // reported `x` for tab[i] doesn't match the visual position of that
+  // tab. The tab indicator (driven by an Animated interpolation against
+  // `layout.x`) ends up landing on a totally different tab than the one
+  // you tapped — exactly the "indicator on الأداء while السجلات اليومية
+  // is highlighted" bug the user screenshotted.
+  //
+  // Reversing the children explicitly + keeping `flexDirection: 'row'`
+  // makes the layout 100% deterministic in both directions: tab[0] in
+  // render order is always the leftmost, regardless of locale or native
+  // RTL state.
+  const renderTabs = useMemo(
+    () => (isRTL ? [...tabs].reverse() : tabs),
+    [tabs, isRTL]
+  );
+
+  const sourceActiveIndex = useMemo(
     () => Math.max(0, tabs.findIndex((t) => t.key === value)),
     [tabs, value]
   );
 
   // Drive a continuous progress value either from the parent (PagerView scroll)
-  // or, as a fallback, from our own state via spring.
+  // or, as a fallback, from our own state via spring. The progress value is
+  // ALWAYS in source order — we map it to render order at interpolation time.
   useEffect(() => {
     if (position) return;
     Animated.spring(internalProgress, {
-      toValue: activeIndex,
+      toValue: sourceActiveIndex,
       useNativeDriver: false,
       friction: 12,
       tension: 90,
     }).start();
-  }, [activeIndex, position, internalProgress]);
+  }, [sourceActiveIndex, position, internalProgress]);
 
   const progress = position || internalProgress;
 
-  const orderedLayouts = useMemo(
-    () => tabs.map((t) => layouts[t.key]).filter(Boolean),
-    [tabs, layouts]
-  );
-
-  const layoutsReady = orderedLayouts.length === tabs.length && tabs.length > 0;
+  const layoutsReady = renderTabs.every((t) => layouts[t.key]) && renderTabs.length > 0;
 
   // Auto-scroll the tab strip so the active tab is centered.
   useEffect(() => {
@@ -74,19 +92,45 @@ export default function Tabs({
 
   const indicatorStyle = useMemo(() => {
     if (!layoutsReady) return null;
-    const inputRange = orderedLayouts.map((_, i) => i);
+
+    // Single-tab strip can't be interpolated (interpolate needs >= 2
+    // points). Fall back to a static underline anchored under the only
+    // tab. Same defensive case as before — capability-restricted users
+    // can land on a 1-tab strip, e.g. ground_staff with only Overview.
+    if (renderTabs.length < 2) {
+      const only = layouts[renderTabs[0].key];
+      return {
+        transform: [{ translateX: only.x + 12 }],
+        width: Math.max(0, only.width - 24),
+      };
+    }
+
+    // Build inputRange in source order [0..N-1], outputRange holds the
+    // RENDER-order layout.x of the corresponding source-order tab.
+    // That way `progress = sourceIdx` always maps to the visual x of
+    // the tab the user actually wants to highlight.
+    const inputRange = tabs.map((_, sIdx) => sIdx);
+    const xOutput = tabs.map((sourceTab) => {
+      const layout = layouts[sourceTab.key];
+      return (layout?.x ?? 0) + 12;
+    });
+    const widthOutput = tabs.map((sourceTab) => {
+      const layout = layouts[sourceTab.key];
+      return Math.max(0, (layout?.width ?? 0) - 24);
+    });
+
     const translateX = progress.interpolate({
       inputRange,
-      outputRange: orderedLayouts.map((l) => l.x + 12),
+      outputRange: xOutput,
       extrapolate: 'clamp',
     });
     const width = progress.interpolate({
       inputRange,
-      outputRange: orderedLayouts.map((l) => Math.max(0, l.width - 24)),
+      outputRange: widthOutput,
       extrapolate: 'clamp',
     });
     return { transform: [{ translateX }], width };
-  }, [layoutsReady, orderedLayouts, progress]);
+  }, [layoutsReady, tabs, renderTabs, layouts, progress]);
 
   return (
     <View
@@ -105,10 +149,21 @@ export default function Tabs({
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        <View>
-          <View style={[styles.row, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-            {tabs.map((tab, i) => {
-              const isActive = i === activeIndex;
+        <View
+          style={{
+            // Force the strip's internal layout to LTR. We've already
+            // reversed `renderTabs` for RTL above; doing it via a real
+            // `row-reverse` would re-introduce the layout.x ambiguity
+            // that broke the indicator. Pinning to LTR makes onLayout
+            // report x from the left in pixel order, which is what the
+            // indicator math relies on.
+            direction: 'ltr',
+          }}
+        >
+          <View style={[styles.row, { flexDirection: 'row' }]}>
+            {renderTabs.map((tab) => {
+              const sourceIdx = tabs.findIndex((t) => t.key === tab.key);
+              const isActive = tab.key === value;
               return (
                 <Pressable
                   key={tab.key}
@@ -129,7 +184,7 @@ export default function Tabs({
                   <View style={styles.tabInner}>
                     <AnimatedTabLabel
                       progress={progress}
-                      index={i}
+                      index={sourceIdx}
                       label={tab.label}
                       mutedColor={mutedColor}
                       accentColor={accentColor}

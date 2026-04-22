@@ -23,6 +23,7 @@ import useSettings from '@/hooks/useSettings';
 import useOfflineMutation from '@/hooks/useOfflineMutation';
 import { SALE_METHODS, SALE_METHOD_ICONS, SALE_INVOICE_TYPES, SALE_INVOICE_TYPE_ICONS, PART_TYPES } from '@/lib/constants';
 import { useToast } from '@/components/ui/Toast';
+import { rowDirection, textAlignStart, textAlignEnd } from '@/lib/rtl';
 
 const parseNum = (v) => { const n = parseFloat(String(v).replace(/,/g, '')); return isNaN(n) ? 0 : n; };
 const fmtDec = (v) => { const n = Number(v || 0); return n ? n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''; };
@@ -613,7 +614,7 @@ function StepProgress({ current, total }) {
   const { accentColor, dark } = tokens;
   const dim = dark ? 'hsl(150, 14%, 24%)' : 'hsl(148, 14%, 88%)';
   return (
-    <View style={[stepStyles.row, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+    <View style={[stepStyles.row, { flexDirection: rowDirection(isRTL) }]}>
       {Array.from({ length: total }).map((_, i) => (
         <View
           key={i}
@@ -643,7 +644,7 @@ function SaleFooter({ step, totalSteps, saving, editData, onBack, onNext, onSave
       style={[
         footerStyles.bar,
         {
-          flexDirection: isRTL ? 'row-reverse' : 'row',
+          flexDirection: rowDirection(isRTL),
           backgroundColor: sheetBg,
           borderTopColor: borderColor,
           paddingBottom: Math.max(insets.bottom, 16),
@@ -700,7 +701,7 @@ function WeightRowCard({ index, item, count, onUpdate, onRemove, t }) {
       <View
         style={[
           rowStyles.headerRow,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
         <Text
@@ -726,7 +727,7 @@ function WeightRowCard({ index, item, count, onUpdate, onRemove, t }) {
         onChangeText={(v) => onUpdate('description', v)}
         placeholder={t('batches.saleForm.description')}
       />
-      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10 }}>
+      <View style={{ flexDirection: rowDirection(isRTL), gap: 10 }}>
         <View style={{ flex: 1 }}>
           <SheetInput
             label={t('batches.saleForm.weightKg', 'Weight (kg)')}
@@ -746,7 +747,7 @@ function WeightRowCard({ index, item, count, onUpdate, onRemove, t }) {
           />
         </View>
       </View>
-      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 4 }}>
+      <View style={{ flexDirection: rowDirection(isRTL), justifyContent: 'space-between', alignItems: 'center', paddingTop: 4 }}>
         <Text style={{ fontSize: 11, fontFamily: 'Poppins-SemiBold', color: mutedColor, letterSpacing: 1.2, textTransform: 'uppercase' }}>
           {t('batches.saleForm.amount')}
         </Text>
@@ -774,10 +775,10 @@ function PortionsTable({ portions, onUpdate, t, currency, portionsTotal }) {
       <View
         style={[
           portionStyles.headerRow,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
-        <Text style={[portionStyles.headerCell, { flex: 1.2, color: mutedColor, textAlign: isRTL ? 'right' : 'left' }]}>
+        <Text style={[portionStyles.headerCell, { flex: 1.2, color: mutedColor, textAlign: textAlignStart(isRTL) }]}>
           {t('batches.saleForm.partType', 'Part')}
         </Text>
         <Text style={[portionStyles.headerCell, { flex: 1, color: mutedColor, textAlign: 'center' }]}>
@@ -786,7 +787,7 @@ function PortionsTable({ portions, onUpdate, t, currency, portionsTotal }) {
         <Text style={[portionStyles.headerCell, { flex: 1, color: mutedColor, textAlign: 'center' }]}>
           {t('batches.saleForm.rate', 'Rate')}
         </Text>
-        <Text style={[portionStyles.headerCell, { flex: 0.9, color: mutedColor, textAlign: isRTL ? 'left' : 'right' }]}>
+        <Text style={[portionStyles.headerCell, { flex: 0.9, color: mutedColor, textAlign: textAlignEnd(isRTL) }]}>
           {t('batches.saleForm.amount', 'Amt')}
         </Text>
       </View>
@@ -795,7 +796,7 @@ function PortionsTable({ portions, onUpdate, t, currency, portionsTotal }) {
           key={p.partType}
           style={[
             portionStyles.row,
-            { flexDirection: isRTL ? 'row-reverse' : 'row' },
+            { flexDirection: rowDirection(isRTL) },
           ]}
         >
           <Text
@@ -804,7 +805,7 @@ function PortionsTable({ portions, onUpdate, t, currency, portionsTotal }) {
               fontSize: 12.5,
               fontFamily: 'Poppins-Medium',
               color: textColor,
-              textAlign: isRTL ? 'right' : 'left',
+              textAlign: textAlignStart(isRTL),
             }}
             numberOfLines={1}
           >
@@ -834,7 +835,7 @@ function PortionsTable({ portions, onUpdate, t, currency, portionsTotal }) {
               fontSize: 12.5,
               fontFamily: 'Poppins-Medium',
               color: mutedColor,
-              textAlign: isRTL ? 'left' : 'right',
+              textAlign: textAlignEnd(isRTL),
               fontVariant: ['tabular-nums'],
             }}
           >
@@ -870,7 +871,7 @@ function DiscountRowCard({ index, item, onUpdate, onRemove, t }) {
       <View
         style={[
           rowStyles.headerRow,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
         <Text
@@ -888,7 +889,7 @@ function DiscountRowCard({ index, item, onUpdate, onRemove, t }) {
           <Trash2 size={14} color={errorColor} />
         </Pressable>
       </View>
-      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10 }}>
+      <View style={{ flexDirection: rowDirection(isRTL), gap: 10 }}>
         <View style={{ flex: 2 }}>
           <SheetInput
             value={item.description}
@@ -918,7 +919,7 @@ function DiscountEmpty({ t }) {
         fontSize: 12.5,
         fontFamily: 'Poppins-Regular',
         color: mutedColor,
-        textAlign: isRTL ? 'right' : 'left',
+        textAlign: textAlignStart(isRTL),
         fontStyle: 'italic',
       }}
     >

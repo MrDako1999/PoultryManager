@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
+import { rowDirection, trailingAlignment, textAlignStart } from '@/lib/rtl';
 
 const NUMERIC_LOCALE = 'en-US';
 
@@ -45,7 +46,7 @@ export default function FeedItemRow({ item, onClick }) {
         <View
           style={[
             styles.row,
-            { flexDirection: isRTL ? 'row-reverse' : 'row' },
+            { flexDirection: rowDirection(isRTL) },
           ]}
         >
           <View style={styles.textCol}>
@@ -55,7 +56,7 @@ export default function FeedItemRow({ item, onClick }) {
                 fontFamily: 'Poppins-SemiBold',
                 color: textColor,
                 letterSpacing: -0.1,
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
               }}
               numberOfLines={1}
             >
@@ -71,7 +72,7 @@ export default function FeedItemRow({ item, onClick }) {
                   fontSize: 12,
                   fontFamily: 'Poppins-Regular',
                   color: mutedColor,
-                  textAlign: isRTL ? 'right' : 'left',
+                  textAlign: textAlignStart(isRTL),
                 }}
                 numberOfLines={1}
               >
@@ -80,7 +81,7 @@ export default function FeedItemRow({ item, onClick }) {
             ) : null}
           </View>
 
-          <View style={[styles.rightCol, { alignItems: isRTL ? 'flex-start' : 'flex-end' }]}>
+          <View style={[styles.rightCol, { alignItems: trailingAlignment(isRTL) }]}>
             <Text
               style={{
                 fontSize: 14,

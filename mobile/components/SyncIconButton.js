@@ -7,22 +7,14 @@ import {
   RefreshCw, WifiOff, Wifi, AlertCircle, Check, X, Trash2, RotateCcw, DatabaseZap,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
+import { useTranslation } from 'react-i18next';
 import useSyncStore from '@/stores/syncStore';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
 import { deltaSync, processQueue, fullResync } from '@/lib/syncEngine';
 import { getFailedEntries, retryFailed, discardFailed } from '@/lib/mutationQueue';
-
-function formatTimeAgo(dateStr) {
-  if (!dateStr) return 'Never';
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'Just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
+import { formatTimeAgo } from '@/lib/relativeDate';
+import { rowDirection, trailingAlignment, textAlignStart } from '@/lib/rtl';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const POPOVER_WIDTH = Math.min(SCREEN_WIDTH - 32, 320);
@@ -110,7 +102,7 @@ function PopoverActionButton({
       accessibilityLabel={label}
       accessibilityState={{ disabled: isBlocked, busy: loading }}
     >
-      <View style={[popButtonStyles.inner, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+      <View style={[popButtonStyles.inner, { flexDirection: rowDirection(isRTL) }]}>
         {loading ? (
           <ActivityIndicator size="small" color={palette.fg} />
         ) : Icon ? (
@@ -164,6 +156,7 @@ const popButtonStyles = StyleSheet.create({
  * fixed offset, so it visually still lives "right under" the icon.
  */
 export default function SyncIconButton() {
+  const { t } = useTranslation();
   const tokens = useHeroSheetTokens();
   const {
     dark, sectionBg, sectionBorder, textColor, mutedColor, accentColor, errorColor,
@@ -264,33 +257,45 @@ export default function SyncIconButton() {
     ]).start(() => setOpen(false));
   }, [scaleAnim, opacityAnim]);
 
-  // ---- Position math (window-coord based, RTL-aware) ---------------------
-  // Anchor the popover so its trailing edge aligns with the trigger's
-  // trailing edge (LTR: right edges align; RTL: left edges align), with
-  // POPOVER_GAP below the icon. Then clamp horizontally so it never escapes
-  // the screen.
+  // ---- Position math (window-coord based, locale-agnostic) --------------
+  // The popover is positioned by the trigger's *actual* screen position,
+  // not by `isRTL`. Earlier we tried to be clever and align the popover's
+  // "trailing" edge to the trigger's trailing edge based on the locale —
+  // but `headerRight` slots in some screens don't get auto-mirrored, so
+  // the trigger can sit on the right edge in Arabic too. The result was a
+  // popover that drifted to the wrong side of the screen with the arrow
+  // pointing at empty space (see the user's RTL screenshot).
+  //
+  // The robust recipe used by every native popover system: place the
+  // popover so its arrow center sits as close to the trigger center as
+  // possible, then clamp the popover horizontally so it stays on screen.
+  // The arrow is then re-clamped relative to the popover.
   let popLeft = 0;
   let popTop = 0;
   let arrowLeft = 0;
   if (anchor) {
-    const triggerRight = anchor.x + anchor.width;
-    if (isRTL) {
-      // Align popover left edge with trigger left edge
-      popLeft = anchor.x;
-      popLeft = Math.max(POPOVER_EDGE_PADDING, popLeft);
-      popLeft = Math.min(SCREEN_WIDTH - POPOVER_WIDTH - POPOVER_EDGE_PADDING, popLeft);
-      // Arrow nub centered above the trigger icon
-      const triggerCenter = anchor.x + anchor.width / 2;
-      arrowLeft = triggerCenter - popLeft - 6;
+    const triggerCenter = anchor.x + anchor.width / 2;
+    const minLeft = POPOVER_EDGE_PADDING;
+    const maxLeft = SCREEN_WIDTH - POPOVER_WIDTH - POPOVER_EDGE_PADDING;
+
+    // Prefer aligning the popover edge to the trigger edge that is
+    // *farthest* from the screen edge — this keeps the bulk of the
+    // popover toward the screen interior and minimises clamping.
+    const screenMid = SCREEN_WIDTH / 2;
+    if (triggerCenter > screenMid) {
+      // Trigger on the right half — align popover's right edge with the
+      // trigger's right edge so it grows leftwards into screen.
+      popLeft = anchor.x + anchor.width - POPOVER_WIDTH;
     } else {
-      // Align popover right edge with trigger right edge
-      popLeft = triggerRight - POPOVER_WIDTH;
-      popLeft = Math.max(POPOVER_EDGE_PADDING, popLeft);
-      popLeft = Math.min(SCREEN_WIDTH - POPOVER_WIDTH - POPOVER_EDGE_PADDING, popLeft);
-      const triggerCenter = anchor.x + anchor.width / 2;
-      arrowLeft = triggerCenter - popLeft - 6;
+      // Trigger on the left half — align left edges so it grows rightwards.
+      popLeft = anchor.x;
     }
-    arrowLeft = Math.max(12, Math.min(POPOVER_WIDTH - 24, arrowLeft));
+    popLeft = Math.max(minLeft, Math.min(maxLeft, popLeft));
+
+    // Arrow nub points back at the trigger center, but never closer than
+    // 12pt to either popover corner so the rounded corner doesn't clip
+    // the diamond.
+    arrowLeft = Math.max(12, Math.min(POPOVER_WIDTH - 24, triggerCenter - popLeft - 6));
     popTop = anchor.y + anchor.height + POPOVER_GAP;
   }
 
@@ -300,23 +305,23 @@ export default function SyncIconButton() {
   let statusColor;
   if (!isOnline) {
     statusIcon = <WifiOff size={16} color={dangerColor} />;
-    statusLabel = 'Offline';
+    statusLabel = t('sync.offline', 'Offline');
     statusColor = dangerColor;
   } else if (isSyncing || syncing) {
     statusIcon = <ActivityIndicator size={14} color={accentColor} />;
-    statusLabel = 'Syncing\u2026';
+    statusLabel = t('sync.syncing', 'Syncing\u2026');
     statusColor = accentColor;
   } else if (failedCount > 0) {
     statusIcon = <AlertCircle size={16} color={dangerColor} />;
-    statusLabel = `${failedCount} Failed`;
+    statusLabel = t('sync.failedCount', '{{n}} Failed', { n: failedCount });
     statusColor = dangerColor;
   } else if (pendingCount > 0) {
     statusIcon = <RefreshCw size={16} color={amberColor} />;
-    statusLabel = `${pendingCount} Pending`;
+    statusLabel = t('sync.pendingCount', '{{n}} Pending', { n: pendingCount });
     statusColor = amberColor;
   } else {
     statusIcon = <Check size={16} color={accentColor} />;
-    statusLabel = 'All Synced';
+    statusLabel = t('sync.allSynced', 'All Synced');
     statusColor = accentColor;
   }
 
@@ -339,15 +344,24 @@ export default function SyncIconButton() {
     hide();
     setTimeout(() => {
       Alert.alert(
-        'Full Resync',
+        t('sync.fullResyncTitle', 'Full Resync'),
         pendingCount > 0
-          ? `This will clear all local data and re-download from the server.\n\nYou have ${pendingCount} unsynced change${
-              pendingCount !== 1 ? 's' : ''
-            } that will be lost.`
-          : 'This will clear all local data and re-download everything from the server.',
+          ? t(
+              'sync.fullResyncBodyPending',
+              'This will clear all local data and re-download from the server.\n\nYou have {{count}} unsynced changes that will be lost.',
+              { count: pendingCount }
+            )
+          : t(
+              'sync.fullResyncBodyClean',
+              'This will clear all local data and re-download everything from the server.'
+            ),
         [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Resync', style: 'destructive', onPress: () => fullResync() },
+          { text: t('common.cancel', 'Cancel'), style: 'cancel' },
+          {
+            text: t('sync.resync', 'Resync'),
+            style: 'destructive',
+            onPress: () => fullResync(),
+          },
         ]
       );
     }, 200);
@@ -368,12 +382,16 @@ export default function SyncIconButton() {
   const handleDiscard = (id, entityType, action) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     Alert.alert(
-      'Discard Change',
-      `Discard this failed ${action} on ${entityType}? This cannot be undone.`,
+      t('sync.discardChangeTitle', 'Discard Change'),
+      t(
+        'sync.discardChangeBody',
+        'Discard this failed {{action}} on {{entity}}? This cannot be undone.',
+        { action, entity: entityType }
+      ),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel', 'Cancel'), style: 'cancel' },
         {
-          text: 'Discard',
+          text: t('sync.discard', 'Discard'),
           style: 'destructive',
           onPress: async () => {
             await discardFailed(id);
@@ -511,7 +529,7 @@ export default function SyncIconButton() {
               {/* Header */}
               <View
                 style={{
-                  flexDirection: isRTL ? 'row-reverse' : 'row',
+                  flexDirection: rowDirection(isRTL),
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   paddingHorizontal: 16,
@@ -526,7 +544,7 @@ export default function SyncIconButton() {
                     color: textColor,
                   }}
                 >
-                  Sync Status
+                  {t('sync.title', 'Sync Status')}
                 </Text>
                 <Pressable onPress={hide} hitSlop={12}>
                   <X size={18} color={mutedColor} strokeWidth={2.2} />
@@ -551,7 +569,7 @@ export default function SyncIconButton() {
                 >
                   <View
                     style={{
-                      flexDirection: isRTL ? 'row-reverse' : 'row',
+                      flexDirection: rowDirection(isRTL),
                       alignItems: 'center',
                       gap: 8,
                       marginBottom: 8,
@@ -571,7 +589,7 @@ export default function SyncIconButton() {
 
                   <View
                     style={{
-                      flexDirection: isRTL ? 'row-reverse' : 'row',
+                      flexDirection: rowDirection(isRTL),
                       justifyContent: 'space-between',
                     }}
                   >
@@ -583,11 +601,11 @@ export default function SyncIconButton() {
                           color: mutedColor,
                         }}
                       >
-                        Connection
+                        {t('sync.connection', 'Connection')}
                       </Text>
                       <View
                         style={{
-                          flexDirection: isRTL ? 'row-reverse' : 'row',
+                          flexDirection: rowDirection(isRTL),
                           alignItems: 'center',
                           gap: 4,
                           marginTop: 2,
@@ -605,12 +623,14 @@ export default function SyncIconButton() {
                             color: textColor,
                           }}
                         >
-                          {isOnline ? 'Connected' : 'No connection'}
+                          {isOnline
+                            ? t('sync.connected', 'Connected')
+                            : t('sync.noConnection', 'No connection')}
                         </Text>
                       </View>
                     </View>
 
-                    <View style={{ alignItems: isRTL ? 'flex-start' : 'flex-end' }}>
+                    <View style={{ alignItems: trailingAlignment(isRTL) }}>
                       <Text
                         style={{
                           fontSize: 10,
@@ -618,7 +638,7 @@ export default function SyncIconButton() {
                           color: mutedColor,
                         }}
                       >
-                        Last synced
+                        {t('sync.lastSynced', 'Last synced')}
                       </Text>
                       <Text
                         style={{
@@ -628,7 +648,7 @@ export default function SyncIconButton() {
                           marginTop: 2,
                         }}
                       >
-                        {formatTimeAgo(lastSyncAt)}
+                        {formatTimeAgo(lastSyncAt, t)}
                       </Text>
                     </View>
                   </View>
@@ -640,7 +660,7 @@ export default function SyncIconButton() {
                         paddingTop: 10,
                         borderTopWidth: 1,
                         borderTopColor: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
-                        flexDirection: isRTL ? 'row-reverse' : 'row',
+                        flexDirection: rowDirection(isRTL),
                         alignItems: 'center',
                         gap: 5,
                       }}
@@ -653,7 +673,9 @@ export default function SyncIconButton() {
                           color: amberColor,
                         }}
                       >
-                        {pendingCount} pending change{pendingCount !== 1 ? 's' : ''}
+                        {t('sync.pendingChanges', '{{count}} pending changes', {
+                          count: pendingCount,
+                        })}
                       </Text>
                     </View>
                   ) : null}
@@ -665,7 +687,7 @@ export default function SyncIconButton() {
                     variables that don't reliably swap to dark mode on RN. */}
                 <View
                   style={{
-                    flexDirection: isRTL ? 'row-reverse' : 'row',
+                    flexDirection: rowDirection(isRTL),
                     gap: 8,
                     marginBottom: 12,
                   }}
@@ -674,7 +696,7 @@ export default function SyncIconButton() {
                     <PopoverActionButton
                       variant="primary"
                       icon={RefreshCw}
-                      label="Sync Now"
+                      label={t('sync.syncNow', 'Sync Now')}
                       onPress={handleSyncNow}
                       disabled={!isOnline || isSyncing || syncing}
                       loading={syncing}
@@ -686,7 +708,7 @@ export default function SyncIconButton() {
                     <PopoverActionButton
                       variant="secondary"
                       icon={DatabaseZap}
-                      label="Full Resync"
+                      label={t('sync.fullResync', 'Full Resync')}
                       onPress={handleFullResync}
                       isRTL={isRTL}
                       tokens={tokens}
@@ -699,7 +721,7 @@ export default function SyncIconButton() {
                   <View style={{ marginBottom: 12 }}>
                     <View
                       style={{
-                        flexDirection: isRTL ? 'row-reverse' : 'row',
+                        flexDirection: rowDirection(isRTL),
                         alignItems: 'center',
                         gap: 5,
                         marginBottom: 8,
@@ -713,7 +735,7 @@ export default function SyncIconButton() {
                           color: dangerColor,
                         }}
                       >
-                        Failed ({failedEntries.length})
+                        {t('sync.failedHeader', 'Failed ({{n}})', { n: failedEntries.length })}
                       </Text>
                     </View>
                     {failedEntries.map((entry) => (
@@ -733,7 +755,7 @@ export default function SyncIconButton() {
                             fontSize: 12,
                             fontFamily: 'Poppins-SemiBold',
                             color: textColor,
-                            textAlign: isRTL ? 'right' : 'left',
+                            textAlign: textAlignStart(isRTL),
                           }}
                           numberOfLines={1}
                         >
@@ -746,7 +768,7 @@ export default function SyncIconButton() {
                               fontFamily: 'Poppins-Regular',
                               color: mutedColor,
                               marginTop: 2,
-                              textAlign: isRTL ? 'right' : 'left',
+                              textAlign: textAlignStart(isRTL),
                             }}
                             numberOfLines={2}
                           >
@@ -755,7 +777,7 @@ export default function SyncIconButton() {
                         ) : null}
                         <View
                           style={{
-                            flexDirection: isRTL ? 'row-reverse' : 'row',
+                            flexDirection: rowDirection(isRTL),
                             gap: 14,
                             marginTop: 6,
                           }}
@@ -764,7 +786,7 @@ export default function SyncIconButton() {
                             onPress={() => handleRetry(entry.id)}
                             disabled={retryingId === entry.id}
                             style={{
-                              flexDirection: isRTL ? 'row-reverse' : 'row',
+                              flexDirection: rowDirection(isRTL),
                               alignItems: 'center',
                               gap: 3,
                               opacity: retryingId === entry.id ? 0.5 : 1,
@@ -782,13 +804,13 @@ export default function SyncIconButton() {
                                 color: accentColor,
                               }}
                             >
-                              Retry
+                              {t('sync.retry', 'Retry')}
                             </Text>
                           </Pressable>
                           <Pressable
                             onPress={() => handleDiscard(entry.id, entry.entityType, entry.action)}
                             style={{
-                              flexDirection: isRTL ? 'row-reverse' : 'row',
+                              flexDirection: rowDirection(isRTL),
                               alignItems: 'center',
                               gap: 3,
                             }}
@@ -801,7 +823,7 @@ export default function SyncIconButton() {
                                 color: dangerColor,
                               }}
                             >
-                              Discard
+                              {t('sync.discard', 'Discard')}
                             </Text>
                           </Pressable>
                         </View>

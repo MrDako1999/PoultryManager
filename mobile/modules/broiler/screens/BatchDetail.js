@@ -6,11 +6,13 @@ import { useTranslation } from 'react-i18next';
 import PagerView from 'react-native-pager-view';
 import {
   Layers, Egg, DollarSign, Wheat, ShoppingCart, ClipboardList,
+  Weight, Thermometer,
 } from 'lucide-react-native';
 import useLocalRecord from '@/hooks/useLocalRecord';
 import useLocalQuery from '@/hooks/useLocalQuery';
 import useCapabilities from '@/hooks/useCapabilities';
 import useOfflineMutation from '@/hooks/useOfflineMutation';
+import { useIsRTL } from '@/stores/localeStore';
 import { useToast } from '@/components/ui/Toast';
 import EmptyState from '@/components/ui/EmptyState';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -31,15 +33,18 @@ import BatchSourcesTab from './batchTabs/BatchSourcesTab';
 import BatchFeedOrdersTab from './batchTabs/BatchFeedOrdersTab';
 import BatchExpensesTab from './batchTabs/BatchExpensesTab';
 import BatchSalesTab from './batchTabs/BatchSalesTab';
+import BatchLogTypeTab from './batchTabs/BatchLogTypeTab';
 
 export default function BatchDetailScreen() {
   const { id, tab: deepTab } = useLocalSearchParams();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const { can } = useCapabilities();
+  const { can, role } = useCapabilities();
+  const isGroundStaff = role === 'ground_staff';
   const { toast } = useToast();
   const { remove } = useOfflineMutation('batches');
   const { screenBg } = useHeroSheetTokens();
+  const isRTL = useIsRTL();
 
   const pagerRef = useRef(null);
   const pagerProgress = useRef(new Animated.Value(0)).current;
@@ -68,18 +73,43 @@ export default function BatchDetailScreen() {
   const [feedOrderSheet, setFeedOrderSheet] = useState(false);
   const [expenseSheet, setExpenseSheet] = useState(false);
   const [saleSheet, setSaleSheet] = useState(false);
-  const [dailyLogSheet, setDailyLogSheet] = useState(false);
+  // The DailyLogSheet now needs to remember which logType to default
+  // to so the Performance-tab quickAdd menu can route Daily/Sample/
+  // Environment into the same sheet without callers having to manage
+  // three booleans. `null` = closed.
+  const [dailyLogSheet, setDailyLogSheet] = useState(null);
+  const openDailyLog = (logType = 'DAILY') => setDailyLogSheet({ logType });
+  const closeDailyLog = () => setDailyLogSheet(null);
 
+  // Tab loadouts intentionally diverge by role:
+  //
+  // - ground_staff lands on a focused operational set —
+  //   Performance + day-grouped log views per type. They never need
+  //   Sources / Feed Orders / Expenses / Sales because they don't
+  //   manage the commercial side of the batch.
+  //
+  // - Everyone else keeps the original ops shell.
+  //
+  // Capabilities still apply on top, so a manager who somehow lacks
+  // `dailyLog:read` would still have those tabs hidden via the filter
+  // below.
   const allTabs = useMemo(
-    () => [
-      { key: 'overview', label: t('batches.overviewTab', 'Overview'), capability: 'batch:read' },
-      { key: 'performance', label: t('batches.performanceTab', 'Performance'), capability: 'dailyLog:read' },
-      { key: 'sources', label: t('batches.sourcesTab', 'Sources'), capability: 'source:read' },
-      { key: 'feedOrders', label: t('batches.feedOrdersTab', 'Feed Orders'), capability: 'feedOrder:read' },
-      { key: 'expenses', label: t('batches.expensesTab', 'Expenses'), capability: 'expense:read' },
-      { key: 'sales', label: t('batches.salesTab', 'Sales'), capability: 'saleOrder:read' },
-    ],
-    [t]
+    () => isGroundStaff
+      ? [
+          { key: 'performance', label: t('batches.performanceTab', 'Performance'), capability: 'dailyLog:read' },
+          { key: 'dailyLogs', label: t('batches.dailyLogsTab', 'Daily Logs'), capability: 'dailyLog:read' },
+          { key: 'samples', label: t('batches.samplesTab', 'Samples'), capability: 'dailyLog:read' },
+          { key: 'environment', label: t('batches.environmentTab', 'Environment'), capability: 'dailyLog:read' },
+        ]
+      : [
+          { key: 'overview', label: t('batches.overviewTab', 'Overview'), capability: 'batch:read' },
+          { key: 'performance', label: t('batches.performanceTab', 'Performance'), capability: 'dailyLog:read' },
+          { key: 'sources', label: t('batches.sourcesTab', 'Sources'), capability: 'source:read' },
+          { key: 'feedOrders', label: t('batches.feedOrdersTab', 'Feed Orders'), capability: 'feedOrder:read' },
+          { key: 'expenses', label: t('batches.expensesTab', 'Expenses'), capability: 'expense:read' },
+          { key: 'sales', label: t('batches.salesTab', 'Sales'), capability: 'saleOrder:read' },
+        ],
+    [t, isGroundStaff]
   );
 
   const visibleTabs = useMemo(
@@ -176,7 +206,13 @@ export default function BatchDetailScreen() {
   const canDelete = can('batch:delete');
   const initialPage = Math.max(0, visibleTabs.findIndex((t) => t.key === initialKey));
 
-  const quickAddItems = [
+  // Once the cycle is closed out, no one can add fresh entries from
+  // this screen — historical data stays viewable but the create FABs
+  // and the per-day "tap to log" pending slots are suppressed. The
+  // DailyLogSheet itself also enforces this if reached via deep link.
+  const isCompleted = batch?.status === 'COMPLETE';
+
+  const overviewQuickAddItems = isCompleted ? [] : [
     can('source:create') && {
       key: 'source',
       icon: Egg,
@@ -205,21 +241,61 @@ export default function BatchDetailScreen() {
       key: 'dailyLog',
       icon: ClipboardList,
       label: t('batches.performanceTab', 'Performance'),
-      onPress: () => setDailyLogSheet(true),
+      onPress: () => openDailyLog('DAILY'),
     },
   ].filter(Boolean);
 
-  // On non-overview tabs the FAB becomes a single-action button that opens
-  // the create sheet for the currently visible content.
-  const tabDirectAction = {
+  // The Performance tab's FAB is a 3-option menu (Daily / Sample /
+  // Environment) so workers can pick the kind of entry without first
+  // navigating to a sub-tab. Each item is gated by the matching
+  // create cap — `dailyLog:create` covers DAILY, scoped variants
+  // cover the other two for roles like ground_staff. We accept the
+  // unscoped cap as a superset, mirroring how the sub-tab FAB is
+  // wired below.
+  const performanceQuickAddItems = isCompleted ? [] : [
+    can('dailyLog:create') && {
+      key: 'dailyLog',
+      icon: ClipboardList,
+      label: t('batches.dailyLogsTab', 'Daily Logs'),
+      onPress: () => openDailyLog('DAILY'),
+    },
+    (can('dailyLog:create:WEIGHT') || can('dailyLog:create')) && {
+      key: 'sample',
+      icon: Weight,
+      label: t('batches.samplesTab', 'Samples'),
+      onPress: () => openDailyLog('WEIGHT'),
+    },
+    (can('dailyLog:create:ENVIRONMENT') || can('dailyLog:create')) && {
+      key: 'environment',
+      icon: Thermometer,
+      label: t('batches.environmentTab', 'Environment'),
+      onPress: () => openDailyLog('ENVIRONMENT'),
+    },
+  ].filter(Boolean);
+
+  // Direct (single-shot) FAB for the leaf log-type tabs — keeps the
+  // tap distance to "one" when the worker already navigated to a
+  // specific kind. Suppressed for completed batches.
+  const tabDirectAction = isCompleted ? null : {
     sources: can('source:create') ? () => setSourceSheet(true) : null,
     feedOrders: can('feedOrder:create') ? () => setFeedOrderSheet(true) : null,
     expenses: can('expense:create') ? () => setExpenseSheet(true) : null,
     sales: can('saleOrder:create') ? () => setSaleSheet(true) : null,
-    performance: can('dailyLog:create') ? () => setDailyLogSheet(true) : null,
+    dailyLogs: can('dailyLog:create') ? () => openDailyLog('DAILY') : null,
+    samples: (can('dailyLog:create:WEIGHT') || can('dailyLog:create'))
+      ? () => openDailyLog('WEIGHT')
+      : null,
+    environment: (can('dailyLog:create:ENVIRONMENT') || can('dailyLog:create'))
+      ? () => openDailyLog('ENVIRONMENT')
+      : null,
   }[activeKey] || null;
-  const showDirectFab = activeKey !== 'overview' && Boolean(tabDirectAction);
-  const showMenuFab = activeKey === 'overview' && quickAddItems.length > 0;
+
+  // Pick which FAB shows (if any) for the active tab.
+  const showOverviewMenuFab = activeKey === 'overview' && overviewQuickAddItems.length > 0;
+  const showPerformanceMenuFab = activeKey === 'performance' && performanceQuickAddItems.length > 0;
+  const showDirectFab = !!tabDirectAction
+    && activeKey !== 'overview'
+    && activeKey !== 'performance';
 
   return (
     <View style={{ flex: 1, backgroundColor: screenBg }}>
@@ -242,6 +318,20 @@ export default function BatchDetailScreen() {
         ref={pagerRef}
         style={{ flex: 1 }}
         initialPage={initialPage}
+        // PagerView does NOT auto-mirror its page order based on
+        // I18nManager — without `layoutDirection="rtl"` the pages stay
+        // laid out left-to-right (page 0 on the left) even though the
+        // tab strip above is reversed. That's what makes the tab
+        // indicator and the visible page drift apart as the user swipes
+        // in Arabic, and why the swipe gesture itself feels backwards
+        // (swipe left to go "forward" but the indicator slides to the
+        // tab visually on the right of the active one).
+        //
+        // Setting `layoutDirection` to match the locale puts page 0 on
+        // the right in RTL, so swipe-left → next-page works naturally
+        // and the indicator's source-order position values land on the
+        // correct visual tab.
+        layoutDirection={isRTL ? 'rtl' : 'ltr'}
         onPageScroll={handlePageScroll}
         onPageSelected={(e) => {
           handlePageSelected(e);
@@ -257,6 +347,15 @@ export default function BatchDetailScreen() {
             )}
             {tab.key === 'performance' && (
               <BatchPerformanceTab batch={batch} batchId={id} />
+            )}
+            {tab.key === 'dailyLogs' && (
+              <BatchLogTypeTab batch={batch} batchId={id} logType="DAILY" />
+            )}
+            {tab.key === 'samples' && (
+              <BatchLogTypeTab batch={batch} batchId={id} logType="WEIGHT" />
+            )}
+            {tab.key === 'environment' && (
+              <BatchLogTypeTab batch={batch} batchId={id} logType="ENVIRONMENT" />
             )}
             {tab.key === 'sources' && (
               <BatchSourcesTab batchId={id} />
@@ -274,8 +373,11 @@ export default function BatchDetailScreen() {
         ))}
       </PagerView>
 
-      {showMenuFab && (
-        <QuickAddFAB items={quickAddItems} bottomInset={insets.bottom} />
+      {showOverviewMenuFab && (
+        <QuickAddFAB items={overviewQuickAddItems} bottomInset={insets.bottom} />
+      )}
+      {showPerformanceMenuFab && (
+        <QuickAddFAB items={performanceQuickAddItems} bottomInset={insets.bottom} />
       )}
       {showDirectFab && (
         <QuickAddFAB
@@ -318,11 +420,12 @@ export default function BatchDetailScreen() {
         editData={null}
       />
       <DailyLogSheet
-        open={dailyLogSheet}
-        onClose={() => setDailyLogSheet(false)}
+        open={!!dailyLogSheet}
+        onClose={closeDailyLog}
         batchId={id}
-        batch={batch}
+        houses={batch?.houses || []}
         editData={null}
+        defaultLogType={dailyLogSheet?.logType || 'DAILY'}
       />
 
       <ConfirmDialog

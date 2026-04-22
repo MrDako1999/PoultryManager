@@ -10,6 +10,7 @@ import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
 import { deltaSync } from '@/lib/syncEngine';
 import { SkeletonBatchOverview } from '@/components/skeletons';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 import BatchKpiCard, {
   profitToneColor, mortalityToneColor,
 } from '@/modules/broiler/components/BatchKpiCard';
@@ -292,9 +293,8 @@ export default function BatchOverviewTab({ batch, batchId, onJumpTab }) {
                 {houses
                   .map((entry, i) => {
                     const houseId = typeof entry.house === 'object' ? entry.house?._id : entry.house;
-                    const name = typeof entry.house === 'object'
-                      ? entry.house?.name
-                      : `House ${i + 1}`;
+                    const name = (typeof entry.house === 'object' ? entry.house?.name : null)
+                      || t('farms.houseN', 'House {{n}}', { n: i + 1 });
                     const initial = entry.quantity || 0;
                     const houseDeaths = deathsByHouse[houseId] || 0;
                     const housePct = initial > 0 ? (houseDeaths / initial) * 100 : 0;
@@ -307,7 +307,7 @@ export default function BatchOverviewTab({ batch, batchId, onJumpTab }) {
                       style={[
                         styles.houseRow,
                         {
-                          flexDirection: isRTL ? 'row-reverse' : 'row',
+                          flexDirection: rowDirection(isRTL),
                           backgroundColor: dark
                             ? 'rgba(255,255,255,0.04)'
                             : 'hsl(148, 18%, 96%)',
@@ -321,7 +321,7 @@ export default function BatchOverviewTab({ batch, batchId, onJumpTab }) {
                           fontSize: 12,
                           fontFamily: 'Poppins-Medium',
                           color: textColor,
-                          textAlign: isRTL ? 'right' : 'left',
+                          textAlign: textAlignStart(isRTL),
                         }}
                         numberOfLines={1}
                       >
@@ -399,7 +399,7 @@ export default function BatchOverviewTab({ batch, batchId, onJumpTab }) {
                       <View
                         style={[
                           styles.barLabelRow,
-                          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                          { flexDirection: rowDirection(isRTL) },
                         ]}
                       >
                         <Text
@@ -408,7 +408,7 @@ export default function BatchOverviewTab({ batch, batchId, onJumpTab }) {
                             fontSize: 12,
                             fontFamily: 'Poppins-Medium',
                             color: textColor,
-                            textAlign: isRTL ? 'right' : 'left',
+                            textAlign: textAlignStart(isRTL),
                           }}
                         >
                           {t(`feed.feedTypes.${type}`, type)}
@@ -480,7 +480,7 @@ export default function BatchOverviewTab({ batch, batchId, onJumpTab }) {
                     <View
                       style={[
                         styles.barLabelRow,
-                        { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                        { flexDirection: rowDirection(isRTL) },
                       ]}
                     >
                       <Text
@@ -489,7 +489,7 @@ export default function BatchOverviewTab({ batch, batchId, onJumpTab }) {
                           fontSize: 12,
                           fontFamily: 'Poppins-Medium',
                           color: textColor,
-                          textAlign: isRTL ? 'right' : 'left',
+                          textAlign: textAlignStart(isRTL),
                         }}
                         numberOfLines={1}
                       >

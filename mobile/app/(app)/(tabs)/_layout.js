@@ -1,15 +1,16 @@
 import { Tabs } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { LayoutDashboard, Egg, FolderOpen, Calculator, Settings } from 'lucide-react-native';
+import { LayoutDashboard, Egg, FolderOpen, Calculator, Settings, ListChecks } from 'lucide-react-native';
 import useThemeStore from '@/stores/themeStore';
 import useCapabilities from '@/hooks/useCapabilities';
 import useModuleStore from '@/stores/moduleStore';
 import { MODULES } from '@/modules/registry';
+import { resolveRoleTasks } from '@/modules/_shared/RoleDashboardRouter';
 
 export default function TabsLayout() {
   const { t } = useTranslation();
   const { resolvedTheme } = useThemeStore();
-  const { can } = useCapabilities();
+  const { can, role } = useCapabilities();
   const activeModuleId = useModuleStore((s) => s.activeModule);
   const activeModule = activeModuleId ? MODULES[activeModuleId] : null;
 
@@ -34,6 +35,20 @@ export default function TabsLayout() {
 
   const accountingVisible = can('expense:read') || can('saleOrder:read');
 
+  // Ground-staff specialised shell: the goal is the four-tab
+  // operational set Today / Tasks / Batches / Settings. We hide the
+  // Directory + Accounting tabs (already gated on capability above for
+  // accounting; directory was always visible) so the worker isn't
+  // distracted by surfaces that aren't theirs.
+  //
+  // Tasks is mounted only when the active module declares a
+  // `roleTasks[role]` screen — keeps non-broiler workers from landing
+  // on an empty tab.
+  const isGroundStaff = role === 'ground_staff';
+  const tasksScreenAvailable = !!resolveRoleTasks(activeModuleId, role);
+  const tasksTabVisible = isGroundStaff && tasksScreenAvailable;
+  const directoryHrefVisible = !isGroundStaff;
+
   return (
     <Tabs
       screenOptions={{
@@ -53,8 +68,16 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="dashboard"
         options={{
-          title: t('nav.dashboard'),
+          title: isGroundStaff ? t('nav.today', 'Today') : t('nav.dashboard'),
           tabBarIcon: ({ color, size }) => <LayoutDashboard size={size - 2} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="tasks"
+        options={{
+          title: t('nav.tasks', 'Tasks'),
+          tabBarIcon: ({ color, size }) => <ListChecks size={size - 2} color={color} />,
+          href: tasksTabVisible ? undefined : null,
         }}
       />
       <Tabs.Screen
@@ -70,6 +93,7 @@ export default function TabsLayout() {
         options={{
           title: t('nav.directory', 'Directory'),
           tabBarIcon: ({ color, size }) => <FolderOpen size={size - 2} color={color} />,
+          href: directoryHrefVisible ? undefined : null,
         }}
       />
       <Tabs.Screen
@@ -77,7 +101,7 @@ export default function TabsLayout() {
         options={{
           title: t('nav.accounting', 'Accounting'),
           tabBarIcon: ({ color, size }) => <Calculator size={size - 2} color={color} />,
-          href: accountingVisible ? undefined : null,
+          href: accountingVisible && !isGroundStaff ? undefined : null,
         }}
       />
       <Tabs.Screen

@@ -7,6 +7,7 @@ import useBroilerQuickStats from './dashboard/broilerQuickStats';
 import BroilerSalesView from './accounting/BroilerSalesView';
 import BroilerExpensesView from './accounting/BroilerExpensesView';
 import WorkerHome from './screens/WorkerHome';
+import WorkerTasks from './screens/WorkerTasks';
 
 const broilerModule = {
   id: 'broiler',
@@ -90,6 +91,13 @@ const broilerModule = {
 
   roleDashboards: {
     ground_staff: WorkerHome,
+  },
+
+  // Per-role Tasks tab. Currently only ground_staff gets one; the
+  // mobile tab layout uses this to decide whether to mount the Tasks
+  // tab at all.
+  roleTasks: {
+    ground_staff: WorkerTasks,
   },
 
   accountingViews: [

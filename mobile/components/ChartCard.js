@@ -3,6 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
 import SheetSection from '@/components/SheetSection';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 /**
  * ChartCard — design-language wrapper around chart bodies.
@@ -45,7 +46,7 @@ export default function ChartCard({
       <View
         style={[
           styles.headerRow,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
         <View style={styles.headerTextCol}>
@@ -56,7 +57,7 @@ export default function ChartCard({
                 fontFamily: 'Poppins-SemiBold',
                 color: textColor,
                 letterSpacing: -0.1,
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
               }}
               numberOfLines={1}
             >
@@ -70,7 +71,7 @@ export default function ChartCard({
                 fontFamily: 'Poppins-Regular',
                 color: mutedColor,
                 marginTop: 2,
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
               }}
               numberOfLines={1}
             >
@@ -93,7 +94,7 @@ export default function ChartCard({
         <View
           style={[
             styles.row2,
-            { flexDirection: isRTL ? 'row-reverse' : 'row' },
+            { flexDirection: rowDirection(isRTL) },
           ]}
         >
           <MiniSegmented
@@ -129,7 +130,7 @@ function MiniSegmented({ options, value, onChange, tokens, isRTL }) {
       style={[
         miniStyles.shell,
         {
-          flexDirection: isRTL ? 'row-reverse' : 'row',
+          flexDirection: rowDirection(isRTL),
           backgroundColor: dark ? 'rgba(255,255,255,0.04)' : 'hsl(148, 18%, 94%)',
         },
       ]}
@@ -152,7 +153,7 @@ function MiniSegmented({ options, value, onChange, tokens, isRTL }) {
             style={[
               miniStyles.pill,
               {
-                flexDirection: isRTL ? 'row-reverse' : 'row',
+                flexDirection: rowDirection(isRTL),
                 backgroundColor: active ? sectionBg : 'transparent',
                 ...(active && !dark
                   ? {

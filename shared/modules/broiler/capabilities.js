@@ -26,8 +26,10 @@ export const broilerCapabilities = {
     'dailyLog:create:ENVIRONMENT', 'dailyLog:update:own',
   ],
   ground_staff: [
-    'batch:read', 'house:read:assigned', 'dailyLog:create',
-    'dailyLog:read:own', 'dailyLog:update:own', 'farm:read',
+    'batch:read', 'house:read:assigned', 'farm:read',
+    'dailyLog:create',
+    'dailyLog:create:WEIGHT', 'dailyLog:create:ENVIRONMENT',
+    'dailyLog:read:own', 'dailyLog:update:own',
   ],
   viewer: [
     'batch:read', 'source:read', 'feedOrder:read', 'saleOrder:read',

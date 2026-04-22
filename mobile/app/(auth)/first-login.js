@@ -12,6 +12,7 @@ import { useToast } from '@/components/ui/Toast';
 import api from '@/lib/api';
 import useAuthStore from '@/stores/authStore';
 import { useIsRTL } from '@/stores/localeStore';
+import { rowDirection } from '@/lib/rtl';
 import HeroSheetScreen, { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import SheetSection from '@/components/SheetSection';
 import { SheetPasswordInput } from '@/components/SheetInput';
@@ -35,7 +36,7 @@ export default function FirstLoginScreen() {
   const [submitting, setSubmitting] = useState(false);
   const isRTL = useIsRTL();
   const ForwardArrow = isRTL ? ArrowLeft : ArrowRight;
-  const row = isRTL ? 'row-reverse' : 'row';
+  const row = rowDirection(isRTL);
   const { mutedColor } = useHeroSheetTokens();
 
   const { control, handleSubmit, formState: { errors } } = useForm({

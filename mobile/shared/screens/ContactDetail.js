@@ -20,6 +20,7 @@ import { useIsRTL } from '@/stores/localeStore';
 import { SkeletonDetailPage } from '@/components/skeletons';
 import WhatsappIcon from '@/components/icons/WhatsappIcon';
 import ContactSheet from '@/shared/sheets/ContactSheet';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 // WhatsApp's deep-link API only accepts digits — strip everything else
 // (spaces, parentheses, dashes, leading "+") so wa.me/<digits> resolves.
@@ -133,7 +134,7 @@ export default function ContactScreen() {
   };
 
   const headerRight = (canEdit || canDelete) ? (
-    <View style={[heroStyles.actionsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+    <View style={[heroStyles.actionsRow, { flexDirection: rowDirection(isRTL) }]}>
       {canEdit ? (
         <Pressable
           onPress={openEdit}
@@ -248,7 +249,7 @@ export default function ContactScreen() {
                 fontFamily: 'Poppins-Regular',
                 color: tokens.textColor,
                 lineHeight: 20,
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
                 writingDirection: isRTL ? 'rtl' : 'ltr',
               }}
             >
@@ -280,7 +281,7 @@ export default function ContactScreen() {
               {
                 marginHorizontal: 16,
                 gap: 10,
-                flexDirection: isRTL ? 'row-reverse' : 'row',
+                flexDirection: rowDirection(isRTL),
               },
             ]}
           >
@@ -345,7 +346,7 @@ function KvLineRow({ tokens, isRTL, icon: Icon, value, actions }) {
     <View
       style={[
         kvLineStyles.row,
-        { flexDirection: isRTL ? 'row-reverse' : 'row' },
+        { flexDirection: rowDirection(isRTL) },
       ]}
     >
       <View
@@ -362,7 +363,7 @@ function KvLineRow({ tokens, isRTL, icon: Icon, value, actions }) {
           fontSize: 14,
           fontFamily: 'Poppins-Regular',
           color: textColor,
-          textAlign: isRTL ? 'right' : 'left',
+          textAlign: textAlignStart(isRTL),
         }}
       >
         {value}
@@ -371,7 +372,7 @@ function KvLineRow({ tokens, isRTL, icon: Icon, value, actions }) {
         <View
           style={[
             kvLineStyles.actions,
-            { flexDirection: isRTL ? 'row-reverse' : 'row' },
+            { flexDirection: rowDirection(isRTL) },
           ]}
         >
           {actions}
@@ -442,7 +443,7 @@ function LinkedRow({ tokens, isRTL, icon: Icon = Building2, label, sublabel, onP
         },
       ]}
     >
-      <View style={[linkedRowStyles.row, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+      <View style={[linkedRowStyles.row, { flexDirection: rowDirection(isRTL) }]}>
         <View
           style={[
             linkedRowStyles.iconTile,
@@ -457,7 +458,7 @@ function LinkedRow({ tokens, isRTL, icon: Icon = Building2, label, sublabel, onP
               fontSize: 15,
               fontFamily: 'Poppins-SemiBold',
               color: textColor,
-              textAlign: isRTL ? 'right' : 'left',
+              textAlign: textAlignStart(isRTL),
             }}
             numberOfLines={1}
           >
@@ -470,7 +471,7 @@ function LinkedRow({ tokens, isRTL, icon: Icon = Building2, label, sublabel, onP
                 fontFamily: 'Poppins-Regular',
                 color: mutedColor,
                 marginTop: 2,
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
               }}
               numberOfLines={1}
             >
@@ -528,7 +529,7 @@ function CtaButton({ variant, icon: Icon, label, onPress, isRTL, tokens }) {
       <View
         style={[
           ctaButtonStyles.inner,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
         <Icon size={18} color={fg} strokeWidth={2.4} />

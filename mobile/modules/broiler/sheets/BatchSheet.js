@@ -18,6 +18,7 @@ import { useIsRTL } from '@/stores/localeStore';
 import useLocalQuery from '@/hooks/useLocalQuery';
 import useOfflineMutation from '@/hooks/useOfflineMutation';
 import { useToast } from '@/components/ui/Toast';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 const BATCH_STATUSES = ['NEW', 'IN_PROGRESS', 'COMPLETE', 'DELAYED', 'OTHER'];
 
@@ -243,7 +244,7 @@ function HouseQtyRow({ name, quantity, onChange, t }) {
       style={[
         rowStyles.row,
         {
-          flexDirection: isRTL ? 'row-reverse' : 'row',
+          flexDirection: rowDirection(isRTL),
           backgroundColor: dark ? 'rgba(255,255,255,0.03)' : 'hsl(148, 22%, 96%)',
           borderColor: dark ? 'hsl(150, 12%, 28%)' : 'hsl(148, 16%, 88%)',
         },
@@ -258,7 +259,7 @@ function HouseQtyRow({ name, quantity, onChange, t }) {
             fontSize: 14,
             fontFamily: 'Poppins-SemiBold',
             color: textColor,
-            textAlign: isRTL ? 'right' : 'left',
+            textAlign: textAlignStart(isRTL),
           }}
           numberOfLines={1}
         >
@@ -271,7 +272,7 @@ function HouseQtyRow({ name, quantity, onChange, t }) {
               fontFamily: 'Poppins-Medium',
               color: accentColor,
               marginTop: 2,
-              textAlign: isRTL ? 'right' : 'left',
+              textAlign: textAlignStart(isRTL),
             }}
           >
             {quantity.toLocaleString('en-US')} {t('batches.birds', 'birds')}

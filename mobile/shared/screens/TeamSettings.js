@@ -24,6 +24,7 @@ import { useIsRTL } from '@/stores/localeStore';
 import { deltaSync } from '@/lib/syncEngine';
 import InviteUserSheet from '@/shared/sheets/InviteUserSheet';
 import TeamMemberSheet from '@/shared/sheets/TeamMemberSheet';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 const SWIPE_ACTION_WIDTH = 76;
 
@@ -349,7 +350,7 @@ function MemberRow({
           <View
             style={[
               rowStyles.row,
-              { flexDirection: isRTL ? 'row-reverse' : 'row' },
+              { flexDirection: rowDirection(isRTL) },
             ]}
           >
             <View
@@ -378,7 +379,7 @@ function MemberRow({
                   fontFamily: 'Poppins-SemiBold',
                   color: textColor,
                   letterSpacing: -0.1,
-                  textAlign: isRTL ? 'right' : 'left',
+                  textAlign: textAlignStart(isRTL),
                 }}
                 numberOfLines={1}
               >
@@ -388,7 +389,7 @@ function MemberRow({
               <View
                 style={[
                   rowStyles.metaRow,
-                  { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                  { flexDirection: rowDirection(isRTL) },
                 ]}
               >
                 <View
@@ -444,7 +445,7 @@ function MemberRow({
                   fontFamily: 'Poppins-Regular',
                   color: mutedColor,
                   marginTop: 4,
-                  textAlign: isRTL ? 'right' : 'left',
+                  textAlign: textAlignStart(isRTL),
                 }}
                 numberOfLines={1}
               >

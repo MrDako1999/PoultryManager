@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { router } from 'expo-router';
 import {
   User, Shield, Puzzle, Users, Calculator, ShoppingCart,
-  ChevronRight, LogOut, Moon, Sun, Monitor, Languages,
+  ChevronRight, ChevronLeft, LogOut, Moon, Sun, Monitor, Languages,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Constants from 'expo-constants';
@@ -18,13 +18,20 @@ import SheetSection from '@/components/SheetSection';
 import { LanguagePickerSheet } from '@/components/LanguageSelector';
 import FlagTile, { getFlagComponent } from '@/components/flags';
 import SlidingSegmentedControl from '@/components/SlidingSegmentedControl';
+import { useIsRTL } from '@/stores/localeStore';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 function SettingsRow({ icon: Icon, label, value, valueAccessory, onPress, destructive, isLast }) {
   const { iconColor, mutedColor, textColor, errorColor, borderColor, dark } = useHeroSheetTokens();
+  const isRTL = useIsRTL();
   const rowIconColor = destructive ? errorColor : iconColor;
   const iconBg = destructive
     ? (dark ? 'rgba(252,165,165,0.12)' : 'rgba(220,38,38,0.08)')
     : (dark ? 'rgba(148,210,165,0.10)' : 'hsl(148, 30%, 95%)');
+  // ChevronRight points the wrong way in RTL — drilling further "in" means
+  // moving toward the trailing edge, which is left in RTL. Flip the glyph
+  // so the affordance reads consistently with the OS's back-arrow gesture.
+  const ChevronGlyph = isRTL ? ChevronLeft : ChevronRight;
 
   return (
     <Pressable
@@ -41,7 +48,7 @@ function SettingsRow({ icon: Icon, label, value, valueAccessory, onPress, destru
     >
       <View
         style={{
-          flexDirection: 'row',
+          flexDirection: rowDirection(isRTL),
           alignItems: 'center',
           paddingHorizontal: 14,
           paddingVertical: 14,
@@ -56,7 +63,10 @@ function SettingsRow({ icon: Icon, label, value, valueAccessory, onPress, destru
               backgroundColor: iconBg,
               alignItems: 'center',
               justifyContent: 'center',
-              marginRight: 14,
+              // marginEnd is direction-aware: in LTR it's marginRight, in RTL
+              // it's marginLeft. Hardcoded marginRight would leave a gap on
+              // the wrong side after the row reverses.
+              marginEnd: 14,
               flexShrink: 0,
             }}
           >
@@ -69,6 +79,8 @@ function SettingsRow({ icon: Icon, label, value, valueAccessory, onPress, destru
               fontSize: 15,
               fontFamily: destructive ? 'Poppins-SemiBold' : 'Poppins-Medium',
               color: destructive ? errorColor : textColor,
+              textAlign: textAlignStart(isRTL),
+              writingDirection: isRTL ? 'rtl' : 'ltr',
             }}
             numberOfLines={1}
           >
@@ -78,11 +90,11 @@ function SettingsRow({ icon: Icon, label, value, valueAccessory, onPress, destru
         {(value || valueAccessory) && (
           <View
             style={{
-              flexDirection: 'row',
+              flexDirection: rowDirection(isRTL),
               alignItems: 'center',
               gap: 8,
-              marginLeft: 8,
-              marginRight: 8,
+              marginStart: 8,
+              marginEnd: 8,
               flexShrink: 1,
               minWidth: 0,
             }}
@@ -95,6 +107,7 @@ function SettingsRow({ icon: Icon, label, value, valueAccessory, onPress, destru
                   fontFamily: 'Poppins-Regular',
                   color: mutedColor,
                   flexShrink: 1,
+                  textAlign: textAlignStart(isRTL),
                 }}
                 numberOfLines={1}
               >
@@ -104,7 +117,7 @@ function SettingsRow({ icon: Icon, label, value, valueAccessory, onPress, destru
           </View>
         )}
         {onPress && !destructive && (
-          <ChevronRight size={18} color={mutedColor} style={{ flexShrink: 0 }} />
+          <ChevronGlyph size={18} color={mutedColor} style={{ flexShrink: 0 }} />
         )}
       </View>
     </Pressable>
@@ -127,6 +140,7 @@ export default function SettingsScreen() {
   const isOwner = !!workspace?.isOwner;
 
   const { dark, mutedColor } = useHeroSheetTokens();
+  const isRTL = useIsRTL();
 
   const handleLogout = () => {
     Alert.alert(
@@ -161,7 +175,7 @@ export default function SettingsScreen() {
     <Pressable
       onPress={() => router.push('/(app)/settings-profile')}
       hitSlop={6}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}
+      style={{ flexDirection: rowDirection(isRTL), alignItems: 'center', gap: 14 }}
     >
       <View
         style={{
@@ -196,6 +210,8 @@ export default function SettingsScreen() {
             fontFamily: 'Poppins-SemiBold',
             color: '#ffffff',
             letterSpacing: -0.3,
+            textAlign: textAlignStart(isRTL),
+            writingDirection: isRTL ? 'rtl' : 'ltr',
           }}
           numberOfLines={1}
         >
@@ -206,6 +222,7 @@ export default function SettingsScreen() {
             fontSize: 13,
             fontFamily: 'Poppins-Regular',
             color: 'rgba(255,255,255,0.78)',
+            textAlign: textAlignStart(isRTL),
           }}
           numberOfLines={1}
         >
@@ -214,8 +231,8 @@ export default function SettingsScreen() {
         {user?.accountRole && (
           <View
             style={{
-              alignSelf: 'flex-start',
-              flexDirection: 'row',
+              alignSelf: isRTL ? 'flex-end' : 'flex-start',
+              flexDirection: rowDirection(isRTL),
               alignItems: 'center',
               backgroundColor: 'rgba(255,255,255,0.18)',
               borderRadius: 999,

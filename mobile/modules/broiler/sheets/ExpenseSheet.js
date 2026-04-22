@@ -24,6 +24,7 @@ import useOfflineMutation from '@/hooks/useOfflineMutation';
 import useFormStepper from '@/hooks/useFormStepper';
 import { INVOICE_TYPES, INVOICE_TYPE_ICONS, EXPENSE_CATEGORIES, EXPENSE_CATEGORY_ICONS } from '@/lib/constants';
 import { useToast } from '@/components/ui/Toast';
+import { rowDirection, trailingAlignment, textAlignStart } from '@/lib/rtl';
 
 const parseNum = (v) => { const n = parseFloat(String(v).replace(/,/g, '')); return isNaN(n) ? 0 : n; };
 
@@ -664,7 +665,7 @@ function ExpenseStickySummary({ currency, isTaxInvoice, categoryLabel, date, gro
         {
           backgroundColor: sheetBg,
           borderTopColor: borderColor,
-          flexDirection: isRTL ? 'row-reverse' : 'row',
+          flexDirection: rowDirection(isRTL),
         },
       ]}
     >
@@ -676,7 +677,7 @@ function ExpenseStickySummary({ currency, isTaxInvoice, categoryLabel, date, gro
             color: mutedColor,
             letterSpacing: 1.2,
             textTransform: 'uppercase',
-            textAlign: isRTL ? 'right' : 'left',
+            textAlign: textAlignStart(isRTL),
           }}
           numberOfLines={1}
         >
@@ -689,7 +690,7 @@ function ExpenseStickySummary({ currency, isTaxInvoice, categoryLabel, date, gro
               fontFamily: 'Poppins-Regular',
               color: mutedColor,
               marginTop: 2,
-              textAlign: isRTL ? 'right' : 'left',
+              textAlign: textAlignStart(isRTL),
             }}
             numberOfLines={1}
           >
@@ -697,7 +698,7 @@ function ExpenseStickySummary({ currency, isTaxInvoice, categoryLabel, date, gro
           </Text>
         ) : null}
       </View>
-      <View style={{ alignItems: isRTL ? 'flex-start' : 'flex-end' }}>
+      <View style={{ alignItems: trailingAlignment(isRTL) }}>
         <Text
           style={{
             fontSize: 10,

@@ -4,12 +4,14 @@ import useAuthStore from '@/stores/authStore';
 import useThemeStore from '@/stores/themeStore';
 import useSubscriptionGate from '@/hooks/useSubscriptionGate';
 import BillingLockScreen from '@/components/BillingLockScreen';
+import { useIsRTL } from '@/stores/localeStore';
 
 export default function AppLayout() {
   const { user, isLoading } = useAuthStore();
   const { resolvedTheme } = useThemeStore();
   const spinnerColor = resolvedTheme === 'dark' ? 'hsl(148, 48%, 38%)' : 'hsl(148, 60%, 20%)';
   const gate = useSubscriptionGate();
+  const isRTL = useIsRTL();
 
   if (isLoading) {
     return (
@@ -33,7 +35,31 @@ export default function AppLayout() {
 
   return (
     <View style={{ flex: 1 }}>
-      <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right', gestureEnabled: true, fullScreenGestureEnabled: true }}>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          // In RTL the new screen should slide in from the LEFT (the
+          // direction the user "moves forward" when reading right-to-left).
+          //
+          // For the back-swipe gesture: react-native-screens only accepts
+          // 'horizontal' | 'vertical' on iOS — `'horizontal-inverted'`
+          // crashes the native layer at app launch ("PoultryManager quit
+          // unexpectedly" because the iOS bridge can't decode the unknown
+          // enum value). The native side already mirrors the gesture
+          // edge automatically when `I18nManager.isRTL === true`, so a
+          // plain 'horizontal' is the correct value in both directions.
+          //
+          // `fullScreenGestureEnabled` lets the user start the swipe
+          // from anywhere in the screen rather than only the leading
+          // edge — important because the 20pt edge target is too narrow
+          // to feel reliable, especially for RTL users reaching from the
+          // opposite side.
+          animation: isRTL ? 'slide_from_left' : 'slide_from_right',
+          gestureDirection: 'horizontal',
+          gestureEnabled: true,
+          fullScreenGestureEnabled: true,
+        }}
+      >
         <Stack.Screen name="(tabs)" options={{ animation: 'none', gestureEnabled: false }} />
         <Stack.Screen name="batch/[id]/index" />
         <Stack.Screen name="batch/[id]/sources" />

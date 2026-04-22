@@ -1,5 +1,7 @@
 import { View, Text } from 'react-native';
 import { useHeroSheetTokens } from './HeroSheetScreen';
+import { useIsRTL } from '@/stores/localeStore';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 /**
  * Grouped section card used inside HeroSheetScreen sheets.
@@ -14,17 +16,20 @@ export default function SheetSection({
   padded = true,
 }) {
   const { sectionBg, sectionBorder, mutedColor, dark } = useHeroSheetTokens();
+  const isRTL = useIsRTL();
 
   return (
     <View style={{ marginHorizontal: 16, marginBottom: 16 }}>
       {title && (
         <View
           style={{
-            flexDirection: 'row',
+            flexDirection: rowDirection(isRTL),
             alignItems: 'center',
             gap: 8,
             marginBottom: 10,
-            marginLeft: 6,
+            // marginStart flips with writing direction so the section header
+            // sits at the leading edge in both LTR and RTL.
+            marginStart: 6,
           }}
         >
           {Icon && <Icon size={13} color={mutedColor} />}
@@ -35,6 +40,7 @@ export default function SheetSection({
               color: mutedColor,
               letterSpacing: 1.2,
               textTransform: 'uppercase',
+              textAlign: textAlignStart(isRTL),
             }}
           >
             {title}
@@ -72,8 +78,9 @@ export default function SheetSection({
             fontFamily: 'Poppins-Regular',
             color: mutedColor,
             marginTop: 8,
-            marginLeft: 6,
+            marginStart: 6,
             lineHeight: 17,
+            textAlign: textAlignStart(isRTL),
           }}
         >
           {description}

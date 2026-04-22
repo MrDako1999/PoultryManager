@@ -2,6 +2,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
+import { rowDirection } from '@/lib/rtl';
 
 /**
  * Grid of enum-value buttons with optional icon.
@@ -49,7 +50,7 @@ export default function EnumButtonSelect({
     <View
       style={[
         styles.grid,
-        { flexDirection: isRTL ? 'row-reverse' : 'row', marginHorizontal: -(gap / 2) },
+        { flexDirection: rowDirection(isRTL), marginHorizontal: -(gap / 2) },
       ]}
     >
       {options.map(({ value: optVal, label, icon: Icon }) => {
@@ -76,7 +77,7 @@ export default function EnumButtonSelect({
                 {
                   width: '100%',
                   flexDirection: compact
-                    ? (isRTL ? 'row-reverse' : 'row')
+                    ? rowDirection(isRTL)
                     : 'column',
                   backgroundColor: selected ? activeBg : idleBg,
                   borderColor: selected ? activeBorder : idleBorder,

@@ -26,6 +26,7 @@ import { useToast } from '@/components/ui/Toast';
 import { useIsRTL } from '@/stores/localeStore';
 import { deltaSync } from '@/lib/syncEngine';
 import FarmSheet from '@/shared/sheets/FarmSheet';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 const NUMERIC_LOCALE = 'en-US';
 const SWIPE_ACTION_WIDTH = 76;
@@ -315,7 +316,7 @@ function BrandHeader({ title, subtitle, gradient, topInset, isRTL }) {
       <View
         style={[
           styles.headerRow,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
         <Pressable
@@ -334,7 +335,7 @@ function BrandHeader({ title, subtitle, gradient, topInset, isRTL }) {
               color: '#ffffff',
               letterSpacing: -0.4,
               lineHeight: 30,
-              textAlign: isRTL ? 'right' : 'left',
+              textAlign: textAlignStart(isRTL),
               writingDirection: isRTL ? 'rtl' : 'ltr',
             }}
             numberOfLines={1}
@@ -348,7 +349,7 @@ function BrandHeader({ title, subtitle, gradient, topInset, isRTL }) {
                 fontFamily: 'Poppins-Regular',
                 color: 'rgba(255,255,255,0.78)',
                 marginTop: 4,
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
                 writingDirection: isRTL ? 'rtl' : 'ltr',
               }}
               numberOfLines={1}
@@ -457,7 +458,7 @@ function FarmRow({
           <View
             style={[
               cardStyles.headerRow,
-              { flexDirection: isRTL ? 'row-reverse' : 'row' },
+              { flexDirection: rowDirection(isRTL) },
             ]}
           >
           <View
@@ -485,7 +486,7 @@ function FarmRow({
                 fontFamily: 'Poppins-SemiBold',
                 color: textColor,
                 letterSpacing: -0.1,
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
               }}
               numberOfLines={1}
             >
@@ -498,7 +499,7 @@ function FarmRow({
                   fontFamily: 'Poppins-Regular',
                   color: mutedColor,
                   marginTop: 2,
-                  textAlign: isRTL ? 'right' : 'left',
+                  textAlign: textAlignStart(isRTL),
                   letterSpacing: 0.4,
                 }}
                 numberOfLines={1}
@@ -512,7 +513,7 @@ function FarmRow({
         <View
           style={[
             cardStyles.statsRow,
-            { flexDirection: isRTL ? 'row-reverse' : 'row' },
+            { flexDirection: rowDirection(isRTL) },
           ]}
         >
           <StatCell
@@ -552,7 +553,7 @@ function StatCell({ icon: Icon, label, value, tokens, isRTL }) {
       <View
         style={[
           cardStyles.statLabelRow,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
         <Icon size={11} color={mutedColor} strokeWidth={2.2} />
@@ -563,7 +564,7 @@ function StatCell({ icon: Icon, label, value, tokens, isRTL }) {
             color: mutedColor,
             letterSpacing: 0.8,
             textTransform: 'uppercase',
-            textAlign: isRTL ? 'right' : 'left',
+            textAlign: textAlignStart(isRTL),
           }}
           numberOfLines={1}
         >
@@ -576,7 +577,7 @@ function StatCell({ icon: Icon, label, value, tokens, isRTL }) {
           fontFamily: 'Poppins-SemiBold',
           color: textColor,
           fontVariant: ['tabular-nums'],
-          textAlign: isRTL ? 'right' : 'left',
+          textAlign: textAlignStart(isRTL),
           marginTop: 2,
         }}
         numberOfLines={1}

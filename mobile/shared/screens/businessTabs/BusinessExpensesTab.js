@@ -8,6 +8,7 @@ import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import ExpensesListView from '@/components/views/ExpensesListView';
 import ListViewHeroKpi from '@/components/views/ListViewHeroKpi';
 import { AccountingToolbar } from '@/components/views/AccountingFilterBar';
+import { formatRelativeDate } from '@/lib/relativeDate';
 
 const NUMERIC_LOCALE = 'en-US';
 
@@ -17,18 +18,6 @@ const fmt = (val) =>
   });
 
 const fmtInt = (val) => Number(val || 0).toLocaleString(NUMERIC_LOCALE);
-
-const fmtRelativeDate = (val) => {
-  if (!val) return null;
-  const d = val instanceof Date ? val : new Date(val);
-  if (Number.isNaN(d.getTime())) return null;
-  const today = new Date();
-  const days = Math.floor((today - d) / 86400000);
-  if (days <= 0) return 'Today';
-  if (days === 1) return 'Yesterday';
-  if (days < 7) return `${days}d ago`;
-  return d.toLocaleDateString(NUMERIC_LOCALE, { day: '2-digit', month: 'short' });
-};
 
 const EXPENSE_CATEGORIES = [
   'MAINTENANCE', 'LABOUR', 'UTILITIES', 'FUEL', 'CONSUMABLES',
@@ -145,7 +134,7 @@ export default function BusinessExpensesTab({ expenses, loading }) {
   ]);
 
   const showLastDate = categoryFilter.length > 0;
-  const lastDateLabel = fmtRelativeDate(heroStats.lastDate);
+  const lastDateLabel = formatRelativeDate(heroStats.lastDate, t);
 
   const resetAll = () => {
     setSearch('');

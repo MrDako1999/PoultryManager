@@ -20,8 +20,10 @@ import { useToast } from '@/components/ui/Toast';
 import useLocalRecord from '@/hooks/useLocalRecord';
 import useOfflineMutation from '@/hooks/useOfflineMutation';
 import useCapabilities from '@/hooks/useCapabilities';
+import useAuthStore from '@/stores/authStore';
 import { useIsRTL } from '@/stores/localeStore';
 import { SkeletonDetailPage } from '@/components/skeletons';
+import { rowDirection, textAlignStart, textAlignEnd } from '@/lib/rtl';
 
 // Western digits everywhere (DL §12.4) — never i18n.language for numerics.
 const NUMERIC_LOCALE = 'en-US';
@@ -60,6 +62,7 @@ export default function DailyLogDetail({ logId, onEdit }) {
   const tokens = useHeroSheetTokens();
   const { toast } = useToast();
   const { can } = useCapabilities();
+  const { user: currentUser } = useAuthStore();
   const { remove } = useOfflineMutation('dailyLogs');
   const [log, logLoading] = useLocalRecord('dailyLogs', logId);
 
@@ -79,8 +82,20 @@ export default function DailyLogDetail({ logId, onEdit }) {
   const photos = (log.photos || []).filter(Boolean).map((p) => p?.media_id || p);
   const photoMedia = photos.filter((m) => m?.url);
 
-  const canEdit = can('dailyLog:update');
-  const canDelete = can('dailyLog:delete');
+  // Roles like ground_staff hold a scoped `dailyLog:update:own` rather
+  // than the unscoped `dailyLog:update`. The scoped grant only matches
+  // when explicitly requested with the same scope, so we OR the two
+  // checks together AND require the current user to be the author for
+  // the scoped path. Same pattern fits delete if a future role ever
+  // gets `dailyLog:delete:own`.
+  const logAuthorId = typeof log.createdBy === 'object'
+    ? log.createdBy?._id
+    : log.createdBy;
+  const isMyLog = String(logAuthorId) === String(currentUser?._id);
+  const canEdit = can('dailyLog:update')
+    || (isMyLog && can('dailyLog:update:own'));
+  const canDelete = can('dailyLog:delete')
+    || (isMyLog && can('dailyLog:delete:own'));
 
   const compactTitle = t(`batches.operations.logTypes.${log.logType}`, log.logType);
 
@@ -116,7 +131,7 @@ export default function DailyLogDetail({ logId, onEdit }) {
   // shortcut since photos live in their own scroll section, not as a
   // single primary attachment.)
   const headerRight = (canEdit || canDelete) ? (
-    <View style={[heroStyles.actionsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+    <View style={[heroStyles.actionsRow, { flexDirection: rowDirection(isRTL) }]}>
       {canEdit ? (
         <Pressable
           onPress={openEdit}
@@ -251,7 +266,7 @@ export default function DailyLogDetail({ logId, onEdit }) {
                 fontFamily: 'Poppins-Regular',
                 color: tokens.textColor,
                 lineHeight: 20,
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
                 writingDirection: isRTL ? 'rtl' : 'ltr',
               }}
             >
@@ -322,7 +337,7 @@ export default function DailyLogDetail({ logId, onEdit }) {
               {
                 marginHorizontal: 16,
                 gap: 10,
-                flexDirection: isRTL ? 'row-reverse' : 'row',
+                flexDirection: rowDirection(isRTL),
               },
             ]}
           >
@@ -389,7 +404,7 @@ function PartyRow({ tokens, isRTL, icon: Icon = Home, name, caption, onPress }) 
           { backgroundColor: elevatedCardBg, borderColor: elevatedCardBorder },
         ]}
       >
-        <View style={[partyStyles.row, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+        <View style={[partyStyles.row, { flexDirection: rowDirection(isRTL) }]}>
           <View style={[partyStyles.iconTile, { backgroundColor: iconTileBg }]}>
             <Icon size={18} color={accentColor} strokeWidth={2.2} />
           </View>
@@ -402,7 +417,7 @@ function PartyRow({ tokens, isRTL, icon: Icon = Home, name, caption, onPress }) 
                   color: mutedColor,
                   letterSpacing: 0.6,
                   textTransform: 'uppercase',
-                  textAlign: isRTL ? 'right' : 'left',
+                  textAlign: textAlignStart(isRTL),
                 }}
                 numberOfLines={1}
               >
@@ -414,7 +429,7 @@ function PartyRow({ tokens, isRTL, icon: Icon = Home, name, caption, onPress }) 
                 fontSize: 15,
                 fontFamily: 'Poppins-SemiBold',
                 color: textColor,
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
               }}
               numberOfLines={1}
             >
@@ -444,7 +459,7 @@ function PartyRow({ tokens, isRTL, icon: Icon = Home, name, caption, onPress }) 
         },
       ]}
     >
-      <View style={[partyStyles.row, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+      <View style={[partyStyles.row, { flexDirection: rowDirection(isRTL) }]}>
         <View style={[partyStyles.iconTile, { backgroundColor: iconTileBg }]}>
           <Icon size={18} color={accentColor} strokeWidth={2.2} />
         </View>
@@ -457,7 +472,7 @@ function PartyRow({ tokens, isRTL, icon: Icon = Home, name, caption, onPress }) 
                 color: mutedColor,
                 letterSpacing: 0.6,
                 textTransform: 'uppercase',
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
               }}
               numberOfLines={1}
             >
@@ -469,7 +484,7 @@ function PartyRow({ tokens, isRTL, icon: Icon = Home, name, caption, onPress }) 
               fontSize: 15,
               fontFamily: 'Poppins-SemiBold',
               color: textColor,
-              textAlign: isRTL ? 'right' : 'left',
+              textAlign: textAlignStart(isRTL),
             }}
             numberOfLines={1}
           >
@@ -489,7 +504,7 @@ function KvRow({ tokens, isRTL, label, value, bold, negative, highlight }) {
     <View
       style={[
         kvStyles.row,
-        { flexDirection: isRTL ? 'row-reverse' : 'row' },
+        { flexDirection: rowDirection(isRTL) },
       ]}
     >
       <Text
@@ -498,7 +513,7 @@ function KvRow({ tokens, isRTL, label, value, bold, negative, highlight }) {
           fontSize: 13,
           fontFamily: bold ? 'Poppins-SemiBold' : 'Poppins-Regular',
           color: mutedColor,
-          textAlign: isRTL ? 'right' : 'left',
+          textAlign: textAlignStart(isRTL),
         }}
         numberOfLines={2}
       >
@@ -510,7 +525,7 @@ function KvRow({ tokens, isRTL, label, value, bold, negative, highlight }) {
           fontFamily: bold ? 'Poppins-SemiBold' : 'Poppins-Regular',
           color: negative ? errorColor : highlight ? accentColor : textColor,
           fontVariant: ['tabular-nums'],
-          textAlign: isRTL ? 'left' : 'right',
+          textAlign: textAlignEnd(isRTL),
         }}
       >
         {value}
@@ -567,7 +582,7 @@ function CtaButton({ variant, icon: Icon, label, onPress, isRTL, tokens }) {
       <View
         style={[
           ctaButtonStyles.inner,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
         <Icon size={18} color={fg} strokeWidth={2.4} />

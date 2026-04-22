@@ -42,7 +42,10 @@ export default function HouseConfigurator({ value = [], onChange }) {
   const add = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     const nextIdx = value.length + 1;
-    onChange?.([...value, { name: `House ${nextIdx}`, capacity: 0 }]);
+    onChange?.([
+      ...value,
+      { name: t('farms.houseN', 'House {{n}}', { n: nextIdx }), capacity: 0 },
+    ]);
   };
 
   return (

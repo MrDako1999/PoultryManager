@@ -4,6 +4,7 @@ import { ChevronRight, ChevronLeft } from 'lucide-react-native';
 import { LOG_TYPE_ICONS } from '@/lib/constants';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 const NUMERIC_LOCALE = 'en-US';
 const fmtInt = (val) => Number(val || 0).toLocaleString(NUMERIC_LOCALE);
@@ -47,7 +48,7 @@ export default function DailyLogRow({ log, onClick, t }) {
       <View
         style={[
           styles.rowInner,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
         <View
@@ -68,7 +69,7 @@ export default function DailyLogRow({ log, onClick, t }) {
               fontSize: 14,
               fontFamily: 'Poppins-SemiBold',
               color: textColor,
-              textAlign: isRTL ? 'right' : 'left',
+              textAlign: textAlignStart(isRTL),
             }}
             numberOfLines={1}
           >
@@ -84,7 +85,7 @@ export default function DailyLogRow({ log, onClick, t }) {
                 fontFamily: 'Poppins-Regular',
                 color: mutedColor,
                 marginTop: 2,
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
               }}
               numberOfLines={1}
             >

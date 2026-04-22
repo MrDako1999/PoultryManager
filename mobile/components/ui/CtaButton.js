@@ -5,6 +5,7 @@ import {
 import * as Haptics from 'expo-haptics';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
+import { rowDirection } from '@/lib/rtl';
 
 /**
  * Polished design-language CTA button used by the form sheets and the
@@ -103,7 +104,7 @@ export default function CtaButton({
       accessibilityLabel={label}
       accessibilityState={{ disabled: isBlocked, busy: loading }}
     >
-      <View style={[styles.inner, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+      <View style={[styles.inner, { flexDirection: rowDirection(isRTL) }]}>
         {loading ? (
           <ActivityIndicator size="small" color={palette.fg} />
         ) : Icon ? (

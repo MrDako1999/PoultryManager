@@ -3,10 +3,11 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Languages, Check } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import useLocaleStore, { SUPPORTED_LANGUAGES } from '@/stores/localeStore';
+import useLocaleStore, { SUPPORTED_LANGUAGES, useIsRTL } from '@/stores/localeStore';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import BottomPickerSheet from '@/components/BottomPickerSheet';
 import FlagTile, { getFlagComponent } from '@/components/flags';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 /**
  * Shared language picker sheet. Owns the option mapping, the live language
@@ -100,6 +101,7 @@ export default function LanguageSelector({ variant = 'hero', compact = true }) {
   const tokens = useHeroSheetTokens();
   const { dark, textColor, mutedColor, sectionBg, borderColor } = tokens;
   const language = useLocaleStore((s) => s.language);
+  const isRTL = useIsRTL();
   const sheetRef = useRef(null);
 
   const current = SUPPORTED_LANGUAGES.find((l) => l.code === language) || SUPPORTED_LANGUAGES[0];
@@ -108,7 +110,7 @@ export default function LanguageSelector({ variant = 'hero', compact = true }) {
 
   const triggerStyle = isHero
     ? {
-        flexDirection: 'row',
+        flexDirection: rowDirection(isRTL),
         alignItems: 'center',
         gap: 8,
         backgroundColor: 'rgba(255,255,255,0.18)',
@@ -117,7 +119,7 @@ export default function LanguageSelector({ variant = 'hero', compact = true }) {
         paddingVertical: 6,
       }
     : {
-        flexDirection: 'row',
+        flexDirection: rowDirection(isRTL),
         alignItems: 'center',
         gap: 8,
         backgroundColor: sectionBg,
@@ -171,6 +173,7 @@ export default function LanguageSelector({ variant = 'hero', compact = true }) {
  * the row layout on a plain View, we sidestep the bug entirely.
  */
 function LanguageRow({ item, isSelected, onPress, dark, accentColor, textColor, mutedColor }) {
+  const isRTL = useIsRTL();
   const flagAvailable = !!getFlagComponent(item.code);
   const bg = isSelected
     ? (dark ? 'rgba(148,210,165,0.10)' : 'hsl(148, 35%, 96%)')
@@ -181,11 +184,13 @@ function LanguageRow({ item, isSelected, onPress, dark, accentColor, textColor, 
       onPress={onPress}
       style={[rowStyles.outer, { backgroundColor: bg }]}
     >
-      <View style={rowStyles.row}>
+      <View style={[rowStyles.row, { flexDirection: rowDirection(isRTL) }]}>
         {/* Leading: flag tile (preferred) or letter-code fallback. All tiles
             share a uniform 42×28 footprint so the column is perfectly aligned
-            regardless of each flag's native aspect ratio. */}
-        <View style={rowStyles.leading}>
+            regardless of each flag's native aspect ratio. `marginEnd` flips
+            with writing direction so the gap stays on the inner side of the
+            row regardless of LTR/RTL. */}
+        <View style={[rowStyles.leading, { marginEnd: 14 }]}>
           {flagAvailable ? (
             <FlagTile code={item.code} size={28} width={42} radius={6} />
           ) : (
@@ -215,13 +220,18 @@ function LanguageRow({ item, isSelected, onPress, dark, accentColor, textColor, 
           )}
         </View>
 
-        {/* Title + description */}
+        {/* Title + description. The native label always uses its own script's
+            writing direction (e.g. "العربية" stays RTL even when the host UI
+            is English) so we derive `writingDirection` from the option's own
+            `rtl` flag, not from the host locale. */}
         <View style={rowStyles.textCol}>
           <Text
             style={{
               fontSize: 15,
               fontFamily: 'Poppins-SemiBold',
               color: textColor,
+              textAlign: textAlignStart(isRTL),
+              writingDirection: item.rtl ? 'rtl' : 'ltr',
             }}
             numberOfLines={1}
           >
@@ -234,6 +244,7 @@ function LanguageRow({ item, isSelected, onPress, dark, accentColor, textColor, 
                 fontFamily: 'Poppins-Regular',
                 color: mutedColor,
                 marginTop: 2,
+                textAlign: textAlignStart(isRTL),
               }}
               numberOfLines={1}
             >
@@ -268,14 +279,12 @@ const rowStyles = StyleSheet.create({
     paddingVertical: 12,
   },
   row: {
-    flexDirection: 'row',
     alignItems: 'center',
   },
   leading: {
     width: 44,
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 14,
   },
   textCol: {
     flex: 1,

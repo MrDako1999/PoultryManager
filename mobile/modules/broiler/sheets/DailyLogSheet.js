@@ -13,7 +13,10 @@ import MultiFileUpload from '@/components/MultiFileUpload';
 import FormSheet from '@/components/FormSheet';
 import { FormSection, FormField, FormSubheader } from '@/components/FormSheetParts';
 import useOfflineMutation from '@/hooks/useOfflineMutation';
+import useLocalQuery from '@/hooks/useLocalQuery';
+import useLocalRecord from '@/hooks/useLocalRecord';
 import useAuthStore from '@/stores/authStore';
+import useCapabilities from '@/hooks/useCapabilities';
 import { LOG_TYPES, LOG_TYPE_ICONS } from '@/lib/constants';
 import { useToast } from '@/components/ui/Toast';
 
@@ -33,19 +36,64 @@ const dailyLogSchema = z.object({
   notes: z.string().optional(),
 });
 
-export default function DailyLogSheet({ open, onClose, batchId, houses, editData }) {
+export default function DailyLogSheet({
+  open,
+  onClose,
+  batchId,
+  houses,
+  editData,
+  defaultLogType,
+  defaultHouseId,
+  // ISO YYYY-MM-DD. Used by the "fill missing day" entry point in
+  // BatchLogTypeTab so the form opens to the gap day instead of today.
+  // Falls back to today if the caller doesn't supply it.
+  defaultDate,
+}) {
   const { t } = useTranslation();
   const { toast } = useToast();
   const { user } = useAuthStore();
+  const { can } = useCapabilities();
   const { create, update } = useOfflineMutation('dailyLogs');
   const [saving, setSaving] = useState(false);
   const [selectedHouse, setSelectedHouse] = useState('');
   const [photos, setPhotos] = useState([]);
 
+  // Pull the parent batch + its logs so the calendar can paint
+  // submitted/missing markers and clamp the picker to the active
+  // cycle. Both queries are local-first and reactive — when a new log
+  // syncs in, the markers update without manual invalidation.
+  const [batch] = useLocalRecord('batches', batchId);
+  const [batchLogs] = useLocalQuery('dailyLogs', { batch: batchId });
+
+  // Worker / vet roles can be capped to a subset of LOG_TYPES via the
+  // `dailyLog:create:<TYPE>` action grammar in shared/permissions.js.
+  // Only show the types this user can actually create. Owners/managers
+  // hold `dailyLog:*` so they see everything; ground_staff and vets see
+  // a filtered list. Falls back to the full list if the user somehow
+  // has none of the create caps (defensive — we'd rather show options
+  // than render an empty button row).
+  const allowedLogTypes = useMemo(() => {
+    const allowed = LOG_TYPES.filter((typeName) => can(`dailyLog:create:${typeName}`)
+      || can('dailyLog:create'));
+    return allowed.length ? allowed : LOG_TYPES;
+  }, [can]);
+
+  const initialLogType = useMemo(() => {
+    if (editData?.logType) return editData.logType;
+    if (defaultLogType && allowedLogTypes.includes(defaultLogType)) return defaultLogType;
+    return allowedLogTypes[0] || 'DAILY';
+  }, [editData?.logType, defaultLogType, allowedLogTypes]);
+
+  const initialDate = useMemo(() => {
+    if (editData?.date) return editData.date.slice(0, 10);
+    if (defaultDate) return defaultDate;
+    return new Date().toISOString().slice(0, 10);
+  }, [editData?.date, defaultDate]);
+
   const { control, handleSubmit, reset, watch, formState: { errors } } = useForm({
     resolver: zodResolver(dailyLogSchema),
     defaultValues: {
-      logType: 'DAILY', date: new Date().toISOString().slice(0, 10),
+      logType: initialLogType, date: initialDate,
       deaths: '', feedKg: '', waterLiters: '',
       averageWeight: '', temperature: '', humidity: '',
       waterTDS: '', waterPH: '', notes: '',
@@ -71,22 +119,31 @@ export default function DailyLogSheet({ open, onClose, batchId, houses, editData
         notes: editData.notes || '',
       });
     } else {
-      setSelectedHouse(houses?.[0]?._id || houses?.[0]?.house?._id || houses?.[0]?.house || '');
+      // Pre-select the requested house when the caller supplies a
+      // `defaultHouseId` (worker dashboard / tasks list does this so
+      // the sheet opens already pinned to the house they tapped).
+      const fallbackHouse =
+        houses?.[0]?._id || houses?.[0]?.house?._id || houses?.[0]?.house || '';
+      setSelectedHouse(defaultHouseId || fallbackHouse);
       setPhotos([]);
       reset({
-        logType: 'DAILY', date: new Date().toISOString().slice(0, 10),
+        logType: initialLogType, date: initialDate,
         deaths: '', feedKg: '', waterLiters: '',
         averageWeight: '', temperature: '', humidity: '',
         waterTDS: '', waterPH: '', notes: '',
       });
     }
-  }, [editData, reset, open, houses]);
+  }, [editData, reset, open, houses, defaultHouseId, initialLogType, initialDate]);
 
   const watchLogType = watch('logType');
 
   const logTypeOptions = useMemo(
-    () => LOG_TYPES.map((v) => ({ value: v, label: t(`batches.operations.logTypes.${v}`), icon: LOG_TYPE_ICONS[v] })),
-    [t]
+    () => allowedLogTypes.map((v) => ({
+      value: v,
+      label: t(`batches.operations.logTypes.${v}`),
+      icon: LOG_TYPE_ICONS[v],
+    })),
+    [t, allowedLogTypes]
   );
   const houseOptions = useMemo(() =>
     (houses || []).map((h) => {
@@ -95,7 +152,94 @@ export default function DailyLogSheet({ open, onClose, batchId, houses, editData
     }),
     [houses]);
 
+  // Date bounds — start of cycle through today (or batch endDate when
+  // the cycle has been closed out). New entries on COMPLETE batches
+  // are blocked entirely; the form still opens for read/edit when
+  // editData is supplied so historical edits remain possible if the
+  // owner chooses to allow them via permissions.
+  const isCompleted = batch?.status === 'COMPLETE';
+  const today = new Date();
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const minDate = batch?.startDate
+    ? new Date(batch.startDate).toISOString().slice(0, 10)
+    : undefined;
+  // Hard cap at today even on completed batches; if the batch carries
+  // an explicit end date earlier than today we use that. Workers can
+  // never log into the future regardless of role.
+  const batchEndKey = batch?.endDate
+    ? new Date(batch.endDate).toISOString().slice(0, 10)
+    : null;
+  const maxDate = batchEndKey && batchEndKey < todayKey ? batchEndKey : todayKey;
+
+  // Per-(house, logType) calendar markings: green for days that
+  // already have an entry, yellow for days inside the cycle that
+  // don't. The user picks "Date" inside the sheet *after* picking
+  // house + log type, so we recompute as those change. We skip
+  // markings entirely until both selections are made — otherwise
+  // every date would render as 'missing'.
+  const markedDates = useMemo(() => {
+    if (!selectedHouse || !watchLogType || !minDate) return undefined;
+    const submittedKeys = new Set();
+    for (const log of batchLogs || []) {
+      if (log.deletedAt) continue;
+      if (log.logType !== watchLogType) continue;
+      const hid = String(typeof log.house === 'object' ? log.house?._id : log.house);
+      if (hid !== String(selectedHouse)) continue;
+      const raw = log.logDate || log.date;
+      if (!raw) continue;
+      submittedKeys.add(new Date(raw).toISOString().slice(0, 10));
+    }
+
+    const map = {};
+    submittedKeys.forEach((k) => { map[k] = 'submitted'; });
+
+    // Walk from start to maxDate, marking unsubmitted days as missing.
+    // This respects the unique-per-day index, and puts a yellow ring
+    // around every actionable empty cell so workers know what's left.
+    const cursor = new Date(`${minDate}T00:00:00`);
+    const limit = new Date(`${maxDate}T00:00:00`);
+    while (cursor.getTime() <= limit.getTime()) {
+      const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`;
+      if (!submittedKeys.has(key)) map[key] = 'missing';
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return map;
+  }, [batchLogs, selectedHouse, watchLogType, minDate, maxDate]);
+
   const onSubmit = async (formData) => {
+    // Refuse new entries on a completed batch — the FAB / pending
+    // slots are already hidden in the UI but this is the last-line
+    // guard for any deep-link path.
+    if (isCompleted && !editData) {
+      toast({
+        variant: 'destructive',
+        title: t(
+          'batches.operations.completeBlocked',
+          'This batch is complete. New entries are no longer accepted.'
+        ),
+      });
+      return;
+    }
+
+    // Belt-and-braces date clamp — the picker disables out-of-range
+    // cells but a deep-link prefill or an old in-flight selection
+    // could still slip a bad date through.
+    const dateKey = String(formData.date || '').slice(0, 10);
+    if (minDate && dateKey < minDate) {
+      toast({
+        variant: 'destructive',
+        title: t('batches.operations.dateBeforeStart', 'Date is before the batch start.'),
+      });
+      return;
+    }
+    if (maxDate && dateKey > maxDate) {
+      toast({
+        variant: 'destructive',
+        title: t('batches.operations.dateInFuture', 'Future dates are not allowed.'),
+      });
+      return;
+    }
+
     setSaving(true);
     try {
       const payload = {
@@ -138,11 +282,16 @@ export default function DailyLogSheet({ open, onClose, batchId, houses, editData
       open={open}
       onClose={onClose}
       title={editData ? t('batches.operations.editEntry') : t('batches.operations.addEntry')}
-      subtitle={t(`batches.operations.logTypes.${watchLogType}`, watchLogType)}
+      subtitle={
+        isCompleted && !editData
+          ? t('batches.operations.completeReadonly', 'Batch complete — read only')
+          : t(`batches.operations.logTypes.${watchLogType}`, watchLogType)
+      }
       icon={ClipboardList}
       onSubmit={handleSubmit(onSubmit)}
       submitLabel={editData ? t('common.save') : t('common.create')}
       loading={saving}
+      disabled={isCompleted && !editData}
     >
       {/* Type & date */}
       <FormSection title={t('batches.operations.entryType', 'Entry Type')}>
@@ -156,16 +305,10 @@ export default function DailyLogSheet({ open, onClose, batchId, houses, editData
           />
         </FormField>
 
-        <FormField label={t('batches.operations.date')} required error={errors.date?.message}>
-          <Controller
-            control={control}
-            name="date"
-            render={({ field: { value, onChange } }) => (
-              <DatePicker value={value} onChange={onChange} label={t('batches.operations.date')} />
-            )}
-          />
-        </FormField>
-
+        {/* House goes BEFORE date so the calendar's submitted/missing
+            markers reflect the actually-selected house. Otherwise
+            opening the picker before picking a house would paint
+            misleading rings. */}
         {houseOptions.length > 0 ? (
           <FormField label={t('batches.house')}>
             <Select
@@ -177,6 +320,23 @@ export default function DailyLogSheet({ open, onClose, batchId, houses, editData
             />
           </FormField>
         ) : null}
+
+        <FormField label={t('batches.operations.date')} required error={errors.date?.message}>
+          <Controller
+            control={control}
+            name="date"
+            render={({ field: { value, onChange } }) => (
+              <DatePicker
+                value={value}
+                onChange={onChange}
+                label={t('batches.operations.date')}
+                minDate={minDate}
+                maxDate={maxDate}
+                markedDates={markedDates}
+              />
+            )}
+          />
+        </FormField>
       </FormSection>
 
       {/* Type-specific metrics */}

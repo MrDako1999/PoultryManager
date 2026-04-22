@@ -23,6 +23,7 @@ import useOfflineMutation from '@/hooks/useOfflineMutation';
 import useCapabilities from '@/hooks/useCapabilities';
 import { useIsRTL } from '@/stores/localeStore';
 import { SkeletonDetailPage } from '@/components/skeletons';
+import { rowDirection, textAlignStart, textAlignEnd } from '@/lib/rtl';
 
 // Western digits everywhere (DL §12.4) — never i18n.language for numerics.
 const NUMERIC_LOCALE = 'en-US';
@@ -144,7 +145,7 @@ export default function ExpenseDetail({ expenseId, onEdit }) {
 
   // Hero header-right: view-receipt + edit + delete translucent circles.
   const headerRight = (receiptMedia || canEdit || canDelete) ? (
-    <View style={[heroStyles.actionsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+    <View style={[heroStyles.actionsRow, { flexDirection: rowDirection(isRTL) }]}>
       {receiptMedia ? (
         <Pressable
           onPress={openReceiptViewer}
@@ -317,7 +318,7 @@ export default function ExpenseDetail({ expenseId, onEdit }) {
                 fontFamily: 'Poppins-Regular',
                 color: tokens.textColor,
                 lineHeight: 20,
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
                 writingDirection: isRTL ? 'rtl' : 'ltr',
               }}
             >
@@ -368,7 +369,7 @@ export default function ExpenseDetail({ expenseId, onEdit }) {
               {
                 marginHorizontal: 16,
                 gap: 10,
-                flexDirection: isRTL ? 'row-reverse' : 'row',
+                flexDirection: rowDirection(isRTL),
               },
             ]}
           >
@@ -440,7 +441,7 @@ function PartyRow({ tokens, isRTL, name, caption, onPress }) {
           { backgroundColor: elevatedCardBg, borderColor: elevatedCardBorder },
         ]}
       >
-        <View style={[partyStyles.row, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+        <View style={[partyStyles.row, { flexDirection: rowDirection(isRTL) }]}>
           <View style={[partyStyles.iconTile, { backgroundColor: dark ? 'rgba(148,210,165,0.16)' : 'hsl(148, 35%, 92%)' }]}>
             <Building2 size={18} color={accentColor} strokeWidth={2.2} />
           </View>
@@ -453,7 +454,7 @@ function PartyRow({ tokens, isRTL, name, caption, onPress }) {
                   color: mutedColor,
                   letterSpacing: 0.6,
                   textTransform: 'uppercase',
-                  textAlign: isRTL ? 'right' : 'left',
+                  textAlign: textAlignStart(isRTL),
                 }}
                 numberOfLines={1}
               >
@@ -465,7 +466,7 @@ function PartyRow({ tokens, isRTL, name, caption, onPress }) {
                 fontSize: 15,
                 fontFamily: 'Poppins-SemiBold',
                 color: textColor,
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
               }}
               numberOfLines={1}
             >
@@ -495,7 +496,7 @@ function PartyRow({ tokens, isRTL, name, caption, onPress }) {
         },
       ]}
     >
-      <View style={[partyStyles.row, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+      <View style={[partyStyles.row, { flexDirection: rowDirection(isRTL) }]}>
         <View style={[partyStyles.iconTile, { backgroundColor: dark ? 'rgba(148,210,165,0.16)' : 'hsl(148, 35%, 92%)' }]}>
           <Building2 size={18} color={accentColor} strokeWidth={2.2} />
         </View>
@@ -508,7 +509,7 @@ function PartyRow({ tokens, isRTL, name, caption, onPress }) {
                 color: mutedColor,
                 letterSpacing: 0.6,
                 textTransform: 'uppercase',
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
               }}
               numberOfLines={1}
             >
@@ -520,7 +521,7 @@ function PartyRow({ tokens, isRTL, name, caption, onPress }) {
               fontSize: 15,
               fontFamily: 'Poppins-SemiBold',
               color: textColor,
-              textAlign: isRTL ? 'right' : 'left',
+              textAlign: textAlignStart(isRTL),
             }}
             numberOfLines={1}
           >
@@ -540,7 +541,7 @@ function KvRow({ tokens, isRTL, label, value, bold, negative, highlight }) {
     <View
       style={[
         kvStyles.row,
-        { flexDirection: isRTL ? 'row-reverse' : 'row' },
+        { flexDirection: rowDirection(isRTL) },
       ]}
     >
       <Text
@@ -549,7 +550,7 @@ function KvRow({ tokens, isRTL, label, value, bold, negative, highlight }) {
           fontSize: 13,
           fontFamily: bold ? 'Poppins-SemiBold' : 'Poppins-Regular',
           color: mutedColor,
-          textAlign: isRTL ? 'right' : 'left',
+          textAlign: textAlignStart(isRTL),
         }}
         numberOfLines={2}
       >
@@ -561,7 +562,7 @@ function KvRow({ tokens, isRTL, label, value, bold, negative, highlight }) {
           fontFamily: bold ? 'Poppins-SemiBold' : 'Poppins-Regular',
           color: negative ? errorColor : highlight ? accentColor : textColor,
           fontVariant: ['tabular-nums'],
-          textAlign: isRTL ? 'left' : 'right',
+          textAlign: textAlignEnd(isRTL),
         }}
       >
         {value}
@@ -577,13 +578,13 @@ function GrandTotalStrip({ tokens, isRTL, label, value }) {
     <View
       style={[
         grandTotalStyles.strip,
-        { backgroundColor: accentColor, flexDirection: isRTL ? 'row-reverse' : 'row' },
+        { backgroundColor: accentColor, flexDirection: rowDirection(isRTL) },
       ]}
     >
-      <Text style={[grandTotalStyles.label, { textAlign: isRTL ? 'right' : 'left' }]}>
+      <Text style={[grandTotalStyles.label, { textAlign: textAlignStart(isRTL) }]}>
         {label}
       </Text>
-      <Text style={[grandTotalStyles.value, { textAlign: isRTL ? 'left' : 'right' }]}>
+      <Text style={[grandTotalStyles.value, { textAlign: textAlignEnd(isRTL) }]}>
         {value}
       </Text>
     </View>
@@ -621,7 +622,7 @@ function LinkedRow({ tokens, isRTL, icon: Icon = Receipt, label, sublabel, onPre
         },
       ]}
     >
-      <View style={[linkedRowStyles.row, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+      <View style={[linkedRowStyles.row, { flexDirection: rowDirection(isRTL) }]}>
         <View
           style={[
             linkedRowStyles.iconTile,
@@ -636,7 +637,7 @@ function LinkedRow({ tokens, isRTL, icon: Icon = Receipt, label, sublabel, onPre
               fontSize: 15,
               fontFamily: 'Poppins-SemiBold',
               color: textColor,
-              textAlign: isRTL ? 'right' : 'left',
+              textAlign: textAlignStart(isRTL),
             }}
             numberOfLines={1}
           >
@@ -649,7 +650,7 @@ function LinkedRow({ tokens, isRTL, icon: Icon = Receipt, label, sublabel, onPre
                 fontFamily: 'Poppins-Regular',
                 color: mutedColor,
                 marginTop: 2,
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
               }}
               numberOfLines={1}
             >
@@ -709,7 +710,7 @@ function CtaButton({ variant, icon: Icon, label, onPress, isRTL, tokens }) {
       <View
         style={[
           ctaButtonStyles.inner,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
         <Icon size={18} color={fg} strokeWidth={2.4} />

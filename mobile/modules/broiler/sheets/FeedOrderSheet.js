@@ -19,6 +19,7 @@ import useSettings from '@/hooks/useSettings';
 import useOfflineMutation from '@/hooks/useOfflineMutation';
 import { FEED_TYPES, FEED_TYPE_ICONS } from '@/lib/constants';
 import { useToast } from '@/components/ui/Toast';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 const parseNum = (v) => { const n = parseFloat(String(v).replace(/,/g, '')); return isNaN(n) ? 0 : n; };
 
@@ -522,7 +523,7 @@ function FeedLineItemCard({
     fontSize: 13,
     fontFamily: 'Poppins-Medium',
     color: textColor,
-    textAlign: isRTL ? 'right' : 'left',
+    textAlign: textAlignStart(isRTL),
   };
 
   return (
@@ -535,7 +536,7 @@ function FeedLineItemCard({
     >
       <View
         style={{
-          flexDirection: isRTL ? 'row-reverse' : 'row',
+          flexDirection: rowDirection(isRTL),
           alignItems: 'center',
           justifyContent: 'space-between',
           marginBottom: 12,
@@ -630,7 +631,7 @@ function FeedLineItemCard({
           <View style={{ gap: 8 }}>
             <View
               style={{
-                flexDirection: isRTL ? 'row-reverse' : 'row',
+                flexDirection: rowDirection(isRTL),
                 gap: 12,
                 alignItems: 'stretch',
               }}
@@ -653,7 +654,7 @@ function FeedLineItemCard({
                     color: mutedColor,
                     marginHorizontal: 4,
                     marginTop: 2,
-                    textAlign: isRTL ? 'right' : 'left',
+                    textAlign: textAlignStart(isRTL),
                   }}
                 >
                   {t('batches.exVat')}
@@ -662,7 +663,7 @@ function FeedLineItemCard({
             </View>
             <View
               style={{
-                flexDirection: isRTL ? 'row-reverse' : 'row',
+                flexDirection: rowDirection(isRTL),
                 gap: 12,
                 alignItems: 'flex-start',
               }}

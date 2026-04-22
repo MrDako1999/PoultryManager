@@ -21,6 +21,7 @@ import useAuthStore from '@/stores/authStore';
 import { useIsRTL } from '@/stores/localeStore';
 import HeroSheetScreen, { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import AuthHeroToolbar from '@/components/AuthHeroToolbar';
+import { rowDirection } from '@/lib/rtl';
 
 const loginSchema = z.object({
   email: z.string().email('auth.emailInvalid').min(1, 'auth.emailRequired'),
@@ -40,7 +41,7 @@ export default function LoginScreen() {
   // Direction-aware row helpers. We don't trust I18nManager.isRTL because it
   // only flips on a true cold-start; the store-driven `isRTL` reflects the
   // user's choice immediately.
-  const row = isRTL ? 'row-reverse' : 'row';
+  const row = rowDirection(isRTL);
   const textAlign = isRTL ? 'right' : 'left';
   const ForwardArrow = isRTL ? ArrowLeft : ArrowRight;
 
@@ -424,7 +425,7 @@ function InputBox({ focused, error, icon: Icon, isRTL, children }) {
   return (
     <View
       style={{
-        flexDirection: isRTL ? 'row-reverse' : 'row',
+        flexDirection: rowDirection(isRTL),
         alignItems: 'center',
         backgroundColor: inputBg,
         borderWidth: 1.5,

@@ -16,6 +16,7 @@ import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -315,7 +316,7 @@ export default function FileViewer({ visible, media, onClose }) {
               />
             </View>
 
-            <View style={[sheetStyles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <View style={[sheetStyles.header, { flexDirection: rowDirection(isRTL) }]}>
               <View style={[sheetStyles.iconTile, { backgroundColor: iconTileBg }]}>
                 <TypeIcon size={20} color={accentColor} strokeWidth={2.2} />
               </View>
@@ -326,7 +327,7 @@ export default function FileViewer({ visible, media, onClose }) {
                     fontFamily: 'Poppins-SemiBold',
                     color: textColor,
                     letterSpacing: -0.2,
-                    textAlign: isRTL ? 'right' : 'left',
+                    textAlign: textAlignStart(isRTL),
                   }}
                   numberOfLines={1}
                 >
@@ -339,7 +340,7 @@ export default function FileViewer({ visible, media, onClose }) {
                       fontFamily: 'Poppins-Regular',
                       color: mutedColor,
                       marginTop: 1,
-                      textAlign: isRTL ? 'right' : 'left',
+                      textAlign: textAlignStart(isRTL),
                     }}
                     numberOfLines={1}
                   >
@@ -441,7 +442,7 @@ export default function FileViewer({ visible, media, onClose }) {
                   backgroundColor: sheetBg,
                   borderTopColor: borderColor,
                   paddingBottom: Math.max(insets.bottom, 14),
-                  flexDirection: isRTL ? 'row-reverse' : 'row',
+                  flexDirection: rowDirection(isRTL),
                 },
               ]}
             >
@@ -461,7 +462,7 @@ export default function FileViewer({ visible, media, onClose }) {
                 accessibilityRole="button"
                 accessibilityLabel={t('common.openInBrowser', 'Open in Browser')}
               >
-                <View style={[footerStyles.btnInner, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                <View style={[footerStyles.btnInner, { flexDirection: rowDirection(isRTL) }]}>
                   <ExternalLink size={16} color={mutedColor} strokeWidth={2.2} />
                   <Text
                     style={{
@@ -493,7 +494,7 @@ export default function FileViewer({ visible, media, onClose }) {
                 accessibilityRole="button"
                 accessibilityLabel={t('common.share', 'Share')}
               >
-                <View style={[footerStyles.btnInner, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                <View style={[footerStyles.btnInner, { flexDirection: rowDirection(isRTL) }]}>
                   {sharing ? (
                     <ActivityIndicator size="small" color={mutedColor} />
                   ) : (

@@ -17,6 +17,7 @@ import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
 import { useToast } from '@/components/ui/Toast';
 import QuickAddBusinessSheet from '@/shared/sheets/QuickAddBusinessSheet';
+import { rowDirection } from '@/lib/rtl';
 
 const schema = z.object({
   firstName: z.string().min(1, 'First name is required'),
@@ -168,7 +169,7 @@ export default function ContactSheet({
       }
     >
       <FormSection title={t('contacts.personalSection', 'Personal Information')}>
-        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10 }}>
+        <View style={{ flexDirection: rowDirection(isRTL), gap: 10 }}>
           <View style={{ flex: 1 }}>
             <FormField label={t('contacts.firstName', 'First Name')} required error={errors.firstName?.message}>
               <Controller
@@ -262,7 +263,7 @@ export default function ContactSheet({
             }}
             hitSlop={6}
             style={{
-              flexDirection: isRTL ? 'row-reverse' : 'row',
+              flexDirection: rowDirection(isRTL),
               alignItems: 'center',
               gap: 4,
               paddingHorizontal: 4,
@@ -288,7 +289,7 @@ export default function ContactSheet({
           <View
             style={[
               styles.chipRow,
-              { flexDirection: isRTL ? 'row-reverse' : 'row' },
+              { flexDirection: rowDirection(isRTL) },
             ]}
           >
             {selectedBusinesses.map((id) => {
@@ -299,7 +300,7 @@ export default function ContactSheet({
                   style={[
                     styles.chip,
                     {
-                      flexDirection: isRTL ? 'row-reverse' : 'row',
+                      flexDirection: rowDirection(isRTL),
                       backgroundColor: dark ? 'rgba(148,210,165,0.16)' : 'hsl(148, 35%, 92%)',
                       borderColor: dark ? 'rgba(148,210,165,0.30)' : 'hsl(148, 35%, 80%)',
                     },

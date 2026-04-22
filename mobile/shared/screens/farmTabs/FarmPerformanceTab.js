@@ -22,6 +22,7 @@ import ConsumptionChart from '@/modules/broiler/charts/ConsumptionChart';
 import { SkeletonFarmPerformanceTab } from '@/components/skeletons';
 import BatchAvatar from '@/modules/broiler/components/BatchAvatar';
 import { getStatusConfig } from '@/modules/broiler/lib/batchStatusConfig';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 import BatchKpiCard, {
   mortalityToneColor,
 } from '@/modules/broiler/components/BatchKpiCard';
@@ -593,7 +594,7 @@ function CycleRow({ cycle, tokens, isRTL, t, onPress }) {
       <View
         style={[
           cycleStyles.headerRow,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
         <BatchAvatar
@@ -610,7 +611,7 @@ function CycleRow({ cycle, tokens, isRTL, t, onPress }) {
               fontFamily: 'Poppins-SemiBold',
               color: textColor,
               letterSpacing: -0.1,
-              textAlign: isRTL ? 'right' : 'left',
+              textAlign: textAlignStart(isRTL),
             }}
             numberOfLines={1}
           >
@@ -620,13 +621,13 @@ function CycleRow({ cycle, tokens, isRTL, t, onPress }) {
             <View
               style={[
                 cycleStyles.metaRow,
-                { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                { flexDirection: rowDirection(isRTL) },
               ]}
             >
               <View
                 style={[
                   cycleStyles.metaPiece,
-                  { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                  { flexDirection: rowDirection(isRTL) },
                 ]}
               >
                 <Bird size={11} color={mutedColor} strokeWidth={2.2} />
@@ -669,13 +670,13 @@ function CycleRow({ cycle, tokens, isRTL, t, onPress }) {
       <View
         style={[
           cycleStyles.progressLabelRow,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
         <View
           style={[
             cycleStyles.progressLabelLeft,
-            { flexDirection: isRTL ? 'row-reverse' : 'row' },
+            { flexDirection: rowDirection(isRTL) },
           ]}
         >
           <Calendar size={11} color={mutedColor} strokeWidth={2.4} />

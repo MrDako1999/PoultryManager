@@ -3,6 +3,7 @@ import { ChevronRight, ChevronLeft } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 /**
  * BatchKpiCard — single reusable KPI card used across Batch Detail tabs.
@@ -62,13 +63,13 @@ export default function BatchKpiCard({
         <View
           style={[
             styles.headlineRow,
-            { flexDirection: isRTL ? 'row-reverse' : 'row' },
+            { flexDirection: rowDirection(isRTL) },
           ]}
         >
           <View
             style={[
               styles.headlineTextRow,
-              { flexDirection: isRTL ? 'row-reverse' : 'row' },
+              { flexDirection: rowDirection(isRTL) },
               (headlinePrefixSubscript || headlineSuffixSubscript)
                 ? styles.headlineTextRowSubscript
                 : null,
@@ -154,7 +155,7 @@ export default function BatchKpiCard({
             fontFamily: 'Poppins-Medium',
             color: sublineColor || mutedColor,
             marginTop: 4,
-            textAlign: isRTL ? 'right' : 'left',
+            textAlign: textAlignStart(isRTL),
           }}
           numberOfLines={1}
         >
@@ -172,7 +173,7 @@ export default function BatchKpiCard({
           style={[
             styles.statsRow,
             {
-              flexDirection: isRTL ? 'row-reverse' : 'row',
+              flexDirection: rowDirection(isRTL),
               borderTopColor: borderColor,
               marginTop: (children || subline || headline != null) ? 16 : 0,
             },
@@ -183,7 +184,7 @@ export default function BatchKpiCard({
               key={stat.label || `s${i}`}
               style={[
                 styles.statsCellWrap,
-                { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                { flexDirection: rowDirection(isRTL) },
               ]}
             >
               {i > 0 ? (
@@ -238,7 +239,7 @@ export default function BatchKpiCard({
         <View
           style={[
             styles.eyebrow,
-            { flexDirection: isRTL ? 'row-reverse' : 'row' },
+            { flexDirection: rowDirection(isRTL) },
           ]}
         >
           {Icon ? <Icon size={13} color={mutedColor} strokeWidth={2.2} /> : null}
@@ -301,7 +302,7 @@ export function StatCell({
       <View
         style={[
           statStyles.labelRow,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
         {Icon ? <Icon size={11} color={mutedColor} strokeWidth={2.4} /> : null}
@@ -325,7 +326,7 @@ export function StatCell({
           lineHeight: 18,
           fontFamily: 'Poppins-SemiBold',
           color: valueColor || textColor,
-          textAlign: isRTL ? 'right' : 'left',
+          textAlign: textAlignStart(isRTL),
         }}
         numberOfLines={1}
         adjustsFontSizeToFit
@@ -340,7 +341,7 @@ export function StatCell({
             lineHeight: 15,
             fontFamily: 'Poppins-Medium',
             color: subValueColor || mutedColor,
-            textAlign: isRTL ? 'right' : 'left',
+            textAlign: textAlignStart(isRTL),
             marginTop: 2,
           }}
           numberOfLines={1}

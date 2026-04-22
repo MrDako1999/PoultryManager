@@ -5,6 +5,7 @@ import * as Haptics from 'expo-haptics';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
 import CtaButton from '@/components/ui/CtaButton';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 /**
  * FormSheet — reusable design-language chrome for create / edit sheets.
@@ -99,7 +100,7 @@ export default function FormSheet({
         <View
           style={[
             styles.header,
-            { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: sheetBg },
+            { flexDirection: rowDirection(isRTL), backgroundColor: sheetBg },
           ]}
         >
           {Icon ? (
@@ -121,7 +122,7 @@ export default function FormSheet({
                 fontFamily: 'Poppins-SemiBold',
                 color: textColor,
                 letterSpacing: -0.2,
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
               }}
               numberOfLines={1}
             >
@@ -134,7 +135,7 @@ export default function FormSheet({
                   fontFamily: 'Poppins-Regular',
                   color: mutedColor,
                   marginTop: 1,
-                  textAlign: isRTL ? 'right' : 'left',
+                  textAlign: textAlignStart(isRTL),
                 }}
                 numberOfLines={1}
               >

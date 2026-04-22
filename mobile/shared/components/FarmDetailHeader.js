@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, Pencil } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 /**
  * Compact brand-gradient header strip for the Farm Detail screen.
@@ -69,7 +70,7 @@ export default function FarmDetailHeader({
       <View
         style={[
           styles.row,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
         <Pressable
@@ -103,7 +104,7 @@ export default function FarmDetailHeader({
               color: '#ffffff',
               letterSpacing: -0.3,
               lineHeight: 26,
-              textAlign: isRTL ? 'right' : 'left',
+              textAlign: textAlignStart(isRTL),
               writingDirection: isRTL ? 'rtl' : 'ltr',
             }}
             numberOfLines={1}
@@ -117,7 +118,7 @@ export default function FarmDetailHeader({
                 fontFamily: 'Poppins-Regular',
                 color: 'rgba(255,255,255,0.78)',
                 marginTop: 4,
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
                 writingDirection: isRTL ? 'rtl' : 'ltr',
               }}
               numberOfLines={1}

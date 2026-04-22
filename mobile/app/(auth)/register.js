@@ -20,6 +20,7 @@ import SheetInput, { SheetPasswordInput } from '@/components/SheetInput';
 import PhoneInput from '@/components/PhoneInput';
 import PasswordStrength from '@/components/PasswordStrength';
 import AuthHeroToolbar from '@/components/AuthHeroToolbar';
+import { rowDirection, leadingAlignment, textAlignStart } from '@/lib/rtl';
 
 const banner = require('@/assets/images/banner-white.png');
 
@@ -66,7 +67,7 @@ export default function RegisterScreen() {
   const { toast } = useToast();
   const isRTL = useIsRTL();
   const ForwardArrow = isRTL ? ArrowLeft : ArrowRight;
-  const row = isRTL ? 'row-reverse' : 'row';
+  const row = rowDirection(isRTL);
 
   const {
     control,
@@ -180,7 +181,7 @@ function ModulePickerStep({ t, isRTL, row, ForwardArrow, selectedModules, onTogg
         style={{
           marginHorizontal: 16,
           marginBottom: 12,
-          alignItems: isRTL ? 'flex-end' : 'flex-start',
+          alignItems: leadingAlignment(isRTL),
         }}
       >
         <CountChip count={activeCount} t={t} />
@@ -340,7 +341,7 @@ function ModuleCard({ mod, isRTL, isSelected, onToggle, t }) {
       <View
         style={[
           styles.cardRow,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
         {/* Icon tile — fixed width, never shrinks */}
@@ -566,7 +567,7 @@ function FormStep({
               fontFamily: 'Poppins-Medium',
               color: textColor,
               marginHorizontal: 4,
-              textAlign: isRTL ? 'right' : 'left',
+              textAlign: textAlignStart(isRTL),
             }}
           >
             {t('auth.phone')}

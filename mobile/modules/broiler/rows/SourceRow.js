@@ -4,6 +4,7 @@ import * as Haptics from 'expo-haptics';
 import { Calendar } from 'lucide-react-native';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 const NUMERIC_LOCALE = 'en-US';
 
@@ -47,7 +48,7 @@ export default function SourceRow({ source, onClick }) {
         <View
           style={[
             styles.row,
-            { flexDirection: isRTL ? 'row-reverse' : 'row' },
+            { flexDirection: rowDirection(isRTL) },
           ]}
         >
           <View style={styles.textCol}>
@@ -57,7 +58,7 @@ export default function SourceRow({ source, onClick }) {
                 fontFamily: 'Poppins-SemiBold',
                 color: textColor,
                 letterSpacing: -0.1,
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
               }}
               numberOfLines={1}
             >
@@ -66,14 +67,14 @@ export default function SourceRow({ source, onClick }) {
             <View
               style={[
                 styles.metaRow,
-                { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                { flexDirection: rowDirection(isRTL) },
               ]}
             >
               {dateLabel ? (
                 <View
                   style={[
                     styles.metaPiece,
-                    { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                    { flexDirection: rowDirection(isRTL) },
                   ]}
                 >
                   <Calendar size={11} color={mutedColor} strokeWidth={2.2} />

@@ -5,6 +5,7 @@ import {
 import { ChevronDown, ChevronRight, ChevronLeft } from 'lucide-react-native';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -59,7 +60,7 @@ export default function ExpenseCategoryGroup({
         <View
           style={[
             styles.headerInner,
-            { flexDirection: isRTL ? 'row-reverse' : 'row' },
+            { flexDirection: rowDirection(isRTL) },
           ]}
         >
           <Glyph size={14} color={mutedColor} strokeWidth={2.4} />
@@ -71,7 +72,7 @@ export default function ExpenseCategoryGroup({
               color: mutedColor,
               letterSpacing: 1.2,
               textTransform: 'uppercase',
-              textAlign: isRTL ? 'right' : 'left',
+              textAlign: textAlignStart(isRTL),
             }}
             numberOfLines={1}
           >
@@ -81,7 +82,7 @@ export default function ExpenseCategoryGroup({
             <View
               style={[
                 styles.pillRow,
-                { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                { flexDirection: rowDirection(isRTL) },
               ]}
             >
               {pills.map((pill, i) => (
@@ -101,7 +102,7 @@ export default function ExpenseCategoryGroup({
             <View
               style={[
                 styles.pillRow,
-                { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                { flexDirection: rowDirection(isRTL) },
               ]}
             >
               {total != null ? (

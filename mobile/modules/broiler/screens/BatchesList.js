@@ -16,6 +16,7 @@ import {
 } from 'lucide-react-native';
 import useLocalQuery from '@/hooks/useLocalQuery';
 import useOfflineMutation from '@/hooks/useOfflineMutation';
+import useCapabilities from '@/hooks/useCapabilities';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import SheetSection from '@/components/SheetSection';
 import SheetInput from '@/components/SheetInput';
@@ -32,6 +33,7 @@ import { deltaSync } from '@/lib/syncEngine';
 import BatchSheet from '@/modules/broiler/sheets/BatchSheet';
 import BatchAvatar from '@/modules/broiler/components/BatchAvatar';
 import { getStatusConfig } from '@/modules/broiler/lib/batchStatusConfig';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -67,12 +69,18 @@ export default function BatchesScreen() {
 
   const { toast } = useToast();
   const { remove } = useOfflineMutation('batches');
+  const { can } = useCapabilities();
+  const canCreate = can('batch:create');
 
   const [searchQuery, setSearchQuery] = useState('');
   const [farmFilter, setFarmFilter] = useState([]);
   // dateRange = { from?: 'YYYY-MM-DD', to?: 'YYYY-MM-DD' } | null
   const [dateRange, setDateRange] = useState(null);
-  const [statusFilter, setStatusFilter] = useState('all');
+  // Default to in-progress only — workers and managers both land here
+  // most often looking at live cycles, not historical ones. The
+  // status picker still exposes 'all' / 'inactive' so anyone who
+  // needs the wider view can flip it themselves.
+  const [statusFilter, setStatusFilter] = useState('active');
   const [dateSheetOpen, setDateSheetOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [batchSheet, setBatchSheet] = useState({ open: false, data: null });
@@ -393,7 +401,7 @@ export default function BatchesScreen() {
         </View>
       </ScrollView>
 
-      {!batchSheet.open && (
+      {!batchSheet.open && canCreate && (
         <QuickAddFAB
           items={[]}
           directAction={openCreate}
@@ -475,7 +483,7 @@ function BrandHeader({ title, subtitle, gradient, topInset, isRTL }) {
     >
       <View
         style={{
-          flexDirection: isRTL ? 'row-reverse' : 'row',
+          flexDirection: rowDirection(isRTL),
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: 12,
@@ -489,7 +497,7 @@ function BrandHeader({ title, subtitle, gradient, topInset, isRTL }) {
               color: '#ffffff',
               letterSpacing: -0.4,
               lineHeight: 30,
-              textAlign: isRTL ? 'right' : 'left',
+              textAlign: textAlignStart(isRTL),
               writingDirection: isRTL ? 'rtl' : 'ltr',
             }}
             numberOfLines={1}
@@ -503,7 +511,7 @@ function BrandHeader({ title, subtitle, gradient, topInset, isRTL }) {
                 fontFamily: 'Poppins-Regular',
                 color: 'rgba(255,255,255,0.78)',
                 marginTop: 4,
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
                 writingDirection: isRTL ? 'rtl' : 'ltr',
               }}
               numberOfLines={1}
@@ -569,7 +577,7 @@ function Toolbar({
       <View
         style={[
           toolbarStyles.searchRow,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
         <View style={{ flex: 1, minWidth: 0 }}>
@@ -615,7 +623,7 @@ function Toolbar({
             <View
               style={[
                 toolbarStyles.resetChipInner,
-                { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                { flexDirection: rowDirection(isRTL) },
               ]}
             >
               <RotateCcw size={14} color={accentColor} strokeWidth={2.4} />
@@ -660,7 +668,7 @@ function Toolbar({
       <View
         style={[
           toolbarStyles.triggerRow,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
         <FilterTrigger
@@ -726,7 +734,7 @@ function FilterTrigger({ icon: Icon, label, active, countBadge, onPress, isRTL, 
       <View
         style={[
           toolbarStyles.triggerInner,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
         <View
@@ -752,7 +760,7 @@ function FilterTrigger({ icon: Icon, label, active, countBadge, onPress, isRTL, 
             fontSize: 13,
             fontFamily: active ? 'Poppins-SemiBold' : 'Poppins-Medium',
             color: active ? accentColor : textColor,
-            textAlign: isRTL ? 'right' : 'left',
+            textAlign: textAlignStart(isRTL),
           }}
           numberOfLines={1}
         >
@@ -794,7 +802,7 @@ function FarmGroupSection({
         hitSlop={6}
         style={[
           sectionStyles.eyebrow,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
         <Text
@@ -805,7 +813,7 @@ function FarmGroupSection({
             color: mutedColor,
             letterSpacing: 1.4,
             textTransform: 'uppercase',
-            textAlign: isRTL ? 'right' : 'left',
+            textAlign: textAlignStart(isRTL),
           }}
           numberOfLines={1}
         >
@@ -1009,7 +1017,7 @@ function BatchRow({
         <View
           style={[
             cardStyles.headerRow,
-            { flexDirection: isRTL ? 'row-reverse' : 'row' },
+            { flexDirection: rowDirection(isRTL) },
           ]}
         >
           <BatchAvatar
@@ -1026,7 +1034,7 @@ function BatchRow({
                 fontFamily: 'Poppins-SemiBold',
                 color: textColor,
                 letterSpacing: -0.1,
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
               }}
               numberOfLines={1}
             >
@@ -1036,13 +1044,13 @@ function BatchRow({
               <View
                 style={[
                   cardStyles.metaRow,
-                  { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                  { flexDirection: rowDirection(isRTL) },
                 ]}
               >
                 <View
                   style={[
                     cardStyles.metaPiece,
-                    { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                    { flexDirection: rowDirection(isRTL) },
                   ]}
                 >
                   <Bird size={11} color={mutedColor} strokeWidth={2.2} />
@@ -1086,13 +1094,13 @@ function BatchRow({
         <View
           style={[
             cardStyles.progressLabelRow,
-            { flexDirection: isRTL ? 'row-reverse' : 'row' },
+            { flexDirection: rowDirection(isRTL) },
           ]}
         >
           <View
             style={[
               cardStyles.progressLabelLeft,
-              { flexDirection: isRTL ? 'row-reverse' : 'row' },
+              { flexDirection: rowDirection(isRTL) },
             ]}
           >
             <Calendar size={11} color={mutedColor} strokeWidth={2.4} />

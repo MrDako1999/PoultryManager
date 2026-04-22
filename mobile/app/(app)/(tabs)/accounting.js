@@ -12,6 +12,7 @@ import ComingSoonView from '@/components/views/ComingSoonView';
 import Tabs from '@/components/ui/Tabs';
 import SyncIconButton from '@/components/SyncIconButton';
 import { MODULES } from '@/modules/registry';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 // Global accounting tabs that aren't owned by any single module — currently
 // VAT and Corporate Tax placeholders, mirroring the frontend sidebar's
@@ -143,7 +144,7 @@ function BrandHeader({ title, subtitle, gradient, topInset, isRTL }) {
       <View
         style={[
           headerStyles.row,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
         <View style={{ flex: 1, minWidth: 0 }}>
@@ -154,7 +155,7 @@ function BrandHeader({ title, subtitle, gradient, topInset, isRTL }) {
               color: '#ffffff',
               letterSpacing: -0.4,
               lineHeight: 30,
-              textAlign: isRTL ? 'right' : 'left',
+              textAlign: textAlignStart(isRTL),
               writingDirection: isRTL ? 'rtl' : 'ltr',
             }}
             numberOfLines={1}
@@ -168,7 +169,7 @@ function BrandHeader({ title, subtitle, gradient, topInset, isRTL }) {
                 fontFamily: 'Poppins-Regular',
                 color: 'rgba(255,255,255,0.78)',
                 marginTop: 4,
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
                 writingDirection: isRTL ? 'rtl' : 'ltr',
               }}
               numberOfLines={1}

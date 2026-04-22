@@ -19,6 +19,7 @@ import QuickAddBusinessSheet from '@/shared/sheets/QuickAddBusinessSheet';
 import useLocalQuery from '@/hooks/useLocalQuery';
 import useOfflineMutation from '@/hooks/useOfflineMutation';
 import { useToast } from '@/components/ui/Toast';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 const FARM_TYPES = ['hatchery', 'broiler', 'free_range', 'layer_eggs', 'slaughterhouse'];
 const QUICK_ADD_VALUE = '__quick_add__';
@@ -200,7 +201,7 @@ export default function FarmSheet({ open, onClose, editData, onDelete, canDelete
         housesState.map(async (house, idx) => {
           const housePayload = {
             farm: farmId,
-            name: house.name || `House ${idx + 1}`,
+            name: house.name || t('farms.houseN', 'House {{n}}', { n: idx + 1 }),
             capacity: house.capacity || 0,
             sortOrder: idx,
           };
@@ -322,7 +323,7 @@ export default function FarmSheet({ open, onClose, editData, onDelete, canDelete
             onPress={editLinkedBiz}
             hitSlop={6}
             style={{
-              flexDirection: isRTL ? 'row-reverse' : 'row',
+              flexDirection: rowDirection(isRTL),
               alignItems: 'center',
               gap: 4,
               paddingHorizontal: 4,
@@ -353,7 +354,7 @@ export default function FarmSheet({ open, onClose, editData, onDelete, canDelete
           clearable
         />
 
-        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10 }}>
+        <View style={{ flexDirection: rowDirection(isRTL), gap: 10 }}>
           <View style={{ flex: 1 }}>
             <FormField label={t('farms.tradeLicenseNumber', 'Trade License #')}>
               <Controller
@@ -397,7 +398,7 @@ export default function FarmSheet({ open, onClose, editData, onDelete, canDelete
               fontFamily: 'Poppins-Regular',
               color: tokens.mutedColor,
               marginHorizontal: 4,
-              textAlign: isRTL ? 'right' : 'left',
+              textAlign: textAlignStart(isRTL),
               lineHeight: 17,
             }}
           >

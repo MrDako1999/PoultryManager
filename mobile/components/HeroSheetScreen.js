@@ -9,6 +9,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import useThemeStore from '@/stores/themeStore';
 import { useIsRTL } from '@/stores/localeStore';
+import { rowDirection, leadingAlignment, textAlignStart } from '@/lib/rtl';
 
 export function useHeroSheetTokens() {
   const { resolvedTheme } = useThemeStore();
@@ -163,19 +164,19 @@ export default function HeroSheetScreen({
       {heroExtraHeaderMerged ? (
         <View
           style={{
-            flexDirection: isRTL ? 'row-reverse' : 'row',
+            flexDirection: rowDirection(isRTL),
             alignItems: 'center',
             justifyContent: 'space-between',
             marginBottom: mergedToolbarMarginBottom,
             gap: 12,
           }}
         >
-          <View style={{ alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
+          <View style={{ alignItems: leadingAlignment(isRTL) }}>
             {heroExtra}
           </View>
           <View
             style={{
-              flexDirection: isRTL ? 'row-reverse' : 'row',
+              flexDirection: rowDirection(isRTL),
               alignItems: 'center',
               gap: 8,
             }}
@@ -188,7 +189,7 @@ export default function HeroSheetScreen({
           {(showBack || headerRight) && (
             <View
               style={{
-                flexDirection: isRTL ? 'row-reverse' : 'row',
+                flexDirection: rowDirection(isRTL),
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 marginBottom: classicToolbarMarginBottom,
@@ -221,7 +222,7 @@ export default function HeroSheetScreen({
             <View
               style={{
                 marginBottom: heroExtraMarginBottom,
-                alignItems: isRTL ? 'flex-end' : 'flex-start',
+                alignItems: leadingAlignment(isRTL),
               }}
             >
               {heroExtra}
@@ -238,7 +239,7 @@ export default function HeroSheetScreen({
             color: '#ffffff',
             letterSpacing: -0.5,
             lineHeight: 34,
-            textAlign: isRTL ? 'right' : 'left',
+            textAlign: textAlignStart(isRTL),
             writingDirection: isRTL ? 'rtl' : 'ltr',
           }}
         >
@@ -251,7 +252,7 @@ export default function HeroSheetScreen({
               fontFamily: 'Poppins-Regular',
               color: 'rgba(255,255,255,0.85)',
               lineHeight: 20,
-              textAlign: isRTL ? 'right' : 'left',
+              textAlign: textAlignStart(isRTL),
               writingDirection: isRTL ? 'rtl' : 'ltr',
             }}
           >
@@ -430,7 +431,7 @@ export default function HeroSheetScreen({
           >
             <View
               style={{
-                flexDirection: isRTL ? 'row-reverse' : 'row',
+                flexDirection: rowDirection(isRTL),
                 alignItems: 'center',
                 gap: 12,
                 minHeight: compactBarContentHeight,
@@ -459,7 +460,7 @@ export default function HeroSheetScreen({
                   fontFamily: 'Poppins-SemiBold',
                   color: '#ffffff',
                   letterSpacing: -0.2,
-                  textAlign: isRTL ? 'right' : 'left',
+                  textAlign: textAlignStart(isRTL),
                   writingDirection: isRTL ? 'rtl' : 'ltr',
                 }}
                 numberOfLines={1}

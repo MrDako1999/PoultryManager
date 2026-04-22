@@ -2,6 +2,7 @@ import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
+import { rowDirection } from '@/lib/rtl';
 
 /**
  * Horizontal scrollable chip row used by the accounting list views.
@@ -27,7 +28,7 @@ export default function FilterChips({ value, onChange, options }) {
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={[
         styles.row,
-        { flexDirection: isRTL ? 'row-reverse' : 'row' },
+        { flexDirection: rowDirection(isRTL) },
       ]}
     >
       {options.map((opt) => {
@@ -57,7 +58,7 @@ export default function FilterChips({ value, onChange, options }) {
             <View
               style={[
                 styles.chipInner,
-                { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                { flexDirection: rowDirection(isRTL) },
               ]}
             >
               {Icon ? (

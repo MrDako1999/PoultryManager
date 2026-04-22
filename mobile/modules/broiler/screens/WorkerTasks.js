@@ -4,11 +4,10 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
-  Home, ClipboardList, ChevronRight, ChevronLeft,
-  CheckCircle2, Circle, Sun, Sunrise, Sunset, Moon,
+  ListChecks, ClipboardList, Home, CheckCircle2, Circle,
+  ChevronRight, ChevronLeft, Weight, Thermometer,
 } from 'lucide-react-native';
 import useAuthStore from '@/stores/authStore';
 import useLocalQuery from '@/hooks/useLocalQuery';
@@ -16,26 +15,35 @@ import HeroSheetScreen, { useHeroSheetTokens } from '@/components/HeroSheetScree
 import SheetSection from '@/components/SheetSection';
 import EmptyState from '@/components/ui/EmptyState';
 import SyncIconButton from '@/components/SyncIconButton';
+import QuickAddFAB from '@/components/QuickAddFAB';
 import { useIsRTL } from '@/stores/localeStore';
 import { deltaSync } from '@/lib/syncEngine';
 import DailyLogSheet from '@/modules/broiler/sheets/DailyLogSheet';
 import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 /**
- * Ground-staff "Today" landing.
+ * Worker Tasks — virtual daily checklist for ground_staff.
  *
- * Shows the worker's assigned houses as inline cards. Status comes
- * from their own DailyLog entries dated today (idempotency rule per
- * the unique index in [backend/models/DailyLog.js]).
+ * One row per assigned house. Status is derived at read time from the
+ * worker's existing DailyLog records:
+ *   - "submitted": this user has a DAILY log for this house dated today.
+ *   - "pending":   no DAILY log yet.
  *
- * Tapping a house card opens DailyLogSheet pre-pinned to that house +
- * its active batch. If the worker has already logged today the sheet
- * opens in edit mode against the existing record. If the user wants
- * the deeper batch view they tap the small "Open batch" affordance on
- * the right; the primary tap is the daily-log action.
+ * No new DB entity. No background job. The list rebuilds from scratch
+ * after midnight automatically because the derivation key is
+ * `isSameLocalDay(log.date, now)`.
  *
- * The Tasks tab provides the same actions in a denser checklist
- * format; this screen leans more "today greeting + cards".
+ * The same scope-resolution recipe used by WorkerHome lives here too —
+ * `farmAssignments` (primary) ∪ legacy `houseAssignments`. Mirrors the
+ * backend helper in [backend/services/workerScope.js].
+ *
+ * Tapping a row opens the standard DailyLogSheet pre-pinned to the
+ * tapped house and its active batch (`logType=DAILY`). If a log already
+ * exists for today the sheet opens in edit mode against it.
+ *
+ * The FAB offers WEIGHT and ENVIRONMENT entry — sample/spot readings
+ * a worker may add on top of their daily log. Capability-gated: shows
+ * only when the user has `dailyLog:create:<TYPE>`.
  */
 
 function isSameLocalDay(a, b) {
@@ -43,43 +51,14 @@ function isSameLocalDay(a, b) {
   return new Date(a).toDateString() === new Date(b).toDateString();
 }
 
-function getGreetingBucket(hour) {
-  if (hour < 5) return 'night';
-  if (hour < 12) return 'morning';
-  if (hour < 17) return 'afternoon';
-  if (hour < 22) return 'evening';
-  return 'night';
-}
-
-const BUCKET_TO_KEY = {
-  morning: 'dashboard.greetingMorning',
-  afternoon: 'dashboard.greetingAfternoon',
-  evening: 'dashboard.greetingEvening',
-  night: 'dashboard.greetingNight',
-};
-
-const BUCKET_TO_FALLBACK = {
-  morning: 'Good morning, {{name}}',
-  afternoon: 'Good afternoon, {{name}}',
-  evening: 'Good evening, {{name}}',
-  night: 'Working late, {{name}}',
-};
-
-const BUCKET_TO_ICON = {
-  morning: Sunrise,
-  afternoon: Sun,
-  evening: Sunset,
-  night: Moon,
-};
-
-export default function WorkerHome() {
-  const { t, i18n } = useTranslation();
+export default function WorkerTasksScreen() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const isRTL = useIsRTL();
   const tokens = useHeroSheetTokens();
-  const { accentColor, dark, mutedColor, sectionBorder } = tokens;
-  const { user } = useAuthStore();
+  const { accentColor, dark, mutedColor, textColor, sectionBorder } = tokens;
 
+  const { user } = useAuthStore();
   const [houses] = useLocalQuery('houses');
   const [batches] = useLocalQuery('batches');
   const [dailyLogs] = useLocalQuery('dailyLogs');
@@ -87,6 +66,9 @@ export default function WorkerHome() {
   const [farms] = useLocalQuery('farms');
 
   const [refreshing, setRefreshing] = useState(false);
+  // Open-state is split per "kind" so the FAB menu and the per-row
+  // "Log" CTA can't conflict. Each entry holds the targeting we need
+  // (house, batch, logType, optional editData for an existing log).
   const [logSheet, setLogSheet] = useState(null);
 
   const worker = useMemo(
@@ -122,6 +104,8 @@ export default function WorkerHome() {
       .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   }, [houses, assignedHouseIds]);
 
+  // Map house -> active batch (anything not yet COMPLETE that contains
+  // this house). Same recipe as WorkerHome.
   const activeBatchByHouse = useMemo(() => {
     const m = new Map();
     for (const batch of batches) {
@@ -134,6 +118,11 @@ export default function WorkerHome() {
     return m;
   }, [batches]);
 
+  // For each assigned house, find my DAILY log dated today (if any).
+  // The `(user_id, batch, house, date, logType)` unique index in
+  // [backend/models/DailyLog.js] guarantees at most one DAILY per
+  // house/day/account, so we can safely treat the first match as
+  // canonical.
   const myTodayLogByHouse = useMemo(() => {
     const now = new Date();
     const m = new Map();
@@ -150,19 +139,20 @@ export default function WorkerHome() {
     return m;
   }, [dailyLogs, user?._id]);
 
-  // Index farms by id once for cheap lookup when attaching farm
-  // metadata to each task. House.farm may be a populated object or a
-  // bare ObjectId string depending on which sync endpoint hydrated it.
+  // Index farms by id for cheap lookup when attaching farm metadata
+  // to each task. House.farm is an ObjectId or a populated object
+  // depending on which sync endpoint hydrated it.
   const farmsById = useMemo(() => {
     const m = new Map();
     for (const f of farms) m.set(String(f._id), f);
     return m;
   }, [farms]);
 
-  // Mirrors the Tasks tab: only houses with an active batch are
-  // actionable today. Houses sitting empty between cycles are dropped
-  // from the list. The empty state below differentiates "no farm
-  // assignments" from "assigned but no live batch yet".
+  // Tasks only exist when there's an active batch to log against.
+  // Houses sitting empty between cycles (no active batch) are silently
+  // dropped — there's nothing for the worker to do until intake. The
+  // empty-state copy below distinguishes "no assignments at all" from
+  // "assigned but no live batch yet" so the worker knows which.
   const tasks = useMemo(() => {
     return myHouses
       .map((house) => {
@@ -188,9 +178,10 @@ export default function WorkerHome() {
       .filter(Boolean);
   }, [myHouses, activeBatchByHouse, myTodayLogByHouse, farmsById]);
 
-  // Group by farm, then sort farms alphabetically and houses inside
-  // each farm with a natural-numeric collator so "House 2" comes
-  // before "House 10" instead of after it.
+  // Group by farm and sort with a natural-numeric collator inside
+  // each group so "House 2" comes before "House 10". Pending rows
+  // float to the top of each farm so the worker still sees what
+  // needs doing first within a farm without losing the grouping.
   const farmGroups = useMemo(() => {
     const naturalCollator = new Intl.Collator(undefined, {
       numeric: true,
@@ -205,16 +196,17 @@ export default function WorkerHome() {
           farmName:
             task.farm?.farmName
             || task.farm?.nickname
-            || t('worker.home.unknownFarm', 'Unassigned farm'),
+            || t('worker.tasks.unknownFarm', 'Unassigned farm'),
           tasks: [],
         });
       }
       groups.get(key).tasks.push(task);
     }
     for (const group of groups.values()) {
-      group.tasks.sort((a, b) =>
-        naturalCollator.compare(a.house.name || '', b.house.name || '')
-      );
+      group.tasks.sort((a, b) => {
+        if (a.status !== b.status) return a.status === 'pending' ? -1 : 1;
+        return naturalCollator.compare(a.house.name || '', b.house.name || '');
+      });
     }
     return [...groups.values()].sort((a, b) =>
       naturalCollator.compare(a.farmName, b.farmName)
@@ -225,54 +217,54 @@ export default function WorkerHome() {
   const totalCount = tasks.length;
   const hasAssignments = myHouses.length > 0;
 
-  const todayLabel = useMemo(() => {
-    try {
-      return new Date().toLocaleDateString(i18n.language, {
-        weekday: 'long',
-        month: 'long',
-        day: 'numeric',
-      });
-    } catch {
-      return new Date().toLocaleDateString();
-    }
-  }, [i18n.language]);
-
-  const greetingBucket = useMemo(() => getGreetingBucket(new Date().getHours()), []);
-  const greeting = useMemo(() => {
-    const name = user?.firstName || (user?.email ? user.email.split('@')[0] : '');
-    return t(BUCKET_TO_KEY[greetingBucket], BUCKET_TO_FALLBACK[greetingBucket], { name });
-  }, [t, user?.firstName, user?.email, greetingBucket]);
-
-  const subtitle = totalCount === 0
-    ? todayLabel
-    : submittedCount === totalCount
-      ? `${todayLabel} · ${t('worker.home.subtitleAllDone', 'all caught up')}`
-      : `${todayLabel} · ${t('worker.home.subtitlePending', '{{n}} of {{total}} houses logged', { n: submittedCount, total: totalCount })}`;
-
   const onRefresh = async () => {
     setRefreshing(true);
     try { await deltaSync(); } catch (e) { console.error(e); }
     setRefreshing(false);
   };
 
-  const openLogSheet = (task) => {
+  // Single entry point so per-row CTA + FAB menu use identical wiring.
+  // `kind` decides logType; falls back to DAILY edit when an existing
+  // log is found for today (idempotency rule).
+  const openLogSheet = ({ task, kind }) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     if (!task?.batch) return;
     const houseId = String(task.house._id);
     setLogSheet({
       batchId: task.batch._id || task.batch,
       defaultHouseId: houseId,
-      defaultLogType: 'DAILY',
-      editData: task.existing || null,
+      defaultLogType: kind,
+      editData: kind === 'DAILY' ? task.existing : null,
+      // Single-house list keeps the in-sheet picker simple (and locked
+      // to the right house); we still pass the array so the existing
+      // Select inside DailyLogSheet renders correctly.
       houses: [{ _id: houseId, name: task.house.name }],
     });
   };
 
-  const HeroIcon = BUCKET_TO_ICON[greetingBucket];
+  // FAB picks the first pending row to direct WEIGHT/ENVIRONMENT into;
+  // if everything's submitted, take the first row regardless. Workers
+  // rarely have more than 1-3 houses, so this is the right default.
+  const fabAnchor = tasks[0] || null;
+
+  const fabItems = fabAnchor ? [
+    {
+      key: 'weight',
+      icon: Weight,
+      label: t('worker.tasks.addWeight', 'Sample weight'),
+      onPress: () => openLogSheet({ task: fabAnchor, kind: 'WEIGHT' }),
+    },
+    {
+      key: 'environment',
+      icon: Thermometer,
+      label: t('worker.tasks.addEnvironment', 'Environment reading'),
+      onPress: () => openLogSheet({ task: fabAnchor, kind: 'ENVIRONMENT' }),
+    },
+  ] : [];
 
   const heroExtra = (
     <View style={styles.heroIconTile}>
-      <HeroIcon size={26} color="#ffffff" strokeWidth={2} />
+      <ListChecks size={26} color="#ffffff" strokeWidth={2} />
     </View>
   );
 
@@ -281,7 +273,7 @@ export default function WorkerHome() {
       {totalCount > 0 ? (
         <View style={styles.heroPill}>
           <Text style={styles.heroPillText}>
-            {t('worker.home.progress', '{{done}} / {{total}}', {
+            {t('worker.tasks.progress', '{{done}} / {{total}}', {
               done: submittedCount,
               total: totalCount,
             })}
@@ -295,12 +287,19 @@ export default function WorkerHome() {
   return (
     <View style={{ flex: 1 }}>
       <HeroSheetScreen
-        title={greeting}
-        subtitle={subtitle}
+        title={t('worker.tasks.title', "Today's Tasks")}
+        subtitle={
+          totalCount === 0
+            ? t('worker.tasks.subtitleEmpty', 'No assigned houses yet')
+            : submittedCount === totalCount
+              ? t('worker.tasks.subtitleAllDone', 'All caught up — great work!')
+              : t('worker.tasks.subtitlePending', '{{n}} houses still need a daily log', {
+                  n: totalCount - submittedCount,
+                })
+        }
         showBack={false}
         heroExtra={heroExtra}
         headerRight={headerRight}
-        scrollableHero
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -349,17 +348,12 @@ export default function WorkerHome() {
                       : null
                   }
                 >
-                  <HouseCard
+                  <TaskRow
                     task={task}
                     tokens={tokens}
                     isRTL={isRTL}
                     t={t}
-                    onLog={() => openLogSheet(task)}
-                    onOpenBatch={
-                      task.batch?._id
-                        ? () => router.push(`/(app)/batch/${task.batch._id}`)
-                        : null
-                    }
+                    onPress={() => openLogSheet({ task, kind: 'DAILY' })}
                   />
                 </View>
               ))}
@@ -367,6 +361,13 @@ export default function WorkerHome() {
           ))
         )}
       </HeroSheetScreen>
+
+      {logSheet === null && fabItems.length > 0 ? (
+        <QuickAddFAB
+          items={fabItems}
+          bottomInset={insets.bottom + 49}
+        />
+      ) : null}
 
       <DailyLogSheet
         open={!!logSheet}
@@ -381,25 +382,29 @@ export default function WorkerHome() {
   );
 }
 
-function HouseCard({ task, tokens, isRTL, t, onLog, onOpenBatch }) {
-  const { textColor, mutedColor, accentColor, dark } = tokens;
+function TaskRow({ task, tokens, isRTL, t, onPress }) {
+  const { textColor, mutedColor, accentColor, dark, errorColor } = tokens;
   const submitted = task.status === 'submitted';
   const StatusIcon = submitted ? CheckCircle2 : Circle;
-  const statusColor = submitted ? accentColor : (dark ? '#fbbf24' : '#d97706');
   const ForwardChevron = isRTL ? ChevronLeft : ChevronRight;
+  const statusColor = submitted ? accentColor : (dark ? '#fbbf24' : '#d97706');
 
   const ctaLabel = submitted
     ? t('worker.tasks.viewDaily', 'View today\'s log')
     : t('worker.tasks.logDaily', 'Log daily');
 
   const subline = task.batch
-    ? task.batch.batchName
+    ? `${task.batch.batchName} · ${
+        t('worker.tasks.day', 'Day {{n}}', {
+          n: task.batch.cycleDay ?? deriveCycleDay(task.batch),
+        })
+      }`
     : t('worker.noActiveBatch', 'No active batch');
 
   return (
     <Pressable
       onPressIn={() => Haptics.selectionAsync().catch(() => {})}
-      onPress={onLog}
+      onPress={onPress}
       android_ripple={{
         color: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
         borderless: false,
@@ -433,7 +438,7 @@ function HouseCard({ task, tokens, isRTL, t, onLog, onOpenBatch }) {
           <View style={styles.textCol}>
             <Text
               style={{
-                fontSize: 16,
+                fontSize: 15,
                 fontFamily: 'Poppins-SemiBold',
                 color: textColor,
                 letterSpacing: -0.1,
@@ -476,35 +481,22 @@ function HouseCard({ task, tokens, isRTL, t, onLog, onOpenBatch }) {
             </View>
           </View>
 
-          {onOpenBatch ? (
-            <Pressable
-              onPress={(e) => {
-                e.stopPropagation?.();
-                Haptics.selectionAsync().catch(() => {});
-                onOpenBatch();
-              }}
-              hitSlop={10}
-              style={({ pressed }) => [
-                styles.openBatchBtn,
-                {
-                  borderColor: dark ? 'rgba(255,255,255,0.10)' : 'hsl(148, 14%, 86%)',
-                  backgroundColor: pressed
-                    ? (dark ? 'rgba(255,255,255,0.06)' : 'hsl(148, 18%, 94%)')
-                    : 'transparent',
-                },
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel={t('worker.home.openBatch', 'Open batch')}
-            >
-              <ForwardChevron size={16} color={mutedColor} strokeWidth={2.2} />
-            </Pressable>
-          ) : (
-            <ForwardChevron size={18} color={mutedColor} strokeWidth={2.2} />
-          )}
+          <ForwardChevron size={18} color={mutedColor} strokeWidth={2.2} />
         </View>
       </View>
     </Pressable>
   );
+}
+
+// Best-effort cycle-day fallback when the synced batch payload doesn't
+// include a precomputed `cycleDay` (some module list endpoints omit it
+// from the lean projection). Computed off `startDate` if present.
+function deriveCycleDay(batch) {
+  if (!batch?.startDate) return 1;
+  const start = new Date(batch.startDate);
+  const now = new Date();
+  const ms = now.getTime() - start.getTime();
+  return Math.max(1, Math.floor(ms / (1000 * 60 * 60 * 24)) + 1);
 }
 
 const styles = StyleSheet.create({
@@ -555,13 +547,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 5,
     marginTop: 6,
-  },
-  openBatchBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });

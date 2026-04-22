@@ -35,7 +35,9 @@ export default function MortalityChart({
       const houseId = typeof h.house === 'object' ? h.house?._id : h.house;
       return {
         id: houseId || `h${i}`,
-        name: (typeof h.house === 'object' ? h.house?.name : null) || h.name || `House ${i + 1}`,
+        name: (typeof h.house === 'object' ? h.house?.name : null)
+          || h.name
+          || t('farms.houseN', 'House {{n}}', { n: i + 1 }),
         color: colorForIndex(i),
       };
     });
@@ -75,7 +77,7 @@ export default function MortalityChart({
     }
 
     return { housesMeta: meta, dayLabels: labels, seriesByHouse: series, hasData: true };
-  }, [dailyLogs, houses, startDate, view]);
+  }, [dailyLogs, houses, startDate, view, t]);
 
   // X-axis ticks: even round-number steps (1, 7, 14, 21, ...) anchored at day 1,
   // chosen so visible labels are at least ~55px apart and never overlap.
@@ -196,7 +198,7 @@ function CumulativeLineChart({
 
   return (
     <View>
-      <View style={{ width: availableWidth, overflow: 'hidden' }}>
+      <ChartCanvas width={availableWidth}>
         <LineChart
           data={dataProps.data}
           data2={dataProps.data2}
@@ -235,7 +237,7 @@ function CumulativeLineChart({
           hideDataPoints
           pointerConfig={pointerConfig}
         />
-      </View>
+      </ChartCanvas>
       <FocusReadout
         pinIdx={pinIdx}
         dayLabels={dayLabels}
@@ -243,6 +245,34 @@ function CumulativeLineChart({
         housesMeta={housesMeta}
       />
       <Legend housesMeta={housesMeta} />
+    </View>
+  );
+}
+
+/**
+ * Wrapper that isolates `react-native-gifted-charts` from iOS RTL auto-
+ * flip. The library positions its pointer line / pointer dot using
+ * absolute `left` styles on plain Views, but draws the data line and
+ * dot points via SVG/Canvas which iOS does NOT mirror. With the host
+ * container in RTL, the pointer line ends up auto-flipped to the
+ * opposite side of the chart while the dots stay put — that's the
+ * "selection line at a different position than the dots" bug from the
+ * RTL screenshot.
+ *
+ * Forcing `direction: 'ltr'` on this wrapper reverts the auto-flip for
+ * the chart's internals only, so the line + dots line up again. The
+ * surrounding readout / legend stay in the host writing direction.
+ */
+function ChartCanvas({ width, children }) {
+  return (
+    <View
+      style={{
+        width,
+        overflow: 'hidden',
+        direction: 'ltr',
+      }}
+    >
+      {children}
     </View>
   );
 }
@@ -277,7 +307,7 @@ function DailyDeathsBarChart({
 
   return (
     <View>
-      <View style={{ width: availableWidth, overflow: 'hidden' }}>
+      <ChartCanvas width={availableWidth}>
         <BarChart
           stackData={stackData}
           xAxisLabelTexts={xAxisLabelTexts}
@@ -300,7 +330,7 @@ function DailyDeathsBarChart({
           highlightedBarConfig={{ color: 'rgba(150, 150, 150, 0.18)' }}
           onPress={(_item, idx) => setPinIdx(idx)}
         />
-      </View>
+      </ChartCanvas>
       <FocusReadout
         pinIdx={pinIdx}
         dayLabels={dayLabels}

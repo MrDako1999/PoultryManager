@@ -20,6 +20,7 @@ import useSettings from '@/hooks/useSettings';
 import { useIsRTL } from '@/stores/localeStore';
 import { SkeletonDetailPage } from '@/components/skeletons';
 import WorkerSheet from '@/shared/sheets/WorkerSheet';
+import { rowDirection, textAlignStart, textAlignEnd } from '@/lib/rtl';
 
 // Western digits everywhere (DL §12.4) — never i18n.language for numerics.
 const NUMERIC_LOCALE = 'en-US';
@@ -133,7 +134,7 @@ export default function WorkerScreen() {
   };
 
   const headerRight = (canEdit || canDelete) ? (
-    <View style={[heroStyles.actionsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+    <View style={[heroStyles.actionsRow, { flexDirection: rowDirection(isRTL) }]}>
       {canEdit ? (
         <Pressable
           onPress={openEdit}
@@ -279,7 +280,7 @@ export default function WorkerScreen() {
                       letterSpacing: 1,
                       textTransform: 'uppercase',
                       marginHorizontal: 4,
-                      textAlign: isRTL ? 'right' : 'left',
+                      textAlign: textAlignStart(isRTL),
                     }}
                     numberOfLines={1}
                   >
@@ -324,7 +325,7 @@ export default function WorkerScreen() {
               {
                 marginHorizontal: 16,
                 gap: 10,
-                flexDirection: isRTL ? 'row-reverse' : 'row',
+                flexDirection: rowDirection(isRTL),
               },
             ]}
           >
@@ -384,7 +385,7 @@ function KvRow({ tokens, isRTL, label, value, bold, negative, highlight }) {
     <View
       style={[
         kvStyles.row,
-        { flexDirection: isRTL ? 'row-reverse' : 'row' },
+        { flexDirection: rowDirection(isRTL) },
       ]}
     >
       <Text
@@ -393,7 +394,7 @@ function KvRow({ tokens, isRTL, label, value, bold, negative, highlight }) {
           fontSize: 13,
           fontFamily: bold ? 'Poppins-SemiBold' : 'Poppins-Regular',
           color: mutedColor,
-          textAlign: isRTL ? 'right' : 'left',
+          textAlign: textAlignStart(isRTL),
         }}
         numberOfLines={2}
       >
@@ -405,7 +406,7 @@ function KvRow({ tokens, isRTL, label, value, bold, negative, highlight }) {
           fontFamily: bold ? 'Poppins-SemiBold' : 'Poppins-Regular',
           color: negative ? errorColor : highlight ? accentColor : textColor,
           fontVariant: ['tabular-nums'],
-          textAlign: isRTL ? 'left' : 'right',
+          textAlign: textAlignEnd(isRTL),
         }}
       >
         {value}
@@ -427,7 +428,7 @@ function HouseCard({ tokens, isRTL, name }) {
         { backgroundColor: elevatedCardBg, borderColor: elevatedCardBorder },
       ]}
     >
-      <View style={[houseCardStyles.row, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+      <View style={[houseCardStyles.row, { flexDirection: rowDirection(isRTL) }]}>
         <View
           style={[
             houseCardStyles.iconTile,
@@ -442,7 +443,7 @@ function HouseCard({ tokens, isRTL, name }) {
             fontSize: 15,
             fontFamily: 'Poppins-SemiBold',
             color: textColor,
-            textAlign: isRTL ? 'right' : 'left',
+            textAlign: textAlignStart(isRTL),
           }}
           numberOfLines={1}
         >
@@ -497,7 +498,7 @@ function CtaButton({ variant, icon: Icon, label, onPress, isRTL, tokens }) {
       <View
         style={[
           ctaButtonStyles.inner,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
         <Icon size={18} color={fg} strokeWidth={2.4} />

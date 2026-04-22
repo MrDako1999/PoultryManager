@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View, Text, Pressable, Animated, Modal, StyleSheet, Easing,
-  useWindowDimensions, Platform,
+  useWindowDimensions, Platform, I18nManager,
 } from 'react-native';
 import { Plus } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
@@ -36,7 +36,7 @@ const EASE_OUT = Easing.bezier(0.16, 1, 0.3, 1);
 export default function QuickAddFAB({ items, bottomInset = 0, directAction = null }) {
   const { resolvedTheme } = useThemeStore();
   const dark = resolvedTheme === 'dark';
-  const { height: windowHeight } = useWindowDimensions();
+  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
 
   const [open, setOpen] = useState(false);
   const [anchor, setAnchor] = useState(null); // { x, y, width, height } in window coords
@@ -156,6 +156,24 @@ export default function QuickAddFAB({ items, bottomInset = 0, directAction = nul
   // then add MENU_GAP to lift the card off the FAB. Using `bottom` lets
   // the card grow upward naturally without needing its own height.
   const menuBottom = anchor ? windowHeight - anchor.y + MENU_GAP : 0;
+
+  // The in-tree FAB pins itself with `right: 20`, which iOS Yoga auto-
+  // flips to `left: 20` whenever `I18nManager.isRTL` is true. So the
+  // captured `anchor.x` reflects the *physical* screen position (eg. ~20
+  // from the screen's left edge in RTL).
+  //
+  // The Modal lives in its own native window where `left` and `right`
+  // also get auto-flipped. If we just write `left: anchor.x` on the
+  // clone, that ~20 gets re-mirrored to "20 from the right edge" — and
+  // the FAB visibly jumps to the opposite side the moment the user opens
+  // the menu (exactly the bug in the user's screenshots).
+  //
+  // Pre-mirror the x-coordinate when native RTL is active so the auto-
+  // flip lands the clone right back on top of the in-tree FAB. Same idea
+  // as `rowDirection` — we'd rather counteract Yoga than fight it.
+  const cloneLeft = anchor
+    ? (I18nManager.isRTL ? windowWidth - anchor.x - anchor.width : anchor.x)
+    : 0;
 
   return (
     <>
@@ -303,14 +321,16 @@ export default function QuickAddFAB({ items, bottomInset = 0, directAction = nul
 
               {/* FAB clone — pinned to the captured screen coordinates so
                   it overlays the in-tree FAB pixel-perfect. Tappable while
-                  the dim backdrop is showing. */}
+                  the dim backdrop is showing. `cloneLeft` is pre-mirrored
+                  in RTL mode so the Modal's auto-flip puts the clone back
+                  exactly where the in-tree FAB lives. */}
               <Pressable
                 onPress={toggle}
                 style={[
                   styles.fab,
                   {
                     backgroundColor: fabBg,
-                    left: anchor.x,
+                    left: cloneLeft,
                     top: anchor.y,
                   },
                 ]}

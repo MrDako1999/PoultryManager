@@ -16,6 +16,7 @@ import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
 import { deltaSync } from '@/lib/syncEngine';
 import InviteAccessSheet from '@/shared/sheets/InviteAccessSheet';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 const personSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
@@ -180,7 +181,7 @@ export default function InviteUserSheet({ open, onClose, onCreated }) {
     >
       {step === 1 ? (
         <FormSection title={t('settings.personalSection', 'Personal Information')}>
-          <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10 }}>
+          <View style={{ flexDirection: rowDirection(isRTL), gap: 10 }}>
             <View style={{ flex: 1 }}>
               <FormField label={t('auth.firstName', 'First Name')} required error={errors.firstName?.message}>
                 <Controller
@@ -286,7 +287,7 @@ export default function InviteUserSheet({ open, onClose, onCreated }) {
         <FormSection>
           <View
             style={{
-              flexDirection: isRTL ? 'row-reverse' : 'row',
+              flexDirection: rowDirection(isRTL),
               alignItems: 'flex-start',
               gap: 12,
               padding: 14,
@@ -305,7 +306,7 @@ export default function InviteUserSheet({ open, onClose, onCreated }) {
                   fontSize: 14,
                   fontFamily: 'Poppins-SemiBold',
                   color: textColor,
-                  textAlign: isRTL ? 'right' : 'left',
+                  textAlign: textAlignStart(isRTL),
                 }}
               >
                 {t('settings.userCreatedHeader', 'Account created')}
@@ -316,7 +317,7 @@ export default function InviteUserSheet({ open, onClose, onCreated }) {
                   fontFamily: 'Poppins-Regular',
                   color: mutedColor,
                   lineHeight: 17,
-                  textAlign: isRTL ? 'right' : 'left',
+                  textAlign: textAlignStart(isRTL),
                 }}
               >
                 {t(
@@ -330,7 +331,7 @@ export default function InviteUserSheet({ open, onClose, onCreated }) {
           <View style={{ gap: 10 }}>
             <View
               style={{
-                flexDirection: isRTL ? 'row-reverse' : 'row',
+                flexDirection: rowDirection(isRTL),
                 justifyContent: 'space-between',
                 alignItems: 'baseline',
               }}
@@ -358,7 +359,7 @@ export default function InviteUserSheet({ open, onClose, onCreated }) {
             </View>
             <View
               style={{
-                flexDirection: isRTL ? 'row-reverse' : 'row',
+                flexDirection: rowDirection(isRTL),
                 justifyContent: 'space-between',
                 alignItems: 'baseline',
               }}
@@ -395,7 +396,7 @@ export default function InviteUserSheet({ open, onClose, onCreated }) {
                 color: mutedColor,
                 letterSpacing: 1.2,
                 textTransform: 'uppercase',
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
               }}
             >
               {t('settings.temporaryPassword', 'Temporary password')}
@@ -416,7 +417,7 @@ export default function InviteUserSheet({ open, onClose, onCreated }) {
                   fontFamily: 'Menlo',
                   fontSize: 14,
                   color: textColor,
-                  textAlign: isRTL ? 'right' : 'left',
+                  textAlign: textAlignStart(isRTL),
                 }}
                 selectable
               >
@@ -429,7 +430,7 @@ export default function InviteUserSheet({ open, onClose, onCreated }) {
                 fontFamily: 'Poppins-Regular',
                 color: mutedColor,
                 lineHeight: 16,
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
               }}
             >
               {t(

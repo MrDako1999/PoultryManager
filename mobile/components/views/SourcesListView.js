@@ -18,6 +18,7 @@ import { SkeletonSourcesTab } from '@/components/skeletons';
 import { deltaSync } from '@/lib/syncEngine';
 import FilterChips from '@/components/views/FilterChips';
 import ListViewHeroKpi from '@/components/views/ListViewHeroKpi';
+import { formatRelativeDate } from '@/lib/relativeDate';
 
 const NUMERIC_LOCALE = 'en-US';
 
@@ -28,18 +29,6 @@ const fmt = (val) =>
   });
 
 const fmtInt = (val) => Number(val || 0).toLocaleString(NUMERIC_LOCALE);
-
-const fmtRelativeDate = (val) => {
-  if (!val) return null;
-  const d = val instanceof Date ? val : new Date(val);
-  if (Number.isNaN(d.getTime())) return null;
-  const today = new Date();
-  const days = Math.floor((today - d) / 86400000);
-  if (days <= 0) return 'Today';
-  if (days === 1) return 'Yesterday';
-  if (days < 7) return `${days}d ago`;
-  return d.toLocaleDateString(NUMERIC_LOCALE, { day: '2-digit', month: 'short' });
-};
 
 export default function SourcesListView({
   sources = [],
@@ -113,7 +102,7 @@ export default function SourcesListView({
     [sourcesAfterBatch]
   );
   const costPerChick = totalChicks > 0 ? totalCost / totalChicks : null;
-  const lastDeliveryLabel = fmtRelativeDate(lastDeliveryDate);
+  const lastDeliveryLabel = formatRelativeDate(lastDeliveryDate, t);
 
   if (loading && sources.length === 0) {
     return <SkeletonSourcesTab />;

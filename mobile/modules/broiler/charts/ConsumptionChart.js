@@ -42,7 +42,9 @@ export default function ConsumptionChart({
       const houseId = typeof h.house === 'object' ? h.house?._id : h.house;
       return {
         id: houseId || `h${i}`,
-        name: (typeof h.house === 'object' ? h.house?.name : null) || h.name || `House ${i + 1}`,
+        name: (typeof h.house === 'object' ? h.house?.name : null)
+          || h.name
+          || t('farms.houseN', 'House {{n}}', { n: i + 1 }),
         color: colorForIndex(i),
       };
     });
@@ -82,7 +84,7 @@ export default function ConsumptionChart({
     }
 
     return { housesMeta: meta, dayLabels: labels, seriesByHouse: series, hasData: true };
-  }, [dailyLogs, houses, startDate, view, valueKey]);
+  }, [dailyLogs, houses, startDate, view, valueKey, t]);
 
   if (!hasData) {
     return (
@@ -244,7 +246,19 @@ export default function ConsumptionChart({
       }}
     >
       {chartContent ? (
-        <View style={{ width: availableWidth, overflow: 'hidden' }}>
+        // Force LTR direction inside the chart so iOS doesn't auto-flip
+        // the absolutely-positioned pointer line / labels while leaving
+        // the SVG-rendered curves in their original LTR pixel space.
+        // Without this, the selection line and the data dots end up at
+        // different X positions in RTL — see MortalityChart for the same
+        // fix and the user's RTL screenshot for the bug.
+        <View
+          style={{
+            width: availableWidth,
+            overflow: 'hidden',
+            direction: 'ltr',
+          }}
+        >
           {chartContent}
         </View>
       ) : (

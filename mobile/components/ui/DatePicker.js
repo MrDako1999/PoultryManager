@@ -14,6 +14,7 @@ import {
 import * as Haptics from 'expo-haptics';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 /**
  * Single-date picker. Trigger matches the SheetInput aesthetic, modal sheet
@@ -29,9 +30,15 @@ import { useIsRTL } from '@/stores/localeStore';
  * @param {string} [props.placeholder] - Placeholder shown when empty
  * @param {string} [props.label] - Header label inside the modal sheet
  * @param {() => void} [props.onOpen] - Called when the sheet opens
+ * @param {string} [props.minDate] - ISO YYYY-MM-DD; days before this are disabled
+ * @param {string} [props.maxDate] - ISO YYYY-MM-DD; days after this are disabled
+ * @param {Record<string, 'submitted'|'missing'>} [props.markedDates] - Annotations per ISO date
  */
-function DatePicker({ value, onChange, placeholder, label, onOpen }, ref) {
-  const { t } = useTranslation();
+function DatePicker({
+  value, onChange, placeholder, label, onOpen,
+  minDate, maxDate, markedDates,
+}, ref) {
+  const { t, i18n } = useTranslation();
   const insets = useSafeAreaInsets();
   const isRTL = useIsRTL();
   const tokens = useHeroSheetTokens();
@@ -46,6 +53,17 @@ function DatePicker({ value, onChange, placeholder, label, onOpen }, ref) {
     return d;
   }, []);
   const parsed = parseDate(value);
+
+  // Pre-parse the bounds once per render so the day cells can do a
+  // cheap day-string comparison instead of date math on every cell.
+  const minKey = minDate || null;
+  const maxKey = maxDate || null;
+  // Today is always selectable from the toolbar pill — but only if
+  // it's in range. Disable the pill when bounds exclude today (e.g. a
+  // completed batch whose endDate was yesterday).
+  const todayKey = formatDate(today);
+  const todayInRange =
+    (!minKey || todayKey >= minKey) && (!maxKey || todayKey <= maxKey);
 
   const [open, setOpen] = useState(false);
   const [viewYear, setViewYear] = useState(parsed?.getFullYear() || today.getFullYear());
@@ -121,9 +139,14 @@ function DatePicker({ value, onChange, placeholder, label, onOpen }, ref) {
   const handleSelect = useCallback((day) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     const d = new Date(viewYear, viewMonth, day);
-    onChange(formatDate(d));
+    const key = formatDate(d);
+    // Defensive: don't fire onChange for a disabled day even if a
+    // press somehow leaks through. The cell renderer also pointer-
+    // events-disables disabled cells.
+    if ((minKey && key < minKey) || (maxKey && key > maxKey)) return;
+    onChange(key);
     slideOut();
-  }, [viewYear, viewMonth, onChange, slideOut]);
+  }, [viewYear, viewMonth, onChange, slideOut, minKey, maxKey]);
 
   const handleToday = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -153,8 +176,15 @@ function DatePicker({ value, onChange, placeholder, label, onOpen }, ref) {
   const todayDay = today.getFullYear() === viewYear && today.getMonth() === viewMonth
     ? today.getDate() : null;
 
-  const monthLabel = `${MONTHS[viewMonth]} ${viewYear}`;
-  const displayValue = parsed ? fmtChipDate(parsed) : null;
+  const monthLabel = useMemo(
+    () => fmtMonthYear(viewYear, viewMonth, i18n.language),
+    [viewYear, viewMonth, i18n.language]
+  );
+  const localizedWeekdays = useMemo(
+    () => buildWeekdayLabels(i18n.language),
+    [i18n.language]
+  );
+  const displayValue = parsed ? fmtChipDate(parsed, i18n.language) : null;
 
   // Prev/next chevrons swap when the layout is RTL so "previous" stays
   // visually on the leading edge.
@@ -183,7 +213,7 @@ function DatePicker({ value, onChange, placeholder, label, onOpen }, ref) {
         <View
           style={[
             styles.triggerRow,
-            { flexDirection: isRTL ? 'row-reverse' : 'row' },
+            { flexDirection: rowDirection(isRTL) },
           ]}
         >
           <Text
@@ -192,7 +222,7 @@ function DatePicker({ value, onChange, placeholder, label, onOpen }, ref) {
               fontSize: 14,
               fontFamily: 'Poppins-Regular',
               color: displayValue ? textColor : mutedColor,
-              textAlign: isRTL ? 'right' : 'left',
+              textAlign: textAlignStart(isRTL),
               writingDirection: isRTL ? 'rtl' : 'ltr',
             }}
             numberOfLines={1}
@@ -249,7 +279,7 @@ function DatePicker({ value, onChange, placeholder, label, onOpen }, ref) {
             <View
               style={[
                 styles.header,
-                { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                { flexDirection: rowDirection(isRTL) },
               ]}
             >
               <View
@@ -262,7 +292,7 @@ function DatePicker({ value, onChange, placeholder, label, onOpen }, ref) {
                     fontFamily: 'Poppins-SemiBold',
                     color: textColor,
                     letterSpacing: -0.2,
-                    textAlign: isRTL ? 'right' : 'left',
+                    textAlign: textAlignStart(isRTL),
                   }}
                   numberOfLines={1}
                 >
@@ -272,36 +302,38 @@ function DatePicker({ value, onChange, placeholder, label, onOpen }, ref) {
 
               <View
                 style={{
-                  flexDirection: isRTL ? 'row-reverse' : 'row',
+                  flexDirection: rowDirection(isRTL),
                   alignItems: 'center',
                   gap: 8,
                 }}
               >
-                <Pressable
-                  onPress={handleToday}
-                  hitSlop={6}
-                  android_ripple={{
-                    color: dark ? 'rgba(148,210,165,0.22)' : 'hsl(148, 35%, 88%)',
-                    borderless: false,
-                  }}
-                  style={[
-                    styles.headerPill,
-                    {
-                      backgroundColor: dark ? 'rgba(148,210,165,0.14)' : 'hsl(148, 35%, 94%)',
-                    },
-                  ]}
-                >
-                  <Text
-                    style={{
-                      fontSize: 12.5,
-                      fontFamily: 'Poppins-SemiBold',
-                      color: accentColor,
-                      letterSpacing: 0.1,
+                {todayInRange ? (
+                  <Pressable
+                    onPress={handleToday}
+                    hitSlop={6}
+                    android_ripple={{
+                      color: dark ? 'rgba(148,210,165,0.22)' : 'hsl(148, 35%, 88%)',
+                      borderless: false,
                     }}
+                    style={[
+                      styles.headerPill,
+                      {
+                        backgroundColor: dark ? 'rgba(148,210,165,0.14)' : 'hsl(148, 35%, 94%)',
+                      },
+                    ]}
                   >
-                    {t('common.today', 'Today')}
-                  </Text>
-                </Pressable>
+                    <Text
+                      style={{
+                        fontSize: 12.5,
+                        fontFamily: 'Poppins-SemiBold',
+                        color: accentColor,
+                        letterSpacing: 0.1,
+                      }}
+                    >
+                      {t('common.today', 'Today')}
+                    </Text>
+                  </Pressable>
+                ) : null}
                 {value ? (
                   <Pressable
                     onPress={handleClear}
@@ -348,7 +380,7 @@ function DatePicker({ value, onChange, placeholder, label, onOpen }, ref) {
             <View
               style={[
                 styles.monthNav,
-                { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                { flexDirection: rowDirection(isRTL) },
               ]}
             >
               <Pressable
@@ -397,8 +429,8 @@ function DatePicker({ value, onChange, placeholder, label, onOpen }, ref) {
             </View>
 
             {/* Weekday headers */}
-            <View style={[styles.weekdayRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              {WEEKDAYS.map((wd) => (
+            <View style={[styles.weekdayRow, { flexDirection: rowDirection(isRTL) }]}>
+              {localizedWeekdays.map((wd) => (
                 <View key={wd.key} style={styles.weekdayCell}>
                   <Text
                     style={{
@@ -415,29 +447,86 @@ function DatePicker({ value, onChange, placeholder, label, onOpen }, ref) {
             </View>
 
             {/* Calendar grid */}
-            <View style={[styles.calendarGrid, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <View style={[styles.calendarGrid, { flexDirection: rowDirection(isRTL) }]}>
               {calendarDays.map((day, i) => {
                 if (day === null) {
                   return <View key={`e-${i}`} style={styles.cellWrap} />;
                 }
                 const isSelected = day === selectedDay;
                 const isToday = day === todayDay;
+
+                // Per-cell ISO key drives both bounds enforcement and
+                // marker lookup. Marker takes a back seat to "selected"
+                // (filled accent disc wins visually), but the ring
+                // colour from missing/submitted still beats the
+                // default today-only outline.
+                const cellKey = formatDate(new Date(viewYear, viewMonth, day));
+                const isOutOfRange =
+                  (minKey && cellKey < minKey) || (maxKey && cellKey > maxKey);
+                const marker = markedDates ? markedDates[cellKey] : null;
+
+                // Marker tone — token-driven so dark mode stays
+                // legible. Submitted = accent green (matches the rest
+                // of the app's "done" affordance). Missing = amber
+                // ring (same warning tone used by WorkerTasks pending
+                // rows).
+                let ringColor = null;
+                let ringFillBg = null;
+                if (marker === 'submitted') {
+                  ringColor = accentColor;
+                  ringFillBg = dark
+                    ? 'rgba(148,210,165,0.14)'
+                    : 'hsl(148, 35%, 94%)';
+                } else if (marker === 'missing') {
+                  ringColor = dark ? '#fbbf24' : '#d97706';
+                  ringFillBg = dark
+                    ? 'rgba(251,191,36,0.14)'
+                    : 'hsl(40, 90%, 94%)';
+                }
+
+                const showRing = !isSelected && !!ringColor;
+                const showTodayOutline = !isSelected && !showRing && isToday;
+                const discBg = isSelected
+                  ? accentColor
+                  : showRing
+                    ? ringFillBg
+                    : 'transparent';
+                const discBorderColor = showRing
+                  ? ringColor
+                  : showTodayOutline
+                    ? accentColor
+                    : 'transparent';
+                const discBorderWidth = showRing ? 1.5 : showTodayOutline ? 1.5 : 0;
+                const dayLabelColor = isOutOfRange
+                  ? mutedColor
+                  : isSelected
+                    ? '#ffffff'
+                    : showRing
+                      ? ringColor
+                      : isToday
+                        ? accentColor
+                        : textColor;
+
                 return (
                   <View key={day} style={styles.cellWrap}>
                     <Pressable
                       onPress={() => handleSelect(day)}
+                      disabled={isOutOfRange}
                       hitSlop={2}
-                      android_ripple={{
-                        color: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
-                        borderless: true,
-                        radius: 18,
-                      }}
+                      android_ripple={
+                        isOutOfRange ? undefined : {
+                          color: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
+                          borderless: true,
+                          radius: 18,
+                        }
+                      }
                       style={[
                         styles.dayDisc,
                         {
-                          backgroundColor: isSelected ? accentColor : 'transparent',
-                          borderWidth: !isSelected && isToday ? 1.5 : 0,
-                          borderColor: accentColor,
+                          backgroundColor: discBg,
+                          borderWidth: discBorderWidth,
+                          borderColor: discBorderColor,
+                          opacity: isOutOfRange ? 0.32 : 1,
                           ...(isSelected && !dark
                             ? {
                                 shadowColor: accentColor,
@@ -454,9 +543,7 @@ function DatePicker({ value, onChange, placeholder, label, onOpen }, ref) {
                         style={{
                           fontSize: 14,
                           fontFamily: isSelected ? 'Poppins-Bold' : 'Poppins-Medium',
-                          color: isSelected
-                            ? '#ffffff'
-                            : isToday ? accentColor : textColor,
+                          color: dayLabelColor,
                         }}
                       >
                         {day}
@@ -466,6 +553,30 @@ function DatePicker({ value, onChange, placeholder, label, onOpen }, ref) {
                 );
               })}
             </View>
+
+            {/* Marker legend — only shown when callers wire `markedDates`
+                so the regular pickers stay uncluttered. */}
+            {markedDates && Object.keys(markedDates).length > 0 ? (
+              <View
+                style={[
+                  styles.legend,
+                  { flexDirection: rowDirection(isRTL) },
+                ]}
+              >
+                <LegendDot
+                  color={accentColor}
+                  fill={dark ? 'rgba(148,210,165,0.14)' : 'hsl(148, 35%, 94%)'}
+                  label={t('datepicker.legendSubmitted', 'Logged')}
+                  textColor={mutedColor}
+                />
+                <LegendDot
+                  color={dark ? '#fbbf24' : '#d97706'}
+                  fill={dark ? 'rgba(251,191,36,0.14)' : 'hsl(40, 90%, 94%)'}
+                  label={t('datepicker.legendMissing', 'Missing')}
+                  textColor={mutedColor}
+                />
+              </View>
+            ) : null}
 
             {/* Bottom safe area */}
             <View style={{ height: insets.bottom + 12 }} />
@@ -477,6 +588,28 @@ function DatePicker({ value, onChange, placeholder, label, onOpen }, ref) {
 }
 
 export default forwardRef(DatePicker);
+
+function LegendDot({ color, fill, label, textColor }) {
+  return (
+    <View style={legendStyles.item}>
+      <View
+        style={[
+          legendStyles.dot,
+          { borderColor: color, backgroundColor: fill },
+        ]}
+      />
+      <Text
+        style={{
+          fontSize: 11,
+          fontFamily: 'Poppins-Medium',
+          color: textColor,
+        }}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Helpers / constants
@@ -521,9 +654,60 @@ function getFirstDayOfWeek(year, month) {
   return new Date(year, month, 1).getDay();
 }
 
-function fmtChipDate(d) {
+function localeWithLatnDigits(locale) {
+  // BCP-47 `-u-nu-latn` extension forces Latin digits even on locales that
+  // would otherwise default to native-script numerals (Arabic, Persian,
+  // Bengali). The full month/weekday names still come out localized.
+  if (!locale) return null;
+  return locale.includes('-u-') ? locale : `${locale}-u-nu-latn`;
+}
+
+function fmtChipDate(d, locale) {
+  const tag = localeWithLatnDigits(locale);
+  if (tag) {
+    try {
+      return d.toLocaleDateString(tag, {
+        day: '2-digit', month: 'short', year: 'numeric',
+      });
+    } catch {
+      // Fall through to en-US default.
+    }
+  }
   return d.toLocaleDateString(NUMERIC_LOCALE, {
     day: '2-digit', month: 'short', year: 'numeric',
+  });
+}
+
+function fmtMonthYear(year, monthIdx, locale) {
+  const tag = localeWithLatnDigits(locale) || NUMERIC_LOCALE;
+  try {
+    return new Date(year, monthIdx, 1).toLocaleDateString(tag, {
+      month: 'long', year: 'numeric',
+    });
+  } catch {
+    return `${MONTHS[monthIdx]} ${year}`;
+  }
+}
+
+function buildWeekdayLabels(locale) {
+  const tag = localeWithLatnDigits(locale) || NUMERIC_LOCALE;
+  // Use a known Sunday as the seed and walk forward 7 days so the order
+  // matches the WEEKDAYS constant. `narrow` style yields the single-letter
+  // glyph (S/M/T/...) in English, ح/ن/ث/... in Arabic, which is what the
+  // grid expects.
+  const formatter = (() => {
+    try {
+      return new Intl.DateTimeFormat(tag, { weekday: 'narrow' });
+    } catch {
+      return null;
+    }
+  })();
+  const seed = new Date(2023, 0, 1); // Jan 1 2023 is a Sunday
+  return WEEKDAYS.map((wd, i) => {
+    const d = new Date(seed);
+    d.setDate(seed.getDate() + i);
+    const label = formatter ? formatter.format(d) : wd.label;
+    return { key: wd.key, label };
   });
 }
 
@@ -613,5 +797,25 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  legend: {
+    paddingHorizontal: 24,
+    paddingTop: 14,
+    gap: 16,
+    alignItems: 'center',
+  },
+});
+
+const legendStyles = StyleSheet.create({
+  item: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  dot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 1.5,
   },
 });

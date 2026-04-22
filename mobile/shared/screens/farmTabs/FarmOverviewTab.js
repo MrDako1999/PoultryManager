@@ -20,6 +20,7 @@ import LocationActions from '@/components/LocationActions';
 import SlidingSegmentedControl from '@/components/SlidingSegmentedControl';
 import BatchAvatar from '@/modules/broiler/components/BatchAvatar';
 import { getStatusConfig } from '@/modules/broiler/lib/batchStatusConfig';
+import { rowDirection, textAlignStart, textAlignEnd } from '@/lib/rtl';
 import BatchKpiCard, {
   profitToneColor, mortalityToneColor,
 } from '@/modules/broiler/components/BatchKpiCard';
@@ -531,7 +532,7 @@ export default function FarmOverviewTab({
                     fontFamily: 'Poppins-Regular',
                     color: textColor,
                     lineHeight: 20,
-                    textAlign: isRTL ? 'right' : 'left',
+                    textAlign: textAlignStart(isRTL),
                     writingDirection: isRTL ? 'rtl' : 'ltr',
                   }}
                 >
@@ -610,7 +611,7 @@ function ActiveBatchCard({ batch, tokens, isRTL, t, onPress }) {
       <View
         style={[
           cardStyles.headerRow,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
         <BatchAvatar
@@ -626,7 +627,7 @@ function ActiveBatchCard({ batch, tokens, isRTL, t, onPress }) {
               fontFamily: 'Poppins-SemiBold',
               color: textColor,
               letterSpacing: -0.1,
-              textAlign: isRTL ? 'right' : 'left',
+              textAlign: textAlignStart(isRTL),
             }}
             numberOfLines={1}
           >
@@ -636,13 +637,13 @@ function ActiveBatchCard({ batch, tokens, isRTL, t, onPress }) {
             <View
               style={[
                 cardStyles.metaRow,
-                { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                { flexDirection: rowDirection(isRTL) },
               ]}
             >
               <View
                 style={[
                   cardStyles.metaPiece,
-                  { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                  { flexDirection: rowDirection(isRTL) },
                 ]}
               >
                 <Bird size={11} color={mutedColor} strokeWidth={2.2} />
@@ -686,13 +687,13 @@ function ActiveBatchCard({ batch, tokens, isRTL, t, onPress }) {
       <View
         style={[
           cardStyles.progressLabelRow,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
         <View
           style={[
             cardStyles.progressLabelLeft,
-            { flexDirection: isRTL ? 'row-reverse' : 'row' },
+            { flexDirection: rowDirection(isRTL) },
           ]}
         >
           <Calendar size={11} color={mutedColor} strokeWidth={2.4} />
@@ -765,7 +766,7 @@ function PastCycleRow({ cycle, tokens, isRTL, t, onPress }) {
       <View
         style={[
           cardStyles.pastRowInner,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
         <Text
@@ -775,7 +776,7 @@ function PastCycleRow({ cycle, tokens, isRTL, t, onPress }) {
             fontSize: 13,
             fontFamily: 'Poppins-SemiBold',
             color: textColor,
-            textAlign: isRTL ? 'right' : 'left',
+            textAlign: textAlignStart(isRTL),
           }}
           numberOfLines={1}
         >
@@ -806,7 +807,7 @@ function PastCycleRow({ cycle, tokens, isRTL, t, onPress }) {
             fontSize: 11,
             fontFamily: 'Poppins-SemiBold',
             color: mortColor,
-            textAlign: isRTL ? 'left' : 'right',
+            textAlign: textAlignEnd(isRTL),
           }}
         >
           {`${cycle.mortalityPct.toFixed(2)}%`}

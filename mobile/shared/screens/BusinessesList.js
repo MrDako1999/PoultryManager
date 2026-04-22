@@ -29,6 +29,7 @@ import { useToast } from '@/components/ui/Toast';
 import { useIsRTL } from '@/stores/localeStore';
 import { deltaSync } from '@/lib/syncEngine';
 import QuickAddBusinessSheet from '@/shared/sheets/QuickAddBusinessSheet';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 const NUMERIC_LOCALE = 'en-US';
 const SWIPE_ACTION_WIDTH = 76;
@@ -348,7 +349,7 @@ function BrandHeader({ title, subtitle, gradient, topInset, isRTL }) {
       <View
         style={[
           headerStyles.row,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
         <Pressable
@@ -367,7 +368,7 @@ function BrandHeader({ title, subtitle, gradient, topInset, isRTL }) {
               color: '#ffffff',
               letterSpacing: -0.4,
               lineHeight: 30,
-              textAlign: isRTL ? 'right' : 'left',
+              textAlign: textAlignStart(isRTL),
               writingDirection: isRTL ? 'rtl' : 'ltr',
             }}
             numberOfLines={1}
@@ -381,7 +382,7 @@ function BrandHeader({ title, subtitle, gradient, topInset, isRTL }) {
                 fontFamily: 'Poppins-Regular',
                 color: 'rgba(255,255,255,0.78)',
                 marginTop: 4,
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
                 writingDirection: isRTL ? 'rtl' : 'ltr',
               }}
               numberOfLines={1}
@@ -436,7 +437,7 @@ function Toolbar({
       <View
         style={[
           toolbarStyles.triggerRow,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
         <FilterTrigger
@@ -469,7 +470,7 @@ function Toolbar({
             <View
               style={[
                 toolbarStyles.resetChipInner,
-                { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                { flexDirection: rowDirection(isRTL) },
               ]}
             >
               <RotateCcw size={14} color={accentColor} strokeWidth={2.4} />
@@ -517,7 +518,7 @@ function FilterTrigger({ icon: Icon, label, active, countBadge, onPress, isRTL, 
       <View
         style={[
           toolbarStyles.triggerInner,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
         <View
@@ -543,7 +544,7 @@ function FilterTrigger({ icon: Icon, label, active, countBadge, onPress, isRTL, 
             fontSize: 13,
             fontFamily: active ? 'Poppins-SemiBold' : 'Poppins-Medium',
             color: active ? accentColor : textColor,
-            textAlign: isRTL ? 'right' : 'left',
+            textAlign: textAlignStart(isRTL),
           }}
           numberOfLines={1}
         >
@@ -659,7 +660,7 @@ function BusinessRow({
           <View
             style={[
               cardStyles.headerRow,
-              { flexDirection: isRTL ? 'row-reverse' : 'row' },
+              { flexDirection: rowDirection(isRTL) },
             ]}
           >
           <View
@@ -679,7 +680,7 @@ function BusinessRow({
                 fontFamily: 'Poppins-SemiBold',
                 color: textColor,
                 letterSpacing: -0.1,
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
               }}
               numberOfLines={1}
             >
@@ -688,7 +689,7 @@ function BusinessRow({
             <View
               style={[
                 cardStyles.subRow,
-                { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                { flexDirection: rowDirection(isRTL) },
               ]}
             >
               <View
@@ -733,7 +734,7 @@ function BusinessRow({
         <View
           style={[
             cardStyles.statsRow,
-            { flexDirection: isRTL ? 'row-reverse' : 'row' },
+            { flexDirection: rowDirection(isRTL) },
           ]}
         >
           <StatCell
@@ -767,7 +768,7 @@ function StatCell({ icon: Icon, label, value, valueColor, tokens, isRTL }) {
       <View
         style={[
           cardStyles.statLabelRow,
-          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: rowDirection(isRTL) },
         ]}
       >
         <Icon size={11} color={mutedColor} strokeWidth={2.2} />
@@ -778,7 +779,7 @@ function StatCell({ icon: Icon, label, value, valueColor, tokens, isRTL }) {
             color: mutedColor,
             letterSpacing: 0.8,
             textTransform: 'uppercase',
-            textAlign: isRTL ? 'right' : 'left',
+            textAlign: textAlignStart(isRTL),
           }}
           numberOfLines={1}
         >
@@ -791,7 +792,7 @@ function StatCell({ icon: Icon, label, value, valueColor, tokens, isRTL }) {
           fontFamily: 'Poppins-SemiBold',
           color: valueColor || textColor,
           fontVariant: ['tabular-nums'],
-          textAlign: isRTL ? 'right' : 'left',
+          textAlign: textAlignStart(isRTL),
           marginTop: 2,
         }}
         numberOfLines={1}

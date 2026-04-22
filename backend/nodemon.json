@@ -1,0 +1,14 @@
+{
+  "watch": [
+    "./",
+    "../shared"
+  ],
+  "ext": "js,json,mjs",
+  "ignore": [
+    "node_modules/**",
+    "../shared/node_modules/**",
+    "logs/**",
+    "*.test.js"
+  ],
+  "delay": 250
+}

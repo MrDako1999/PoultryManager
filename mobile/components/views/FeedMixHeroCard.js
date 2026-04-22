@@ -10,6 +10,7 @@ import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
 import useSettings from '@/hooks/useSettings';
 import BatchKpiCard from '@/modules/broiler/components/BatchKpiCard';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 const NUMERIC_LOCALE = 'en-US';
 
@@ -150,7 +151,7 @@ export default function FeedMixHeroCard({
             <View
               style={[
                 styles.barLabelRow,
-                { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                { flexDirection: rowDirection(isRTL) },
               ]}
             >
               <Text
@@ -159,7 +160,7 @@ export default function FeedMixHeroCard({
                   fontSize: 12,
                   fontFamily: 'Poppins-Medium',
                   color: textColor,
-                  textAlign: isRTL ? 'right' : 'left',
+                  textAlign: textAlignStart(isRTL),
                 }}
               >
                 {t(`feed.feedTypes.${type}`, type)}

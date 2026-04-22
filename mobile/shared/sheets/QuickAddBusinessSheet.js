@@ -20,6 +20,7 @@ import { FormSection, FormField } from '@/components/FormSheetParts';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
 import { useToast } from '@/components/ui/Toast';
+import { rowDirection } from '@/lib/rtl';
 
 const BUSINESS_TYPES = ['TRADER', 'SUPPLIER'];
 
@@ -245,7 +246,7 @@ export default function QuickAddBusinessSheet({
           />
         </FormField>
 
-        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10 }}>
+        <View style={{ flexDirection: rowDirection(isRTL), gap: 10 }}>
           <View style={{ flex: 1 }}>
             <FormField label={t('businesses.tradeLicenseNumber', 'Trade License Number')}>
               <Controller
@@ -324,7 +325,7 @@ export default function QuickAddBusinessSheet({
           />
         </FormField>
 
-        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10 }}>
+        <View style={{ flexDirection: rowDirection(isRTL), gap: 10 }}>
           <View style={{ flex: 1 }}>
             <FormField label={t('businesses.city', 'City')}>
               <SheetInput
@@ -347,7 +348,7 @@ export default function QuickAddBusinessSheet({
           </View>
         </View>
 
-        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10 }}>
+        <View style={{ flexDirection: rowDirection(isRTL), gap: 10 }}>
           <View style={{ flex: 1 }}>
             <FormField label={t('businesses.postalCode', 'Postal / PO Box')}>
               <SheetInput
@@ -410,7 +411,7 @@ export default function QuickAddBusinessSheet({
           <View
             style={[
               styles.chipRow,
-              { flexDirection: isRTL ? 'row-reverse' : 'row' },
+              { flexDirection: rowDirection(isRTL) },
             ]}
           >
             {selectedContacts.map((id) => {
@@ -421,7 +422,7 @@ export default function QuickAddBusinessSheet({
                   style={[
                     styles.chip,
                     {
-                      flexDirection: isRTL ? 'row-reverse' : 'row',
+                      flexDirection: rowDirection(isRTL),
                       backgroundColor: dark ? 'rgba(148,210,165,0.16)' : 'hsl(148, 35%, 92%)',
                       borderColor: dark ? 'rgba(148,210,165,0.30)' : 'hsl(148, 35%, 80%)',
                     },

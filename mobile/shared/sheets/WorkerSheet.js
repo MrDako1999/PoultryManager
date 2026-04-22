@@ -19,6 +19,7 @@ import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
 import { useToast } from '@/components/ui/Toast';
 import api from '@/lib/api';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 const WORKER_ROLES = ['manager', 'supervisor', 'labourer', 'driver', 'other'];
 
@@ -196,7 +197,7 @@ export default function WorkerSheet({
       }
     >
       <FormSection title={t('workers.personalSection', 'Personal Information')}>
-        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10 }}>
+        <View style={{ flexDirection: rowDirection(isRTL), gap: 10 }}>
           <View style={{ flex: 1 }}>
             <FormField label={t('workers.firstName', 'First Name')} required error={errors.firstName?.message}>
               <Controller
@@ -311,7 +312,7 @@ export default function WorkerSheet({
       </FormSection>
 
       <FormSection title={t('workers.passportSection', 'Passport')}>
-        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10 }}>
+        <View style={{ flexDirection: rowDirection(isRTL), gap: 10 }}>
           <View style={{ flex: 1 }}>
             <FormField label={t('workers.passportNumber', 'Passport Number')}>
               <Controller
@@ -417,7 +418,7 @@ function FarmRow({ farm, checked, isLast, onToggle, tokens, isRTL }) {
       style={({ pressed }) => [
         rowStyles.row,
         {
-          flexDirection: isRTL ? 'row-reverse' : 'row',
+          flexDirection: rowDirection(isRTL),
           borderBottomWidth: isLast ? 0 : StyleSheet.hairlineWidth,
           borderBottomColor: borderColor,
           backgroundColor: pressed
@@ -450,7 +451,7 @@ function FarmRow({ farm, checked, isLast, onToggle, tokens, isRTL }) {
             fontSize: 14,
             fontFamily: checked ? 'Poppins-SemiBold' : 'Poppins-Medium',
             color: textColor,
-            textAlign: isRTL ? 'right' : 'left',
+            textAlign: textAlignStart(isRTL),
           }}
           numberOfLines={1}
         >
@@ -462,7 +463,7 @@ function FarmRow({ farm, checked, isLast, onToggle, tokens, isRTL }) {
               fontSize: 11,
               fontFamily: 'Poppins-Regular',
               color: mutedColor,
-              textAlign: isRTL ? 'right' : 'left',
+              textAlign: textAlignStart(isRTL),
               marginTop: 2,
             }}
             numberOfLines={1}

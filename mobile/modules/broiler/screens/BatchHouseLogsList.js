@@ -27,6 +27,7 @@ import { AccountingToolbar } from '@/components/views/AccountingFilterBar';
 import { SkeletonRow } from '@/components/skeletons';
 import { LOG_TYPES } from '@/lib/constants';
 import { deltaSync } from '@/lib/syncEngine';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 const NUMERIC_LOCALE = 'en-US';
 
@@ -269,7 +270,7 @@ export default function BatchHouseLogsList() {
             paddingTop: insets.top + 8,
             backgroundColor: screenBg,
             borderBottomColor: borderColor,
-            flexDirection: isRTL ? 'row-reverse' : 'row',
+            flexDirection: rowDirection(isRTL),
           },
         ]}
       >
@@ -294,7 +295,7 @@ export default function BatchHouseLogsList() {
           <View
             style={[
               styles.headerTitleRow,
-              { flexDirection: isRTL ? 'row-reverse' : 'row' },
+              { flexDirection: rowDirection(isRTL) },
             ]}
           >
             <Home size={14} color={mutedColor} strokeWidth={2.2} />
@@ -303,7 +304,7 @@ export default function BatchHouseLogsList() {
                 fontSize: 17,
                 fontFamily: 'Poppins-Bold',
                 color: textColor,
-                textAlign: isRTL ? 'right' : 'left',
+                textAlign: textAlignStart(isRTL),
               }}
               numberOfLines={1}
             >
@@ -316,7 +317,7 @@ export default function BatchHouseLogsList() {
               fontFamily: 'Poppins-Medium',
               color: mutedColor,
               marginTop: 1,
-              textAlign: isRTL ? 'right' : 'left',
+              textAlign: textAlignStart(isRTL),
             }}
             numberOfLines={1}
           >
