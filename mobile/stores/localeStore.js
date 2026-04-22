@@ -1,9 +1,16 @@
 import { create } from 'zustand';
 import { I18nManager } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
+import * as Updates from 'expo-updates';
+import { router } from 'expo-router';
 import i18n, { SUPPORTED_LANGUAGES, isRtlLanguage } from '@/i18n';
 
 const LANG_KEY = 'pm-language';
+// Stash key for the last route the user was on when a direction-flip
+// reload happened, so we can pop them back there after the JS bridge
+// restarts. Without this they always land on the dashboard after a
+// language change, which feels like the app forgot what it was doing.
+const POST_RELOAD_ROUTE_KEY = 'pm-post-reload-route';
 
 // Timing for the language-change transition overlay (see LanguageChangeOverlay).
 //
@@ -64,6 +71,17 @@ const useLocaleStore = create((set, get) => ({
     if (get().isChangingLanguage) return;
 
     const nextIsRTL = isRtlLanguage(code);
+    // A "direction flip" means the new locale needs the opposite Yoga
+    // RTL setting from what's currently active in the native bridge.
+    // Crossing this line is what triggers all the layout corruption
+    // (icons jammed against labels, theme pill drifting off the right
+    // edge, settings rows squished) because logical-side properties
+    // and `flexDirection: 'row'` keep resolving against the stale
+    // platform flag until the next cold start.
+    //
+    // Same-script switches (e.g. EN ↔ ES, AR ↔ FA) need NO bridge
+    // reload — they only swap strings.
+    const directionFlipping = !!nextIsRTL !== !!I18nManager.isRTL;
 
     // The picker (if open) was already dismissed instantly by the caller,
     // so we can mount the overlay's Modal right away — no Modal-stacking
@@ -88,6 +106,49 @@ const useLocaleStore = create((set, get) => ({
       I18nManager.forceRTL(nextIsRTL);
 
       set({ language: code, isRTL: nextIsRTL });
+
+      if (directionFlipping) {
+        // Only the JS bridge actually re-reads I18nManager when it
+        // restarts, so on a cross-direction switch we hard-reload the
+        // bundle while the overlay still covers the screen. The user
+        // sees the same fade animation; they don't see the reload
+        // boundary. Without this they'd live with auto-flipped
+        // `flexDirection: 'row'` / mis-resolved `marginEnd` / drifted
+        // SlidingSegmentedControl pill until they next cold-launched
+        // the app — exactly the "switching from Arabic back to
+        // English gets cooked" complaint.
+
+        // Stash the user's current route so the next session can pop
+        // them back there. Without this they always land on the home
+        // tab after a language change, which feels like the app lost
+        // their place. expo-router's `pathname` is the live URL of the
+        // currently-rendered route (incl. dynamic segments), so it
+        // round-trips through `router.push` cleanly.
+        try {
+          const pathname = router?.pathname;
+          if (pathname && pathname !== '/') {
+            await SecureStore.setItemAsync(POST_RELOAD_ROUTE_KEY, pathname);
+          }
+        } catch {
+          // Don't block the language change on a route-stash failure;
+          // worst case the user lands on dashboard after reload.
+        }
+
+        try {
+          await Updates.reloadAsync();
+          // reloadAsync resolves only after a successful reload kicks
+          // in; the JS context is destroyed so anything below this line
+          // never runs in the new session. Belt-and-braces: if it
+          // somehow returns instead of nuking the bridge, fall through
+          // to the post-change hold so the overlay still dismisses.
+        } catch (err) {
+          // expo-updates throws in some odd corner cases (e.g. a stale
+          // dev client without the native module). Swallow and continue
+          // — the language has still been persisted and i18n strings
+          // are now correct, only the layout-drift fix is skipped.
+          console.warn('[locale] Updates.reloadAsync failed; layout may need a manual app restart:', err?.message);
+        }
+      }
 
       // Hold the overlay so the change reads as deliberate. Without this,
       // the overlay would dismiss the moment React renders the new state
@@ -115,6 +176,34 @@ const useLocaleStore = create((set, get) => ({
     I18nManager.forceRTL(wantRTL);
 
     set({ language: code, isRTL: wantRTL });
+
+    // If the previous JS session stashed a "where I was" route before
+    // calling Updates.reloadAsync (i.e. a language-change reload), pop
+    // the user back there. We always clear the key first so a partial
+    // failure can't loop them back to the same screen forever.
+    //
+    // Routed AFTER the locale is applied so the destination renders in
+    // the correct writing direction on first paint. Slight defer so the
+    // root navigator has time to mount before we push.
+    try {
+      const stashedRoute = await SecureStore.getItemAsync(POST_RELOAD_ROUTE_KEY);
+      if (stashedRoute) {
+        await SecureStore.deleteItemAsync(POST_RELOAD_ROUTE_KEY);
+        // requestAnimationFrame isn't enough on iOS — the (app)/(tabs)
+        // navigator can still be in the middle of its mount. A 0ms
+        // setTimeout queues the navigation after the current render
+        // commit, which is reliable in practice.
+        setTimeout(() => {
+          try {
+            router.replace(stashedRoute);
+          } catch {
+            /* destination invalid in new session — fall back to home */
+          }
+        }, 0);
+      }
+    } catch {
+      /* SecureStore noise is non-fatal */
+    }
   },
 }));
 

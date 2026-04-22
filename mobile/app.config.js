@@ -27,6 +27,15 @@ module.exports = {
     name: 'PoultryManager',
     slug: 'poultrymanager',
     version: '1.0.2',
+    // Required by expo-updates so Updates.reloadAsync() (used by the
+    // language switcher to apply RTL layout changes mid-session) can
+    // initialise. We pin to the app's `version` so OTA channels stay
+    // tightly coupled to a specific JS bundle / native binary pair —
+    // expo-updates throws "configuration object must include a valid
+    // runtime version" without it.
+    runtimeVersion: {
+      policy: 'appVersion',
+    },
     orientation: 'portrait',
     icon: './assets/images/icon.png',
     scheme: 'poultrymanager',
