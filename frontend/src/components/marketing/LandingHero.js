@@ -8,7 +8,6 @@ import {
   Leaf,
   Smartphone,
   Radio,
-  Code2,
 } from 'lucide-react';
 import { isRTL } from '@/i18n/languages';
 import RadialHubDiagram from './RadialHubDiagram';
@@ -116,13 +115,13 @@ export default function LandingHero() {
               3. Compact radial (small, no labels)
               4. Subtitle
               5. CTAs
-              (Powered-by badges intentionally hidden — they crowded the
-              mobile viewport and the trust strip below already does that
-              credibility job.)
 
             DESKTOP order:
-              Left column: eyebrow → headline → subtitle → CTAs → powered-by
+              Left column: eyebrow → headline → subtitle → CTAs
               Right column: full radial with labels
+
+            The trust strip below the grid does the credibility lifting on
+            both breakpoints, so we don't need separate "powered by" badges.
           */}
           <div className="flex flex-col lg:grid lg:grid-cols-2 lg:items-center gap-6 sm:gap-8 lg:gap-12 max-w-2xl mx-auto lg:max-w-none">
             {/* 1) Eyebrow pill — first on every breakpoint. */}
@@ -178,25 +177,10 @@ export default function LandingHero() {
               </a>
             </div>
 
-            {/* 6) Powered-by badges — desktop-only (hidden on mobile per
-                redesign feedback: too much information for a phone hero). */}
-            <div className="hidden lg:order-5 lg:col-start-1 lg:flex flex-wrap items-center justify-start gap-x-7 gap-y-3 mt-2">
-              <PoweredByBadge
-                Icon={Leaf}
-                title={t('marketing.hero.poweredBy.esteraFarmsTitle')}
-                subtitle={t('marketing.hero.poweredBy.esteraFarmsSub')}
-              />
-              <PoweredByBadge
-                Icon={Code2}
-                title={t('marketing.hero.poweredBy.esteraTechTitle')}
-                subtitle={t('marketing.hero.poweredBy.esteraTechSub')}
-              />
-            </div>
-
-            {/* 7) Full radial — desktop-only. Spans all rows of the right
+            {/* Full radial — desktop-only. Spans all rows of the left
                 column so it stays vertically centred next to the text
                 stack on the left. */}
-            <div className="hidden lg:flex lg:col-start-2 lg:row-start-1 lg:row-span-5 lg:max-w-[520px] lg:ms-auto w-full items-center">
+            <div className="hidden lg:flex lg:col-start-2 lg:row-start-1 lg:row-span-4 lg:max-w-[520px] lg:ms-auto w-full items-center">
               <RadialHubDiagram />
             </div>
           </div>
@@ -247,23 +231,3 @@ export default function LandingHero() {
   );
 }
 
-// Compact "powered by" credibility badge: small icon + two stacked lines.
-// Used below the hero CTAs to attribute the platform to Estera Farms (the
-// operational expertise) and Estera Tech (the engineering team).
-function PoweredByBadge({ Icon, title, subtitle }) {
-  return (
-    <div className="flex items-center gap-2.5 text-white/85">
-      <span className="flex h-7 w-7 items-center justify-center rounded-md bg-white/10 ring-1 ring-white/15 text-[hsl(148_55%_62%)]">
-        <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-      </span>
-      <span className="leading-tight text-start">
-        <span className="block text-[12px] sm:text-[13px] font-semibold text-white">
-          {title}
-        </span>
-        <span className="block text-[11px] sm:text-[12px] text-white/65">
-          {subtitle}
-        </span>
-      </span>
-    </div>
-  );
-}

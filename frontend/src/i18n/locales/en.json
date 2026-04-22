@@ -583,18 +583,12 @@
     },
     "hero": {
       "eyebrow": "Built in the UAE for Poultry Operators",
-      "titleLead": "One platform for every link in your",
+      "titleLead": "One platform for every link in\u00a0your",
       "titleAccent": "poultry chain.",
       "title": "One platform for every link in your poultry chain.",
       "subtitle": "From hatchery to customer delivery, manage operations, production, compliance and profits in one intelligent workspace.",
       "ctaPrimary": "Get Started Free",
       "ctaSecondary": "Book Demo",
-      "poweredBy": {
-        "esteraFarmsTitle": "Powered by Estera Farms",
-        "esteraFarmsSub": "operational expertise",
-        "esteraTechTitle": "Estera Tech",
-        "esteraTechSub": "software engineering"
-      },
       "trustStrip": {
         "uaeStandard": {
           "line1": "UAE Industry",
