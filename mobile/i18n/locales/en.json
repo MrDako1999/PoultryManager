@@ -1362,7 +1362,11 @@
   },
   "datepicker": {
     "legendSubmitted": "Logged",
-    "legendMissing": "Missing"
+    "legendMissing": "Missing",
+    "previous": "Previous",
+    "next": "Next",
+    "changeMonth": "Change month",
+    "changeYear": "Change year"
   },
   "sync": {
     "title": "Sync Status",

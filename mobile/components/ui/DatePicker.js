@@ -68,6 +68,10 @@ function DatePicker({
   const [open, setOpen] = useState(false);
   const [viewYear, setViewYear] = useState(parsed?.getFullYear() || today.getFullYear());
   const [viewMonth, setViewMonth] = useState(parsed?.getMonth() ?? today.getMonth());
+  // 'days' shows the calendar grid (default).
+  // 'months' shows a 3x4 grid of months for the current viewYear.
+  // 'years'  shows a 3x4 grid of years (a 12-year page anchored on viewYear).
+  const [mode, setMode] = useState('days');
 
   const slideAnim = useRef(new Animated.Value(SHEET_HEIGHT)).current;
   const backdropAnim = useRef(new Animated.Value(0)).current;
@@ -95,6 +99,7 @@ function DatePicker({
     const seed = parseDate(value) || today;
     setViewYear(seed.getFullYear());
     setViewMonth(seed.getMonth());
+    setMode('days');
     setOpen(true);
   }, [value, onOpen, today]);
 
@@ -124,17 +129,62 @@ function DatePicker({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [slideOut]);
 
-  const prevMonth = useCallback(() => {
+  // The prev/next chevrons step different units depending on which mode the
+  // sheet is in: a month in days view, a year in months view, and a 12-year
+  // page in years view. Wrapping the logic here keeps the chevron Pressables
+  // dumb and avoids a forest of conditionals in the render tree.
+  const stepBackward = useCallback(() => {
     Haptics.selectionAsync().catch(() => {});
+    if (mode === 'months') {
+      setViewYear((y) => y - 1);
+      return;
+    }
+    if (mode === 'years') {
+      setViewYear((y) => y - 12);
+      return;
+    }
     if (viewMonth === 0) { setViewMonth(11); setViewYear((y) => y - 1); }
     else setViewMonth((m) => m - 1);
-  }, [viewMonth]);
+  }, [viewMonth, mode]);
 
-  const nextMonth = useCallback(() => {
+  const stepForward = useCallback(() => {
     Haptics.selectionAsync().catch(() => {});
+    if (mode === 'months') {
+      setViewYear((y) => y + 1);
+      return;
+    }
+    if (mode === 'years') {
+      setViewYear((y) => y + 12);
+      return;
+    }
     if (viewMonth === 11) { setViewMonth(0); setViewYear((y) => y + 1); }
     else setViewMonth((m) => m + 1);
-  }, [viewMonth]);
+  }, [viewMonth, mode]);
+
+  const openMonthsMode = useCallback(() => {
+    Haptics.selectionAsync().catch(() => {});
+    setMode((m) => (m === 'months' ? 'days' : 'months'));
+  }, []);
+
+  const openYearsMode = useCallback(() => {
+    Haptics.selectionAsync().catch(() => {});
+    setMode((m) => (m === 'years' ? 'days' : 'years'));
+  }, []);
+
+  const pickMonth = useCallback((monthIdx) => {
+    Haptics.selectionAsync().catch(() => {});
+    setViewMonth(monthIdx);
+    setMode('days');
+  }, []);
+
+  const pickYear = useCallback((year) => {
+    Haptics.selectionAsync().catch(() => {});
+    setViewYear(year);
+    // Drop into the months grid so the user can keep zooming in without
+    // having to detour through the days view first.
+    setMode('months');
+  }, []);
+
 
   const handleSelect = useCallback((day) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -160,13 +210,22 @@ function DatePicker({
     slideOut();
   }, [onChange, slideOut]);
 
-  const calendarDays = useMemo(() => {
+  // Build the calendar as explicit rows of seven cells. The previous
+  // implementation laid all cells into one wrap container with
+  // `width: ${100/7}%`, which on iOS rounds up just enough to push the 7th
+  // cell of every row onto the next line — leaving the Saturday column
+  // visually empty. Chunking into rows + `flex: 1` cells avoids the
+  // floating-point overflow because flex divides the row evenly in pixels.
+  const calendarRows = useMemo(() => {
     const daysInMonth = getDaysInMonth(viewYear, viewMonth);
     const firstDay = getFirstDayOfWeek(viewYear, viewMonth);
     const cells = [];
     for (let i = 0; i < firstDay; i++) cells.push(null);
     for (let d = 1; d <= daysInMonth; d++) cells.push(d);
-    return cells;
+    while (cells.length % 7 !== 0) cells.push(null);
+    const rows = [];
+    for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7));
+    return rows;
   }, [viewYear, viewMonth]);
 
   const selectedDay = parsed
@@ -176,22 +235,151 @@ function DatePicker({
   const todayDay = today.getFullYear() === viewYear && today.getMonth() === viewMonth
     ? today.getDate() : null;
 
-  const monthLabel = useMemo(
-    () => fmtMonthYear(viewYear, viewMonth, i18n.language),
+  const monthLongLabel = useMemo(
+    () => fmtMonthName(viewYear, viewMonth, i18n.language),
     [viewYear, viewMonth, i18n.language]
+  );
+  const yearOnlyLabel = useMemo(
+    () => fmtYearOnly(viewYear, i18n.language),
+    [viewYear, i18n.language]
   );
   const localizedWeekdays = useMemo(
     () => buildWeekdayLabels(i18n.language),
     [i18n.language]
   );
+  const localizedMonthsShort = useMemo(
+    () => buildShortMonthLabels(i18n.language),
+    [i18n.language]
+  );
   const displayValue = parsed ? fmtChipDate(parsed, i18n.language) : null;
+
+  // 12-year page anchored on the current viewYear (e.g. 2026 → 2024..2035).
+  // We center the page on the current year so it lands somewhere sensible
+  // even when the user opens a far-flung date for the first time.
+  const yearPageStart = Math.floor((viewYear - 2) / 12) * 12 + 2;
+  const yearPageEnd = yearPageStart + 11;
+  const yearList = useMemo(
+    () => Array.from({ length: 12 }, (_, i) => yearPageStart + i),
+    [yearPageStart]
+  );
+
+  const todayYear = today.getFullYear();
+  const todayMonth = today.getMonth();
 
   // Prev/next chevrons swap when the layout is RTL so "previous" stays
   // visually on the leading edge.
   const PrevIcon = isRTL ? ChevronRight : ChevronLeft;
   const NextIcon = isRTL ? ChevronLeft : ChevronRight;
-  const onLeadingNav = isRTL ? nextMonth : prevMonth;
-  const onTrailingNav = isRTL ? prevMonth : nextMonth;
+  const onLeadingNav = isRTL ? stepForward : stepBackward;
+  const onTrailingNav = isRTL ? stepBackward : stepForward;
+
+  // ---- Swipe / slide animation -------------------------------------------
+  // The body content (calendar / months / years) sits inside an Animated.View
+  // whose translateX is driven both by a horizontal pan gesture and by the
+  // chevron buttons. The animation flow on a step:
+  //   1. current content slides off-screen in the direction of motion
+  //   2. at the apex we run the actual step (mutating viewMonth / viewYear)
+  //   3. content jumps to the opposite off-screen edge and springs to 0
+  // That gives the perception of new content sliding in from the side
+  // instead of appearing as an abrupt jump.
+  const bodyTranslateX = useRef(new Animated.Value(0)).current;
+  const bodyWidthRef = useRef(0);
+  const isSliding = useRef(false);
+
+  const onBodyLayout = useCallback((e) => {
+    const w = e.nativeEvent.layout.width;
+    if (w && w !== bodyWidthRef.current) bodyWidthRef.current = w;
+  }, []);
+
+  // visualDirection: -1 = content slides left (next from the user's POV in
+  // LTR), +1 = content slides right (prev in LTR). For RTL the caller
+  // passes the inverted value so the slide tracks the mirrored layout.
+  const animateSlide = useCallback((visualDirection, action) => {
+    const w = bodyWidthRef.current;
+    if (!w) {
+      // Layout hasn't measured yet — fall back to an instant step so we
+      // never lose the user's intent on a fresh-open swipe.
+      action();
+      return;
+    }
+    if (isSliding.current) {
+      // A second swipe / chevron tap mid-animation: snap to the apex,
+      // run the new action, and let the spring carry the new content.
+      bodyTranslateX.stopAnimation();
+    }
+    isSliding.current = true;
+    Animated.timing(bodyTranslateX, {
+      toValue: visualDirection * w,
+      duration: 160,
+      useNativeDriver: true,
+    }).start(() => {
+      action();
+      bodyTranslateX.setValue(-visualDirection * w);
+      Animated.spring(bodyTranslateX, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 65,
+        friction: 11,
+      }).start(() => {
+        isSliding.current = false;
+      });
+    });
+  }, [bodyTranslateX]);
+
+  // Chevron handlers wrapped with animation. The visualDirection is keyed
+  // to the chevron's physical position (left / right), independent of mode,
+  // so the animation always tracks the user's spatial intuition.
+  const animatedLeading = useCallback(() => {
+    // Leading chevron is physically left in LTR, physically right in RTL.
+    animateSlide(isRTL ? -1 : +1, onLeadingNav);
+  }, [isRTL, onLeadingNav, animateSlide]);
+
+  const animatedTrailing = useCallback(() => {
+    animateSlide(isRTL ? +1 : -1, onTrailingNav);
+  }, [isRTL, onTrailingNav, animateSlide]);
+
+  // Horizontal swipe gesture. Tracks the finger live, then either snaps
+  // back (short / slow swipe) or runs animateSlide to commit the step.
+  const swipePan = useMemo(() => PanResponder.create({
+    // Never claim a fresh touch so taps fall through to the cells.
+    onStartShouldSetPanResponder: () => false,
+    onMoveShouldSetPanResponder: (_, g) =>
+      Math.abs(g.dx) > 12 && Math.abs(g.dx) > Math.abs(g.dy) * 1.4,
+    onPanResponderGrant: () => {
+      // Stop any in-flight slide so the finger is in control.
+      bodyTranslateX.stopAnimation();
+      isSliding.current = false;
+    },
+    onPanResponderMove: (_, g) => {
+      bodyTranslateX.setValue(g.dx);
+    },
+    onPanResponderRelease: (_, g) => {
+      const SWIPE_DIST = 40;
+      const SWIPE_VELOCITY = 0.3;
+      if (Math.abs(g.dx) < SWIPE_DIST && Math.abs(g.vx) < SWIPE_VELOCITY) {
+        Animated.spring(bodyTranslateX, {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 80,
+          friction: 11,
+        }).start();
+        return;
+      }
+      const visualDirection = g.dx > 0 ? +1 : -1;
+      const swipingNext = isRTL ? g.dx > 0 : g.dx < 0;
+      const action = swipingNext ? onTrailingNav : onLeadingNav;
+      animateSlide(visualDirection, action);
+    },
+    onPanResponderTerminate: () => {
+      Animated.spring(bodyTranslateX, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 80,
+        friction: 11,
+      }).start();
+    },
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [isRTL, onLeadingNav, onTrailingNav, animateSlide]);
 
   return (
     <>
@@ -376,7 +564,11 @@ function DatePicker({
 
             <View style={{ height: 1, backgroundColor: borderColor }} />
 
-            {/* Month navigation */}
+            {/* Month / year / decade navigation. Chevrons step the unit that
+                matches the active mode (month → year → decade). The center
+                area renders different controls so the user can drill in by
+                tapping month or year, or read the year-page range while
+                browsing years. */}
             <View
               style={[
                 styles.monthNav,
@@ -384,7 +576,7 @@ function DatePicker({
               ]}
             >
               <Pressable
-                onPress={onLeadingNav}
+                onPress={animatedLeading}
                 hitSlop={6}
                 android_ripple={{
                   color: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
@@ -395,24 +587,63 @@ function DatePicker({
                   styles.monthNavBtn,
                   { backgroundColor: dark ? 'rgba(255,255,255,0.04)' : 'hsl(148, 18%, 94%)' },
                 ]}
+                accessibilityRole="button"
+                accessibilityLabel={t('datepicker.previous', 'Previous')}
               >
                 <PrevIcon size={18} color={textColor} strokeWidth={2.2} />
               </Pressable>
-              <Text
-                style={{
-                  flex: 1,
-                  fontSize: 15,
-                  fontFamily: 'Poppins-SemiBold',
-                  color: textColor,
-                  textAlign: 'center',
-                  letterSpacing: -0.1,
-                }}
-                numberOfLines={1}
+
+              <View
+                style={[
+                  styles.monthNavCenter,
+                  { flexDirection: rowDirection(isRTL) },
+                ]}
               >
-                {monthLabel}
-              </Text>
+                {mode === 'days' ? (
+                  <>
+                    <HeaderButton
+                      label={monthLongLabel}
+                      onPress={openMonthsMode}
+                      tokens={tokens}
+                      accessibilityLabel={t('datepicker.changeMonth', 'Change month')}
+                    />
+                    <HeaderButton
+                      label={yearOnlyLabel}
+                      onPress={openYearsMode}
+                      tokens={tokens}
+                      accessibilityLabel={t('datepicker.changeYear', 'Change year')}
+                    />
+                  </>
+                ) : null}
+
+                {mode === 'months' ? (
+                  <HeaderButton
+                    label={yearOnlyLabel}
+                    active
+                    onPress={openYearsMode}
+                    tokens={tokens}
+                    accessibilityLabel={t('datepicker.changeYear', 'Change year')}
+                  />
+                ) : null}
+
+                {mode === 'years' ? (
+                  <Text
+                    style={{
+                      fontSize: 15,
+                      fontFamily: 'Poppins-SemiBold',
+                      color: textColor,
+                      textAlign: 'center',
+                      letterSpacing: -0.1,
+                    }}
+                    numberOfLines={1}
+                  >
+                    {`${fmtYearOnly(yearPageStart, i18n.language)} – ${fmtYearOnly(yearPageEnd, i18n.language)}`}
+                  </Text>
+                ) : null}
+              </View>
+
               <Pressable
-                onPress={onTrailingNav}
+                onPress={animatedTrailing}
                 hitSlop={6}
                 android_ripple={{
                   color: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
@@ -423,12 +654,29 @@ function DatePicker({
                   styles.monthNavBtn,
                   { backgroundColor: dark ? 'rgba(255,255,255,0.04)' : 'hsl(148, 18%, 94%)' },
                 ]}
+                accessibilityRole="button"
+                accessibilityLabel={t('datepicker.next', 'Next')}
               >
                 <NextIcon size={18} color={textColor} strokeWidth={2.2} />
               </Pressable>
             </View>
 
-            {/* Weekday headers */}
+            {/* Swipe-aware body wrapper. PanResponder lives here so a
+                horizontal flick anywhere over the grid steps the active
+                unit, while taps still fall through to the day / month /
+                year cells underneath. The Animated.View's translateX is
+                what makes the new month / year / decade slide in from the
+                side instead of jump-cutting. */}
+            <Animated.View
+              {...swipePan.panHandlers}
+              onLayout={onBodyLayout}
+              style={[
+                styles.swipeBody,
+                { transform: [{ translateX: bodyTranslateX }] },
+              ]}
+            >
+            {/* Weekday headers — days mode only */}
+            {mode === 'days' ? (
             <View style={[styles.weekdayRow, { flexDirection: rowDirection(isRTL) }]}>
               {localizedWeekdays.map((wd) => (
                 <View key={wd.key} style={styles.weekdayCell}>
@@ -445,118 +693,276 @@ function DatePicker({
                 </View>
               ))}
             </View>
+            ) : null}
 
-            {/* Calendar grid */}
-            <View style={[styles.calendarGrid, { flexDirection: rowDirection(isRTL) }]}>
-              {calendarDays.map((day, i) => {
-                if (day === null) {
-                  return <View key={`e-${i}`} style={styles.cellWrap} />;
-                }
-                const isSelected = day === selectedDay;
-                const isToday = day === todayDay;
-
-                // Per-cell ISO key drives both bounds enforcement and
-                // marker lookup. Marker takes a back seat to "selected"
-                // (filled accent disc wins visually), but the ring
-                // colour from missing/submitted still beats the
-                // default today-only outline.
-                const cellKey = formatDate(new Date(viewYear, viewMonth, day));
-                const isOutOfRange =
-                  (minKey && cellKey < minKey) || (maxKey && cellKey > maxKey);
-                const marker = markedDates ? markedDates[cellKey] : null;
-
-                // Marker tone — token-driven so dark mode stays
-                // legible. Submitted = accent green (matches the rest
-                // of the app's "done" affordance). Missing = amber
-                // ring (same warning tone used by WorkerTasks pending
-                // rows).
-                let ringColor = null;
-                let ringFillBg = null;
-                if (marker === 'submitted') {
-                  ringColor = accentColor;
-                  ringFillBg = dark
-                    ? 'rgba(148,210,165,0.14)'
-                    : 'hsl(148, 35%, 94%)';
-                } else if (marker === 'missing') {
-                  ringColor = dark ? '#fbbf24' : '#d97706';
-                  ringFillBg = dark
-                    ? 'rgba(251,191,36,0.14)'
-                    : 'hsl(40, 90%, 94%)';
-                }
-
-                const showRing = !isSelected && !!ringColor;
-                const showTodayOutline = !isSelected && !showRing && isToday;
-                const discBg = isSelected
-                  ? accentColor
-                  : showRing
-                    ? ringFillBg
-                    : 'transparent';
-                const discBorderColor = showRing
-                  ? ringColor
-                  : showTodayOutline
-                    ? accentColor
-                    : 'transparent';
-                const discBorderWidth = showRing ? 1.5 : showTodayOutline ? 1.5 : 0;
-                const dayLabelColor = isOutOfRange
-                  ? mutedColor
-                  : isSelected
-                    ? '#ffffff'
-                    : showRing
-                      ? ringColor
-                      : isToday
-                        ? accentColor
-                        : textColor;
-
-                return (
-                  <View key={day} style={styles.cellWrap}>
-                    <Pressable
-                      onPress={() => handleSelect(day)}
-                      disabled={isOutOfRange}
-                      hitSlop={2}
-                      android_ripple={
-                        isOutOfRange ? undefined : {
-                          color: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
-                          borderless: true,
-                          radius: 18,
-                        }
+            {/* Calendar grid — days mode only. Rendered as explicit rows of
+                seven flex:1 cells so iOS sub-pixel rounding can't push the
+                Saturday cell onto a new line (the bug that made every
+                Saturday column appear empty). */}
+            {mode === 'days' ? (
+              <View style={styles.calendarGrid}>
+                {calendarRows.map((row, rowIdx) => (
+                  <View
+                    key={`row-${rowIdx}`}
+                    style={[styles.calendarRow, { flexDirection: rowDirection(isRTL) }]}
+                  >
+                    {row.map((day, colIdx) => {
+                      if (day === null) {
+                        return <View key={`e-${rowIdx}-${colIdx}`} style={styles.cellWrap} />;
                       }
-                      style={[
-                        styles.dayDisc,
-                        {
-                          backgroundColor: discBg,
-                          borderWidth: discBorderWidth,
-                          borderColor: discBorderColor,
-                          opacity: isOutOfRange ? 0.32 : 1,
-                          ...(isSelected && !dark
-                            ? {
-                                shadowColor: accentColor,
-                                shadowOffset: { width: 0, height: 2 },
-                                shadowOpacity: 0.28,
-                                shadowRadius: 6,
-                                elevation: 4,
+                      const isSelected = day === selectedDay;
+                      const isToday = day === todayDay;
+
+                      // Per-cell ISO key drives both bounds enforcement and
+                      // marker lookup. Marker takes a back seat to "selected"
+                      // (filled accent disc wins visually), but the ring
+                      // colour from missing/submitted still beats the
+                      // default today-only outline.
+                      const cellKey = formatDate(new Date(viewYear, viewMonth, day));
+                      const isOutOfRange =
+                        (minKey && cellKey < minKey) || (maxKey && cellKey > maxKey);
+                      const marker = markedDates ? markedDates[cellKey] : null;
+
+                      // Marker tone — token-driven so dark mode stays
+                      // legible. Submitted = accent green (matches the rest
+                      // of the app's "done" affordance). Missing = amber
+                      // ring (same warning tone used by WorkerTasks pending
+                      // rows).
+                      let ringColor = null;
+                      let ringFillBg = null;
+                      if (marker === 'submitted') {
+                        ringColor = accentColor;
+                        ringFillBg = dark
+                          ? 'rgba(148,210,165,0.14)'
+                          : 'hsl(148, 35%, 94%)';
+                      } else if (marker === 'missing') {
+                        ringColor = dark ? '#fbbf24' : '#d97706';
+                        ringFillBg = dark
+                          ? 'rgba(251,191,36,0.14)'
+                          : 'hsl(40, 90%, 94%)';
+                      }
+
+                      const showRing = !isSelected && !!ringColor;
+                      const showTodayOutline = !isSelected && !showRing && isToday;
+                      const discBg = isSelected
+                        ? accentColor
+                        : showRing
+                          ? ringFillBg
+                          : 'transparent';
+                      const discBorderColor = showRing
+                        ? ringColor
+                        : showTodayOutline
+                          ? accentColor
+                          : 'transparent';
+                      const discBorderWidth = showRing ? 1.5 : showTodayOutline ? 1.5 : 0;
+                      const dayLabelColor = isOutOfRange
+                        ? mutedColor
+                        : isSelected
+                          ? '#ffffff'
+                          : showRing
+                            ? ringColor
+                            : isToday
+                              ? accentColor
+                              : textColor;
+
+                      return (
+                        <View key={`d-${day}`} style={styles.cellWrap}>
+                          <Pressable
+                            onPress={() => handleSelect(day)}
+                            disabled={isOutOfRange}
+                            hitSlop={2}
+                            android_ripple={
+                              isOutOfRange ? undefined : {
+                                color: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
+                                borderless: true,
+                                radius: 18,
                               }
-                            : {}),
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 14,
-                          fontFamily: isSelected ? 'Poppins-Bold' : 'Poppins-Medium',
-                          color: dayLabelColor,
-                        }}
-                      >
-                        {day}
-                      </Text>
-                    </Pressable>
+                            }
+                            style={[
+                              styles.dayDisc,
+                              {
+                                backgroundColor: discBg,
+                                borderWidth: discBorderWidth,
+                                borderColor: discBorderColor,
+                                opacity: isOutOfRange ? 0.32 : 1,
+                                ...(isSelected && !dark
+                                  ? {
+                                      shadowColor: accentColor,
+                                      shadowOffset: { width: 0, height: 2 },
+                                      shadowOpacity: 0.28,
+                                      shadowRadius: 6,
+                                      elevation: 4,
+                                    }
+                                  : {}),
+                              },
+                            ]}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 14,
+                                fontFamily: isSelected ? 'Poppins-Bold' : 'Poppins-Medium',
+                                color: dayLabelColor,
+                              }}
+                            >
+                              {day}
+                            </Text>
+                          </Pressable>
+                        </View>
+                      );
+                    })}
                   </View>
-                );
-              })}
-            </View>
+                ))}
+              </View>
+            ) : null}
+
+            {/* Months grid — 3 cols × 4 rows (Jan..Dec) for the active year.
+                The "selected" pill tracks the active navigation (viewMonth)
+                so tapping a month gives immediate visual feedback before
+                the days view slides in. The committed date's month gets a
+                subtle accent outline so the user can still tell where
+                they last saved a date. Today gets the same outline when
+                no committed indicator is competing for it. */}
+            {mode === 'months' ? (
+              <View style={styles.gridPad}>
+                <View style={[styles.monthsGrid, { flexDirection: rowDirection(isRTL) }]}>
+                  {localizedMonthsShort.map((label, idx) => {
+                    const isSelected = idx === viewMonth;
+                    const isCommitted = parsed
+                      && parsed.getFullYear() === viewYear
+                      && parsed.getMonth() === idx;
+                    const isCurrent = !isCommitted
+                      && todayYear === viewYear && todayMonth === idx;
+                    // Bound check: a month is out of range only if every day
+                    // it contains falls outside [minKey, maxKey]. The cheap
+                    // approximation below tests the first/last days and is
+                    // good enough for the common min/max use cases.
+                    const lastDay = getDaysInMonth(viewYear, idx);
+                    const monthFirst = formatDate(new Date(viewYear, idx, 1));
+                    const monthLast = formatDate(new Date(viewYear, idx, lastDay));
+                    const isOutOfRange =
+                      (minKey && monthLast < minKey)
+                      || (maxKey && monthFirst > maxKey);
+                    return (
+                      <View key={`m-${idx}`} style={styles.monthCellWrap}>
+                        <Pressable
+                          onPress={() => pickMonth(idx)}
+                          disabled={isOutOfRange}
+                          android_ripple={
+                            isOutOfRange ? undefined : {
+                              color: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
+                              borderless: false,
+                            }
+                          }
+                          style={[
+                            styles.monthCell,
+                            {
+                              backgroundColor: isSelected
+                                ? accentColor
+                                : (dark ? 'rgba(255,255,255,0.04)' : 'hsl(148, 18%, 96%)'),
+                              borderColor: isSelected
+                                ? accentColor
+                                : (isCommitted || isCurrent)
+                                  ? accentColor
+                                  : 'transparent',
+                              borderWidth: (isSelected || isCommitted || isCurrent) ? 1.5 : 0,
+                              opacity: isOutOfRange ? 0.32 : 1,
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 13.5,
+                              fontFamily: isSelected ? 'Poppins-Bold' : 'Poppins-SemiBold',
+                              color: isSelected
+                                ? '#ffffff'
+                                : (isCommitted || isCurrent)
+                                  ? accentColor
+                                  : textColor,
+                              letterSpacing: 0.1,
+                            }}
+                            numberOfLines={1}
+                          >
+                            {label}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            ) : null}
+
+            {/* Years grid — 12 years per page anchored on viewYear. Chevrons
+                step the page by ±12. Tapping a year drops back to the months
+                grid so the user can finish drilling in. The "selected"
+                pill tracks viewYear (same nav-feedback rule as the months
+                grid); the committed date's year keeps an accent outline. */}
+            {mode === 'years' ? (
+              <View style={styles.gridPad}>
+                <View style={[styles.monthsGrid, { flexDirection: rowDirection(isRTL) }]}>
+                  {yearList.map((year) => {
+                    const isSelected = year === viewYear;
+                    const isCommitted = parsed && parsed.getFullYear() === year;
+                    const isCurrent = !isCommitted && todayYear === year;
+                    const yearFirst = formatDate(new Date(year, 0, 1));
+                    const yearLast = formatDate(new Date(year, 11, 31));
+                    const isOutOfRange =
+                      (minKey && yearLast < minKey)
+                      || (maxKey && yearFirst > maxKey);
+                    return (
+                      <View key={`y-${year}`} style={styles.monthCellWrap}>
+                        <Pressable
+                          onPress={() => pickYear(year)}
+                          disabled={isOutOfRange}
+                          android_ripple={
+                            isOutOfRange ? undefined : {
+                              color: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
+                              borderless: false,
+                            }
+                          }
+                          style={[
+                            styles.monthCell,
+                            {
+                              backgroundColor: isSelected
+                                ? accentColor
+                                : (dark ? 'rgba(255,255,255,0.04)' : 'hsl(148, 18%, 96%)'),
+                              borderColor: isSelected
+                                ? accentColor
+                                : (isCommitted || isCurrent)
+                                  ? accentColor
+                                  : 'transparent',
+                              borderWidth: (isSelected || isCommitted || isCurrent) ? 1.5 : 0,
+                              opacity: isOutOfRange ? 0.32 : 1,
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 13.5,
+                              fontFamily: isSelected ? 'Poppins-Bold' : 'Poppins-SemiBold',
+                              color: isSelected
+                                ? '#ffffff'
+                                : (isCommitted || isCurrent)
+                                  ? accentColor
+                                  : textColor,
+                              letterSpacing: 0.1,
+                            }}
+                            numberOfLines={1}
+                          >
+                            {fmtYearOnly(year, i18n.language)}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            ) : null}
+            </Animated.View>
 
             {/* Marker legend — only shown when callers wire `markedDates`
                 so the regular pickers stay uncluttered. */}
-            {markedDates && Object.keys(markedDates).length > 0 ? (
+            {mode === 'days' && markedDates && Object.keys(markedDates).length > 0 ? (
               <View
                 style={[
                   styles.legend,
@@ -588,6 +994,44 @@ function DatePicker({
 }
 
 export default forwardRef(DatePicker);
+
+// HeaderButton — pressable label used for the month and year controls in
+// the calendar header. Styled to match the side chevrons (same rounded
+// background, same height) so all four header controls read as one
+// consistent button family. Tapping opens the corresponding picker grid.
+function HeaderButton({ label, active, onPress, tokens, accessibilityLabel }) {
+  const { dark, accentColor, textColor } = tokens;
+  const idleBg = dark ? 'rgba(255,255,255,0.04)' : 'hsl(148, 18%, 94%)';
+  const activeBg = dark ? 'rgba(148,210,165,0.18)' : 'hsl(148, 35%, 90%)';
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={4}
+      android_ripple={{
+        color: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+        borderless: false,
+      }}
+      style={[
+        styles.headerBtn,
+        { backgroundColor: active ? activeBg : idleBg },
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+    >
+      <Text
+        style={{
+          fontSize: 14,
+          fontFamily: 'Poppins-SemiBold',
+          color: active ? accentColor : textColor,
+          letterSpacing: -0.1,
+        }}
+        numberOfLines={1}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
 
 function LegendDot({ color, fill, label, textColor }) {
   return (
@@ -678,15 +1122,36 @@ function fmtChipDate(d, locale) {
   });
 }
 
-function fmtMonthYear(year, monthIdx, locale) {
+function fmtMonthName(year, monthIdx, locale) {
   const tag = localeWithLatnDigits(locale) || NUMERIC_LOCALE;
   try {
-    return new Date(year, monthIdx, 1).toLocaleDateString(tag, {
-      month: 'long', year: 'numeric',
-    });
+    return new Date(year, monthIdx, 1).toLocaleDateString(tag, { month: 'long' });
   } catch {
-    return `${MONTHS[monthIdx]} ${year}`;
+    return MONTHS[monthIdx];
   }
+}
+
+function fmtYearOnly(year, locale) {
+  const tag = localeWithLatnDigits(locale) || NUMERIC_LOCALE;
+  try {
+    return new Date(year, 0, 1).toLocaleDateString(tag, { year: 'numeric' });
+  } catch {
+    return String(year);
+  }
+}
+
+function buildShortMonthLabels(locale) {
+  const tag = localeWithLatnDigits(locale) || NUMERIC_LOCALE;
+  let formatter = null;
+  try { formatter = new Intl.DateTimeFormat(tag, { month: 'short' }); }
+  catch { formatter = null; }
+  return MONTHS.map((name, i) => {
+    if (formatter) {
+      try { return formatter.format(new Date(2000, i, 1)); }
+      catch { return name.slice(0, 3); }
+    }
+    return name.slice(0, 3);
+  });
 }
 
 function buildWeekdayLabels(locale) {
@@ -760,10 +1225,18 @@ const styles = StyleSheet.create({
   },
   monthNav: {
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
     paddingHorizontal: 20,
     marginTop: 14,
     marginBottom: 6,
+  },
+  monthNavCenter: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // Generous gap so the month and year stepper columns read as two
+    // distinct controls instead of one squashed pair.
+    gap: 18,
   },
   monthNavBtn: {
     width: 36,
@@ -771,6 +1244,38 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  headerBtn: {
+    minWidth: 72,
+    paddingHorizontal: 14,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gridPad: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+  },
+  monthsGrid: {
+    flexWrap: 'wrap',
+  },
+  monthCellWrap: {
+    width: `${100 / 3}%`,
+    paddingHorizontal: 4,
+    paddingVertical: 6,
+  },
+  monthCell: {
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  swipeBody: {
+    // Stretch so the swipe area covers any blank space below the grids,
+    // not just the painted cells. Without alignSelf:'stretch' the View
+    // would shrink to its tallest child's natural width on some layouts.
+    alignSelf: 'stretch',
   },
   weekdayRow: {
     paddingHorizontal: 24,
@@ -782,11 +1287,16 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   calendarGrid: {
-    flexWrap: 'wrap',
     paddingHorizontal: 20,
   },
+  calendarRow: {
+    // Each row owns its own flexbox so the seven cells share the row width
+    // exactly via flex:1 — no `${100/7}%` rounding overflow that wraps the
+    // 7th cell to the next line.
+    alignSelf: 'stretch',
+  },
   cellWrap: {
-    width: `${100 / 7}%`,
+    flex: 1,
     height: 44,
     alignItems: 'center',
     justifyContent: 'center',

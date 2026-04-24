@@ -501,7 +501,11 @@
   },
   "datepicker": {
     "legendSubmitted": "مُسجَّل",
-    "legendMissing": "ناقص"
+    "legendMissing": "ناقص",
+    "previous": "السابق",
+    "next": "التالي",
+    "changeMonth": "تغيير الشهر",
+    "changeYear": "تغيير السنة"
   },
   "sync": {
     "title": "حالة المزامنة",
