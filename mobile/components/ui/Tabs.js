@@ -1,14 +1,35 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Pressable, ScrollView, Animated, StyleSheet } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  interpolate,
+  Extrapolation,
+} from 'react-native-reanimated';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
 
 /**
  * Tabs strip — design-language tokenized.
  *
- * Drop-in replacement for the legacy NativeWind tabs. Same props, same
- * `position` Animated.Value contract for PagerView-driven indicator slides.
+ * Drop-in replacement for the legacy NativeWind tabs. Same props, except the
+ * pager integration now uses a reanimated `SharedValue` (`progress`) instead
+ * of an `Animated.Value` (`position`) so the indicator and label fades run
+ * on the UI thread.
+ *
+ * Before the migration every `onPageScroll` event had to bridge native → JS,
+ * fire a `setValue()` on a plain `Animated.Value`, rerun every bound
+ * `interpolate()` on the JS thread, and bridge every style update back to
+ * native. On Android under load (e.g. the batch detail screen during data
+ * hydration) that loop dropped the tab indicator to ~2 fps even though the
+ * underlying pager swipe stayed smooth — the exact "highlighter lags the
+ * swipe" complaint users were hitting.
+ *
+ * Now `progress.value` is written from a pager worklet on the UI thread and
+ * every `useAnimatedStyle` reader runs there too; the JS thread is out of
+ * the hot path entirely.
  *
  * Visual:
  *   - Strip background: sheetBg, hairline bottom border (borderColor)
@@ -20,7 +41,7 @@ export default function Tabs({
   tabs,
   value,
   onChange,
-  position,
+  progress: externalProgress,
 }) {
   const tokens = useHeroSheetTokens();
   const { sheetBg, borderColor, mutedColor, accentColor } = tokens;
@@ -29,7 +50,14 @@ export default function Tabs({
   const scrollRef = useRef(null);
   const [layouts, setLayouts] = useState({});
   const containerWidth = useRef(0);
-  const internalProgress = useRef(new Animated.Value(0)).current;
+  // When the parent doesn't supply a pager-driven SharedValue (e.g. the
+  // Accounting tab strip with no swipe pager) we drive the indicator with a
+  // local spring on a SharedValue of our own. The contract — "progress is a
+  // reanimated SharedValue whose numeric value is the source-order index" —
+  // is identical either way, so the rest of the component doesn't need to
+  // branch on where it came from.
+  const internalProgress = useSharedValue(0);
+  const progress = externalProgress || internalProgress;
 
   // The strip lays out children in the SAME order they appear in `tabs`,
   // but we render them in reversed order when the locale is RTL. Why
@@ -58,20 +86,16 @@ export default function Tabs({
     [tabs, value]
   );
 
-  // Drive a continuous progress value either from the parent (PagerView scroll)
-  // or, as a fallback, from our own state via spring. The progress value is
-  // ALWAYS in source order — we map it to render order at interpolation time.
+  // Drive our internal progress via spring when no external (pager) progress
+  // was supplied. `withSpring` runs fully on the UI thread.
   useEffect(() => {
-    if (position) return;
-    Animated.spring(internalProgress, {
-      toValue: sourceActiveIndex,
-      useNativeDriver: false,
-      friction: 12,
-      tension: 90,
-    }).start();
-  }, [sourceActiveIndex, position, internalProgress]);
-
-  const progress = position || internalProgress;
+    if (externalProgress) return;
+    internalProgress.value = withSpring(sourceActiveIndex, {
+      damping: 18,
+      stiffness: 180,
+      mass: 1,
+    });
+  }, [sourceActiveIndex, externalProgress, internalProgress]);
 
   const layoutsReady = renderTabs.every((t) => layouts[t.key]) && renderTabs.length > 0;
 
@@ -90,47 +114,59 @@ export default function Tabs({
     onChange?.(key);
   };
 
-  const indicatorStyle = useMemo(() => {
-    if (!layoutsReady) return null;
-
-    // Single-tab strip can't be interpolated (interpolate needs >= 2
-    // points). Fall back to a static underline anchored under the only
-    // tab. Same defensive case as before — capability-restricted users
-    // can land on a 1-tab strip, e.g. ground_staff with only Overview.
-    if (renderTabs.length < 2) {
-      const only = layouts[renderTabs[0].key];
-      return {
-        transform: [{ translateX: only.x + 12 }],
-        width: Math.max(0, only.width - 24),
-      };
+  // Pre-compute the interpolation input/output arrays in source order. We
+  // snapshot them into numeric arrays so the worklet below can capture them
+  // cleanly (reanimated rebuilds the worklet when the deps change).
+  const { inputRange, xOutput, widthOutput } = useMemo(() => {
+    if (!layoutsReady || renderTabs.length < 2) {
+      return { inputRange: [], xOutput: [], widthOutput: [] };
     }
-
-    // Build inputRange in source order [0..N-1], outputRange holds the
-    // RENDER-order layout.x of the corresponding source-order tab.
-    // That way `progress = sourceIdx` always maps to the visual x of
-    // the tab the user actually wants to highlight.
-    const inputRange = tabs.map((_, sIdx) => sIdx);
-    const xOutput = tabs.map((sourceTab) => {
+    const input = tabs.map((_, sIdx) => sIdx);
+    const x = tabs.map((sourceTab) => {
       const layout = layouts[sourceTab.key];
       return (layout?.x ?? 0) + 12;
     });
-    const widthOutput = tabs.map((sourceTab) => {
+    const w = tabs.map((sourceTab) => {
       const layout = layouts[sourceTab.key];
       return Math.max(0, (layout?.width ?? 0) - 24);
     });
+    return { inputRange: input, xOutput: x, widthOutput: w };
+  }, [layoutsReady, tabs, renderTabs, layouts]);
 
-    const translateX = progress.interpolate({
+  const animatedIndicatorStyle = useAnimatedStyle(() => {
+    if (inputRange.length < 2) {
+      return { transform: [{ translateX: 0 }], width: 0, opacity: 0 };
+    }
+    const translateX = interpolate(
+      progress.value,
       inputRange,
-      outputRange: xOutput,
-      extrapolate: 'clamp',
-    });
-    const width = progress.interpolate({
+      xOutput,
+      Extrapolation.CLAMP
+    );
+    const width = interpolate(
+      progress.value,
       inputRange,
-      outputRange: widthOutput,
-      extrapolate: 'clamp',
-    });
-    return { transform: [{ translateX }], width };
-  }, [layoutsReady, tabs, renderTabs, layouts, progress]);
+      widthOutput,
+      Extrapolation.CLAMP
+    );
+    return {
+      transform: [{ translateX }],
+      width,
+      opacity: 1,
+    };
+  }, [inputRange, xOutput, widthOutput]);
+
+  // Single-tab strip can't be interpolated. Fall back to a static underline
+  // anchored under the only tab. Same defensive case as before —
+  // capability-restricted users can land on a 1-tab strip.
+  const staticIndicatorStyle = useMemo(() => {
+    if (!layoutsReady || renderTabs.length !== 1) return null;
+    const only = layouts[renderTabs[0].key];
+    return {
+      transform: [{ translateX: only.x + 12 }],
+      width: Math.max(0, only.width - 24),
+    };
+  }, [layoutsReady, renderTabs, layouts]);
 
   return (
     <View
@@ -195,16 +231,25 @@ export default function Tabs({
             })}
           </View>
 
-          {indicatorStyle && (
+          {staticIndicatorStyle ? (
+            <View
+              pointerEvents="none"
+              style={[
+                styles.indicator,
+                { backgroundColor: accentColor },
+                staticIndicatorStyle,
+              ]}
+            />
+          ) : layoutsReady ? (
             <Animated.View
               pointerEvents="none"
               style={[
                 styles.indicator,
                 { backgroundColor: accentColor },
-                indicatorStyle,
+                animatedIndicatorStyle,
               ]}
             />
-          )}
+          ) : null}
         </View>
       </ScrollView>
     </View>
@@ -213,16 +258,27 @@ export default function Tabs({
 
 function AnimatedTabLabel({ progress, index, label, mutedColor, accentColor }) {
   // Active text fades in around `index`, fully visible at `index`, fades out
-  // toward neighbors. Inactive text does the inverse.
-  const activeOpacity = progress.interpolate({
-    inputRange: [index - 1, index, index + 1],
-    outputRange: [0, 1, 0],
-    extrapolate: 'clamp',
+  // toward neighbors. Inactive text does the inverse. Both opacities are
+  // derived on the UI thread — before the reanimated migration this block
+  // was two JS-side `Animated.Value.interpolate()` calls per tab, which is
+  // what tanked the frame rate on Android during a swipe.
+  const activeStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(
+      progress.value,
+      [index - 1, index, index + 1],
+      [0, 1, 0],
+      Extrapolation.CLAMP
+    );
+    return { opacity };
   });
-  const inactiveOpacity = progress.interpolate({
-    inputRange: [index - 1, index, index + 1],
-    outputRange: [1, 0, 1],
-    extrapolate: 'clamp',
+  const inactiveStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(
+      progress.value,
+      [index - 1, index, index + 1],
+      [1, 0, 1],
+      Extrapolation.CLAMP
+    );
+    return { opacity };
   });
 
   return (
@@ -239,12 +295,9 @@ function AnimatedTabLabel({ progress, index, label, mutedColor, accentColor }) {
         style={[
           styles.label,
           styles.labelInactive,
-          {
-            position: 'absolute',
-            top: 0, left: 0, right: 0,
-            opacity: inactiveOpacity,
-            color: mutedColor,
-          },
+          styles.labelOverlay,
+          { color: mutedColor },
+          inactiveStyle,
         ]}
         numberOfLines={1}
       >
@@ -254,12 +307,9 @@ function AnimatedTabLabel({ progress, index, label, mutedColor, accentColor }) {
         style={[
           styles.label,
           styles.labelActive,
-          {
-            position: 'absolute',
-            top: 0, left: 0, right: 0,
-            opacity: activeOpacity,
-            color: accentColor,
-          },
+          styles.labelOverlay,
+          { color: accentColor },
+          activeStyle,
         ]}
         numberOfLines={1}
       >
@@ -298,6 +348,12 @@ const styles = StyleSheet.create({
   },
   labelActive: {
     fontFamily: 'Poppins-SemiBold',
+  },
+  labelOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
   },
   indicator: {
     position: 'absolute',

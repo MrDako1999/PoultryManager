@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Animated } from 'react-native';
+import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import PagerView from 'react-native-pager-view';
 import {
   Layers, Egg, DollarSign, Wheat, ShoppingCart, ClipboardList,
   Weight, Thermometer,
@@ -12,6 +11,7 @@ import useLocalRecord from '@/hooks/useLocalRecord';
 import useLocalQuery from '@/hooks/useLocalQuery';
 import useCapabilities from '@/hooks/useCapabilities';
 import useOfflineMutation from '@/hooks/useOfflineMutation';
+import usePagerProgress, { AnimatedPagerView } from '@/hooks/usePagerProgress';
 import { useIsRTL } from '@/stores/localeStore';
 import { useToast } from '@/components/ui/Toast';
 import EmptyState from '@/components/ui/EmptyState';
@@ -47,20 +47,24 @@ export default function BatchDetailScreen() {
   const isRTL = useIsRTL();
 
   const pagerRef = useRef(null);
-  const pagerProgress = useRef(new Animated.Value(0)).current;
+  // Progress is now a reanimated SharedValue driven by a worklet
+  // `onPageScroll` handler — see `usePagerProgress`. This keeps the tab
+  // indicator / label fades on the UI thread so they stay at 60fps even
+  // when the JS thread is busy (Android was dropping to ~2fps during
+  // swipes before this migration).
+  const { progress: pagerProgress, scrollHandler } = usePagerProgress(0);
   // Tracks the page index the pager itself most recently reported. Used to
   // suppress programmatic `setPage` calls in response to state updates that
   // originated from the pager (which would otherwise create a feedback loop
   // of selections and produce the runaway swipe seen on fast gestures).
   const pagerIndexRef = useRef(0);
-  const handlePageScroll = (e) => {
-    const { position, offset } = e.nativeEvent;
-    pagerProgress.setValue(position + offset);
-  };
   const handlePageSelected = (e) => {
     const idx = e.nativeEvent.position;
     pagerIndexRef.current = idx;
-    pagerProgress.setValue(idx);
+    // Normal swipes have already driven `pagerProgress.value` to `idx` via
+    // the worklet; this assignment is a safety net for edge cases where a
+    // programmatic `setPage` finishes without a final scroll event.
+    pagerProgress.value = idx;
   };
 
   const [batch, batchLoading] = useLocalRecord('batches', id);
@@ -132,7 +136,7 @@ export default function BatchDetailScreen() {
   useEffect(() => {
     const idx = Math.max(0, visibleTabs.findIndex((t) => t.key === initialKey));
     pagerIndexRef.current = idx;
-    pagerProgress.setValue(idx);
+    pagerProgress.value = idx;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -311,10 +315,10 @@ export default function BatchDetailScreen() {
         tabs={visibleTabs}
         value={activeKey}
         onChange={setActiveKey}
-        position={pagerProgress}
+        progress={pagerProgress}
       />
 
-      <PagerView
+      <AnimatedPagerView
         ref={pagerRef}
         style={{ flex: 1 }}
         initialPage={initialPage}
@@ -332,7 +336,7 @@ export default function BatchDetailScreen() {
         // and the indicator's source-order position values land on the
         // correct visual tab.
         layoutDirection={isRTL ? 'rtl' : 'ltr'}
-        onPageScroll={handlePageScroll}
+        onPageScroll={scrollHandler}
         onPageSelected={(e) => {
           handlePageSelected(e);
           const idx = e.nativeEvent.position;
@@ -371,7 +375,7 @@ export default function BatchDetailScreen() {
             )}
           </View>
         ))}
-      </PagerView>
+      </AnimatedPagerView>
 
       {showOverviewMenuFab && (
         <QuickAddFAB items={overviewQuickAddItems} bottomInset={insets.bottom} />

@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Animated } from 'react-native';
+import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import PagerView from 'react-native-pager-view';
 import { Warehouse } from 'lucide-react-native';
 import useLocalRecord from '@/hooks/useLocalRecord';
 import useLocalQuery from '@/hooks/useLocalQuery';
 import useCapabilities from '@/hooks/useCapabilities';
 import useOfflineMutation from '@/hooks/useOfflineMutation';
+import usePagerProgress, { AnimatedPagerView } from '@/hooks/usePagerProgress';
 import { useToast } from '@/components/ui/Toast';
 import EmptyState from '@/components/ui/EmptyState';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -53,11 +53,9 @@ export default function FarmDetailScreen() {
   // selection back into the pager.
   const pagerRef = useRef(null);
   const pagerIndexRef = useRef(0);
-  const pagerProgress = useRef(new Animated.Value(0)).current;
-  const handlePageScroll = (e) => {
-    const { position, offset } = e.nativeEvent;
-    pagerProgress.setValue(position + offset);
-  };
+  // UI-thread progress tracker — see `usePagerProgress` for why this is a
+  // reanimated SharedValue instead of a JS-driven `Animated.Value`.
+  const { progress: pagerProgress, scrollHandler } = usePagerProgress(0);
 
   const farmBatches = useMemo(
     () => allBatches.filter((b) => {
@@ -130,7 +128,7 @@ export default function FarmDetailScreen() {
   useEffect(() => {
     const idx = Math.max(0, visibleTabs.findIndex((tab) => tab.key === activeKey));
     pagerIndexRef.current = idx;
-    pagerProgress.setValue(idx);
+    pagerProgress.value = idx;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -193,18 +191,18 @@ export default function FarmDetailScreen() {
         tabs={visibleTabs}
         value={activeKey}
         onChange={setActiveKey}
-        position={pagerProgress}
+        progress={pagerProgress}
       />
 
-      <PagerView
+      <AnimatedPagerView
         ref={pagerRef}
         style={{ flex: 1 }}
         initialPage={initialPage}
-        onPageScroll={handlePageScroll}
+        onPageScroll={scrollHandler}
         onPageSelected={(e) => {
           const idx = e.nativeEvent.position;
           pagerIndexRef.current = idx;
-          pagerProgress.setValue(idx);
+          pagerProgress.value = idx;
           const next = visibleTabs[idx]?.key;
           if (next && next !== activeKey) setActiveKey(next);
         }}
@@ -268,7 +266,7 @@ export default function FarmDetailScreen() {
             )}
           </View>
         ))}
-      </PagerView>
+      </AnimatedPagerView>
 
       <FarmSheet
         open={editOpen}
