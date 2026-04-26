@@ -1,11 +1,20 @@
-import { useState } from 'react';
-import { View, Text, Pressable, ActivityIndicator } from 'react-native';
-import { Upload, FileText, Image as ImageIcon, X, Camera } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
+import {
+  View, Text, Pressable, ActivityIndicator, StyleSheet,
+} from 'react-native';
+import {
+  FileText, Image as ImageIcon, X, Camera, FolderOpen,
+} from 'lucide-react-native';
 import * as DocumentPicker from 'expo-document-picker';
+import * as Haptics from 'expo-haptics';
 import { useTranslation } from 'react-i18next';
-import useThemeStore from '@/stores/themeStore';
+import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
+import { useIsRTL } from '@/stores/localeStore';
+import { rowDirection, textAlignStart } from '@/lib/rtl';
 import api from '@/lib/api';
-import { uploadMedia, getUploadErrorMessage } from '@/lib/uploadMedia';
+import {
+  uploadMedia, uploadPreflight, getUploadErrorMessage,
+} from '@/lib/uploadMedia';
 import FileViewer from './FileViewer';
 import InstantCamera from './InstantCamera';
 
@@ -16,53 +25,181 @@ function formatFileSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function getIcon(media) {
-  if (media?.mime_type?.startsWith('image/') || /\.(jpe?g|png|webp)$/i.test(media?.url || '')) return ImageIcon;
-  return FileText;
+function isImageMedia(media) {
+  if (!media) return false;
+  const mime = media.mime_type || '';
+  if (mime.startsWith('image/')) return true;
+  const url = media.url || media.original_filename || media.filename || '';
+  return /\.(jpe?g|png|webp|gif|heic)$/i.test(url);
 }
 
-function FileValueRow({ value, label, mutedColor, onRemove, error }) {
-  const [viewerOpen, setViewerOpen] = useState(false);
-  const Icon = getIcon(value);
-  const filename = value.original_filename || value.filename || 'File';
-  const size = formatFileSize(value.file_size || value.size);
-  const canPreview = !!value.url;
+function FileRow({ media, onView, onRemove, removeLabel }) {
+  const {
+    elevatedCardBg, elevatedCardBorder, elevatedCardPressedBg,
+    accentColor, textColor, mutedColor, errorColor, dark,
+  } = useHeroSheetTokens();
+  const isRTL = useIsRTL();
+  const Icon = isImageMedia(media) ? ImageIcon : FileText;
+  const filename = media.original_filename || media.filename || media.name || 'File';
+  const size = formatFileSize(media.file_size || media.size);
+  const tintBg = dark ? 'rgba(148,210,165,0.16)' : 'hsl(148, 35%, 92%)';
 
   return (
-    <View className="gap-1.5">
-      {label && <Text className="text-sm font-medium text-foreground">{label}</Text>}
-      <Pressable
-        onPress={canPreview ? () => setViewerOpen(true) : undefined}
-        className="flex-row items-center rounded-lg border border-border px-3 py-2.5 bg-card active:bg-muted/30"
-      >
-        <Icon size={16} color={mutedColor} />
-        <View className="flex-1 ml-2.5 mr-2 min-w-0">
-          <Text className="text-xs text-foreground" numberOfLines={1}>{filename}</Text>
-          {size ? <Text className="text-[10px] text-muted-foreground">{size}</Text> : null}
+    <Pressable
+      onPressIn={() => Haptics.selectionAsync().catch(() => {})}
+      onPress={onView}
+      android_ripple={{
+        color: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+        borderless: false,
+      }}
+      style={({ pressed }) => [
+        styles.row,
+        {
+          backgroundColor: pressed ? elevatedCardPressedBg : elevatedCardBg,
+          borderColor: elevatedCardBorder,
+        },
+      ]}
+      accessibilityRole="button"
+    >
+      <View style={[styles.rowInner, { flexDirection: rowDirection(isRTL) }]}>
+        <View style={[styles.iconTile, { backgroundColor: tintBg }]}>
+          <Icon size={16} color={accentColor} strokeWidth={2.4} />
         </View>
-        <Pressable onPress={onRemove} className="p-1.5 rounded active:bg-destructive/10" hitSlop={8}>
-          <X size={14} color="hsl(0, 72%, 51%)" />
+        <View style={styles.textCol}>
+          <Text
+            style={{
+              fontSize: 13,
+              fontFamily: 'Poppins-SemiBold',
+              color: textColor,
+              textAlign: textAlignStart(isRTL),
+            }}
+            numberOfLines={1}
+          >
+            {filename}
+          </Text>
+          {size ? (
+            <Text
+              style={{
+                fontSize: 11,
+                fontFamily: 'Poppins-Regular',
+                color: mutedColor,
+                marginTop: 2,
+                textAlign: textAlignStart(isRTL),
+              }}
+              numberOfLines={1}
+            >
+              {size}
+            </Text>
+          ) : null}
+        </View>
+        <Pressable
+          onPressIn={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})}
+          onPress={onRemove}
+          hitSlop={8}
+          style={styles.removeBtn}
+          accessibilityRole="button"
+          accessibilityLabel={removeLabel}
+        >
+          <X size={14} color={errorColor} strokeWidth={2.6} />
         </Pressable>
-      </Pressable>
-      {error && <Text className="text-xs text-destructive">{error}</Text>}
-      {canPreview && (
-        <FileViewer visible={viewerOpen} media={value} onClose={() => setViewerOpen(false)} />
-      )}
-    </View>
+      </View>
+    </Pressable>
   );
 }
 
-export default function FileUpload({ value, onUpload, onRemove, label, entityType, entityId, category, mediaType = 'document' }) {
+function TileButton({ icon: Icon, label, onPress, loading, disabled }) {
+  const {
+    accentColor, textColor, mutedColor, inputBg, inputBorderIdle, dark,
+  } = useHeroSheetTokens();
+  const [pressed, setPressed] = useState(false);
+
+  const isBlocked = !!(disabled || loading);
+  const activeBg = dark ? 'rgba(148,210,165,0.16)' : 'hsl(148, 35%, 93%)';
+  const isAccent = pressed || loading;
+
+  return (
+    <Pressable
+      onPressIn={() => {
+        if (isBlocked) return;
+        setPressed(true);
+        Haptics.selectionAsync().catch(() => {});
+      }}
+      onPressOut={() => setPressed(false)}
+      onPress={onPress}
+      disabled={isBlocked}
+      android_ripple={{
+        color: dark ? 'rgba(148,210,165,0.18)' : 'rgba(20,83,45,0.10)',
+        borderless: false,
+      }}
+      style={[
+        styles.tile,
+        {
+          backgroundColor: isAccent ? activeBg : inputBg,
+          borderColor: isAccent ? accentColor : inputBorderIdle,
+          opacity: isBlocked && !loading ? 0.5 : 1,
+        },
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: isBlocked, busy: !!loading }}
+    >
+      {loading ? (
+        <ActivityIndicator size="small" color={accentColor} />
+      ) : Icon ? (
+        <Icon
+          size={20}
+          color={isAccent ? accentColor : mutedColor}
+          strokeWidth={isAccent ? 2.4 : 2}
+        />
+      ) : null}
+      <Text
+        style={{
+          fontSize: 11.5,
+          fontFamily: isAccent ? 'Poppins-SemiBold' : 'Poppins-Medium',
+          color: isAccent ? accentColor : textColor,
+          textAlign: 'center',
+        }}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.8}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+/**
+ * Single-file upload slot. Shows a Camera + Upload button row when empty
+ * and a tappable file row (with preview + delete) when filled.
+ *
+ * Camera uses `InstantCamera` in single-shot mode (`multi={false}`) — the
+ * first capture closes the modal and uploads immediately.
+ */
+export default function FileUpload({
+  value,
+  onUpload,
+  onRemove,
+  label,
+  entityType,
+  entityId,
+  category,
+  mediaType = 'document',
+}) {
   const { t } = useTranslation();
-  const { resolvedTheme } = useThemeStore();
+  const tokens = useHeroSheetTokens();
+  const { textColor, errorColor } = tokens;
+  const isRTL = useIsRTL();
+
   const [uploadSource, setUploadSource] = useState(null);
   const uploading = !!uploadSource;
   const [error, setError] = useState(null);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
 
-  const isDark = resolvedTheme === 'dark';
-  const mutedColor = isDark ? 'hsl(148, 10%, 55%)' : 'hsl(150, 10%, 45%)';
-  const primaryColor = isDark ? 'hsl(148, 48%, 38%)' : 'hsl(148, 60%, 20%)';
+  useEffect(() => {
+    uploadPreflight().catch(() => {});
+  }, []);
 
   const doUpload = (uri, filename, mimeType) =>
     uploadMedia({
@@ -80,7 +217,8 @@ export default function FileUpload({ value, onUpload, onRemove, label, entityTyp
     setCameraOpen(true);
   };
 
-  const handleCameraCapture = async (asset) => {
+  const handleCameraCapture = async (assets) => {
+    const asset = Array.isArray(assets) ? assets[0] : assets;
     if (!asset?.uri) return;
     setUploadSource('camera');
     try {
@@ -100,7 +238,7 @@ export default function FileUpload({ value, onUpload, onRemove, label, entityTyp
     setError(null);
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: ['application/pdf', 'image/*'],
+        type: '*/*',
         copyToCacheDirectory: true,
       });
       if (result.canceled || !result.assets?.length) return;
@@ -118,7 +256,10 @@ export default function FileUpload({ value, onUpload, onRemove, label, entityTyp
   };
 
   const handleRemove = async () => {
-    if (!value?._id) return;
+    if (!value?._id) {
+      onRemove?.();
+      return;
+    }
     try {
       await api.delete(`/media/${value._id}`);
       onRemove?.();
@@ -127,60 +268,122 @@ export default function FileUpload({ value, onUpload, onRemove, label, entityTyp
     }
   };
 
-  if (value) {
-    return (
-      <FileValueRow
-        value={value}
-        label={label}
-        mutedColor={mutedColor}
-        onRemove={handleRemove}
-        error={error}
-      />
-    );
-  }
+  const removeLabel = t('common.delete', 'Delete');
 
   return (
-    <View className="gap-1.5">
-      {label && <Text className="text-sm font-medium text-foreground">{label}</Text>}
-      <View className="flex-row gap-2">
-        <Pressable
-          onPress={uploading ? undefined : handleCamera}
-          className="flex-1 flex-row items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 py-3 active:border-primary/50 gap-2"
+    <View style={{ gap: 10 }}>
+      {label ? (
+        <Text
+          style={{
+            fontSize: 13,
+            fontFamily: 'Poppins-Medium',
+            color: textColor,
+            marginHorizontal: 4,
+            textAlign: textAlignStart(isRTL),
+          }}
         >
-          {uploadSource === 'camera' ? (
-            <ActivityIndicator color={primaryColor} size="small" />
-          ) : (
-            <>
-              <Camera size={18} color={uploading ? mutedColor + '60' : mutedColor} />
-              <Text className={`text-xs ${uploading ? 'text-muted-foreground/40' : 'text-muted-foreground'}`}>
-                {t('documents.takePhoto', 'Take Photo')}
-              </Text>
-            </>
-          )}
-        </Pressable>
-        <Pressable
-          onPress={uploading ? undefined : handleUploadFile}
-          className="flex-1 flex-row items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 py-3 active:border-primary/50 gap-2"
+          {label}
+        </Text>
+      ) : null}
+
+      {value ? (
+        <FileRow
+          media={value}
+          onView={() => setViewerOpen(true)}
+          onRemove={handleRemove}
+          removeLabel={removeLabel}
+        />
+      ) : (
+        <View style={[styles.actionRow, { flexDirection: rowDirection(isRTL) }]}>
+          <TileButton
+            icon={Camera}
+            label={t('documents.camera', 'Camera')}
+            onPress={handleCamera}
+            loading={uploadSource === 'camera'}
+            disabled={uploading}
+          />
+          <TileButton
+            icon={FolderOpen}
+            label={t('documents.files', 'Files')}
+            onPress={handleUploadFile}
+            loading={uploadSource === 'upload'}
+            disabled={uploading}
+          />
+        </View>
+      )}
+
+      {error ? (
+        <Text
+          style={{
+            fontSize: 12,
+            fontFamily: 'Poppins-Regular',
+            color: errorColor,
+            marginHorizontal: 4,
+            textAlign: textAlignStart(isRTL),
+          }}
         >
-          {uploadSource === 'upload' ? (
-            <ActivityIndicator color={primaryColor} size="small" />
-          ) : (
-            <>
-              <Upload size={18} color={uploading ? mutedColor + '60' : mutedColor} />
-              <Text className={`text-xs ${uploading ? 'text-muted-foreground/40' : 'text-muted-foreground'}`}>
-                {t('documents.tapToUpload', 'Upload File')}
-              </Text>
-            </>
-          )}
-        </Pressable>
-      </View>
-      {error && <Text className="text-xs text-destructive">{error}</Text>}
+          {error}
+        </Text>
+      ) : null}
 
       <InstantCamera
         visible={cameraOpen}
+        multi={false}
         onClose={() => setCameraOpen(false)}
         onCapture={handleCameraCapture}
+      />
+
+      <FileViewer
+        visible={viewerOpen}
+        media={value}
+        onClose={() => setViewerOpen(false)}
       />
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  row: {
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  rowInner: {
+    alignItems: 'center',
+    gap: 12,
+  },
+  iconTile: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  textCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  removeBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionRow: {
+    gap: 8,
+    alignItems: 'stretch',
+  },
+  tile: {
+    flex: 1,
+    minHeight: 68,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderWidth: 1.5,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+});

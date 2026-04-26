@@ -1,22 +1,25 @@
 import { useMemo, useState } from 'react';
 import {
   View, Text, Pressable, ScrollView, RefreshControl, LayoutAnimation,
-  StyleSheet, Platform,
+  StyleSheet,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
 import {
-  ChevronLeft, ChevronRight, ClipboardList, Plus, Home, Skull, Heart,
+  ChevronLeft, ChevronRight, ClipboardList, Home, Skull, Heart,
   Wheat, Droplets, ChevronsDownUp, ChevronsUpDown, Tag,
+  Weight, Thermometer,
 } from 'lucide-react-native';
 import useLocalRecord from '@/hooks/useLocalRecord';
 import useLocalQuery from '@/hooks/useLocalQuery';
+import useCapabilities from '@/hooks/useCapabilities';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
 import SheetSection from '@/components/SheetSection';
 import EmptyState from '@/components/ui/EmptyState';
+import QuickAddFAB from '@/components/QuickAddFAB';
 import DailyLogRow from '@/modules/broiler/rows/DailyLogRow';
 import DailyLogSheet from '@/modules/broiler/sheets/DailyLogSheet';
 import ExpenseCategoryGroup from '@/components/rows/ExpenseCategoryGroup';
@@ -65,6 +68,7 @@ export default function BatchHouseLogsList() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const isRTL = useIsRTL();
+  const { can } = useCapabilities();
   const tokens = useHeroSheetTokens();
   const {
     accentColor, dark, mutedColor, textColor, screenBg, borderColor,
@@ -76,10 +80,16 @@ export default function BatchHouseLogsList() {
   const [dateRange, setDateRange] = useState(undefined);
   const [logTypeFilter, setLogTypeFilter] = useState([]);
   const [groupOpen, setGroupOpen] = useState({});
-  const [sheet, setSheet] = useState({ open: false, data: null });
+  // null = closed. When set, holds the entry context: an existing log
+  // (`data`) for edit mode, or a `defaultLogType` chosen from the
+  // QuickAddFAB menu so the same sheet handles all three create flows
+  // without juggling separate booleans.
+  const [sheet, setSheet] = useState(null);
 
   const [batch, batchLoading] = useLocalRecord('batches', id);
   const [dailyLogs, logsLoading] = useLocalQuery('dailyLogs', { batch: id });
+
+  const isCompleted = batch?.status === 'COMPLETE';
 
   const houses = batch?.houses || [];
 
@@ -204,6 +214,34 @@ export default function BatchHouseLogsList() {
       onChange: setLogTypeFilter,
     },
   ]), [t, logTypeFilter]);
+
+  // Quick-add menu — same per-type shape as BatchDetail's Performance
+  // tab so the affordance is consistent wherever the user lands. Each
+  // item opens the DailyLogSheet pre-pinned to this house + the chosen
+  // log type. We re-evaluate when capabilities change (rare) and when
+  // the sheet's own callback identity changes (never; useState
+  // setters are stable, but the linter can't prove that).
+  const openLog = (logType) => setSheet({ logType, data: null });
+  const quickAddItems = useMemo(() => [
+    can('dailyLog:create') && {
+      key: 'dailyLog',
+      icon: ClipboardList,
+      label: t('batches.dailyLogsTab', 'Daily Logs'),
+      onPress: () => openLog('DAILY'),
+    },
+    (can('dailyLog:create:WEIGHT') || can('dailyLog:create')) && {
+      key: 'sample',
+      icon: Weight,
+      label: t('batches.samplesTab', 'Samples'),
+      onPress: () => openLog('WEIGHT'),
+    },
+    (can('dailyLog:create:ENVIRONMENT') || can('dailyLog:create')) && {
+      key: 'environment',
+      icon: Thermometer,
+      label: t('batches.environmentTab', 'Environment'),
+      onPress: () => openLog('ENVIRONMENT'),
+    },
+  ].filter(Boolean), [can, t]);
 
   const resetAll = () => {
     setSearch('');
@@ -471,37 +509,28 @@ export default function BatchHouseLogsList() {
         )}
       </ScrollView>
 
-      {/* FAB — preserve add-log entry from the previous version. */}
-      <Pressable
-        onPress={() => setSheet({ open: true, data: null })}
-        android_ripple={{
-          color: 'rgba(255,255,255,0.18)',
-          borderless: true,
-          radius: 32,
-        }}
-        style={({ pressed }) => [
-          styles.fab,
-          {
-            bottom: insets.bottom + 24,
-            backgroundColor: accentColor,
-            opacity: pressed ? 0.92 : 1,
-            transform: [{ scale: pressed ? 0.95 : 1 }],
-          },
-        ]}
-        hitSlop={8}
-        accessibilityRole="button"
-        accessibilityLabel={t('batches.operations.addEntry', 'Add Entry')}
-      >
-        <Plus size={26} color="#ffffff" strokeWidth={2.6} />
-      </Pressable>
+      {/* Quick-add FAB — expands to a 3-option menu (Daily Log / Sample
+          / Environment). Each option opens DailyLogSheet pre-filled with
+          (a) the entry type the user picked and (b) the house they're
+          currently looking at, so the form lands ready to save with
+          two taps total. The unscoped `dailyLog:create` cap is treated
+          as a superset of the per-type variants — owners and managers
+          see all three options; ground_staff / vets see only the
+          subsets they're authorised for. Suppressed entirely on
+          completed batches. */}
+      {!isCompleted && quickAddItems.length > 0 ? (
+        <QuickAddFAB items={quickAddItems} bottomInset={insets.bottom} />
+      ) : null}
 
       <DailyLogSheet
-        open={sheet.open}
-        onClose={() => setSheet({ open: false, data: null })}
+        open={!!sheet}
+        onClose={() => setSheet(null)}
         batchId={id}
         batch={batch}
         houses={houses}
-        editData={sheet.data}
+        editData={sheet?.data || null}
+        defaultLogType={sheet?.logType || 'DAILY'}
+        defaultHouseId={houseId}
       />
     </View>
   );
@@ -540,23 +569,5 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  fab: {
-    position: 'absolute',
-    right: 16,
-    height: 56,
-    width: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.22,
-        shadowRadius: 12,
-      },
-      android: { elevation: 8 },
-    }),
   },
 });

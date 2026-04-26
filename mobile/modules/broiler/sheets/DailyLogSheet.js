@@ -4,9 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { ClipboardList } from 'lucide-react-native';
+import { ClipboardList, Warehouse } from 'lucide-react-native';
 import SheetInput from '@/components/SheetInput';
-import Select from '@/components/ui/Select';
 import EnumButtonSelect from '@/components/ui/EnumButtonSelect';
 import DatePicker from '@/components/ui/DatePicker';
 import MultiFileUpload from '@/components/MultiFileUpload';
@@ -22,8 +21,16 @@ import { useToast } from '@/components/ui/Toast';
 
 const parseNum = (v) => { if (!v || v === '') return null; const n = parseFloat(String(v).replace(/,/g, '')); return isNaN(n) ? null : n; };
 
-const dailyLogSchema = z.object({
+// House is required whenever the parent batch has at least one house —
+// every operational entry has to be attributed to a specific house so
+// the per-house dashboards (mortality curve, FCR, yield) stay correct.
+// When a batch genuinely has no houses (rare — usually only seeded
+// data) we relax the constraint so the form remains submittable.
+const buildSchema = (houseRequired, t) => z.object({
   logType: z.string().min(1, 'Log type is required'),
+  house: houseRequired
+    ? z.string().min(1, t('batches.operations.houseRequired', 'Please select a house.'))
+    : z.string().optional(),
   date: z.string().min(1, 'Date is required'),
   deaths: z.string().optional(),
   feedKg: z.string().optional(),
@@ -55,7 +62,6 @@ export default function DailyLogSheet({
   const { can } = useCapabilities();
   const { create, update } = useOfflineMutation('dailyLogs');
   const [saving, setSaving] = useState(false);
-  const [selectedHouse, setSelectedHouse] = useState('');
   const [photos, setPhotos] = useState([]);
 
   // Pull the parent batch + its logs so the calendar can paint
@@ -90,10 +96,39 @@ export default function DailyLogSheet({
     return new Date().toISOString().slice(0, 10);
   }, [editData?.date, defaultDate]);
 
+  const houseOptions = useMemo(() =>
+    (houses || []).map((h) => {
+      const houseObj = typeof h.house === 'object' ? h.house : h;
+      return {
+        value: houseObj._id || houseObj,
+        label: houseObj.name || 'House',
+        icon: Warehouse,
+      };
+    }),
+    [houses]);
+
+  const houseRequired = houseOptions.length > 0;
+
+  const initialHouse = useMemo(() => {
+    if (editData) {
+      const houseId = typeof editData.house === 'object' ? editData.house._id : editData.house;
+      return houseId || '';
+    }
+    if (defaultHouseId) return defaultHouseId;
+    // Pre-select the only house when there's just one available — the
+    // user has nothing to choose from anyway, so a click would be busy
+    // work. With multiple houses we deliberately leave it blank so the
+    // user has to make an explicit pick.
+    if (houseOptions.length === 1) return houseOptions[0].value;
+    return '';
+  }, [editData, defaultHouseId, houseOptions]);
+
+  const schema = useMemo(() => buildSchema(houseRequired, t), [houseRequired, t]);
+
   const { control, handleSubmit, reset, watch, formState: { errors } } = useForm({
-    resolver: zodResolver(dailyLogSchema),
+    resolver: zodResolver(schema),
     defaultValues: {
-      logType: initialLogType, date: initialDate,
+      logType: initialLogType, date: initialDate, house: initialHouse,
       deaths: '', feedKg: '', waterLiters: '',
       averageWeight: '', temperature: '', humidity: '',
       waterTDS: '', waterPH: '', notes: '',
@@ -103,10 +138,10 @@ export default function DailyLogSheet({
   useEffect(() => {
     if (editData) {
       const houseId = typeof editData.house === 'object' ? editData.house._id : editData.house;
-      setSelectedHouse(houseId || '');
       setPhotos(editData.photos || []);
       reset({
         logType: editData.logType || 'DAILY',
+        house: houseId || '',
         date: editData.date?.slice(0, 10) || new Date().toISOString().slice(0, 10),
         deaths: editData.deaths?.toString() || '',
         feedKg: editData.feedKg?.toString() || '',
@@ -119,23 +154,18 @@ export default function DailyLogSheet({
         notes: editData.notes || '',
       });
     } else {
-      // Pre-select the requested house when the caller supplies a
-      // `defaultHouseId` (worker dashboard / tasks list does this so
-      // the sheet opens already pinned to the house they tapped).
-      const fallbackHouse =
-        houses?.[0]?._id || houses?.[0]?.house?._id || houses?.[0]?.house || '';
-      setSelectedHouse(defaultHouseId || fallbackHouse);
       setPhotos([]);
       reset({
-        logType: initialLogType, date: initialDate,
+        logType: initialLogType, date: initialDate, house: initialHouse,
         deaths: '', feedKg: '', waterLiters: '',
         averageWeight: '', temperature: '', humidity: '',
         waterTDS: '', waterPH: '', notes: '',
       });
     }
-  }, [editData, reset, open, houses, defaultHouseId, initialLogType, initialDate]);
+  }, [editData, reset, open, initialLogType, initialDate, initialHouse]);
 
   const watchLogType = watch('logType');
+  const watchHouse = watch('house');
 
   const logTypeOptions = useMemo(
     () => allowedLogTypes.map((v) => ({
@@ -145,12 +175,6 @@ export default function DailyLogSheet({
     })),
     [t, allowedLogTypes]
   );
-  const houseOptions = useMemo(() =>
-    (houses || []).map((h) => {
-      const houseObj = typeof h.house === 'object' ? h.house : h;
-      return { value: houseObj._id || houseObj, label: houseObj.name || `House` };
-    }),
-    [houses]);
 
   // Date bounds — start of cycle through today (or batch endDate when
   // the cycle has been closed out). New entries on COMPLETE batches
@@ -178,13 +202,13 @@ export default function DailyLogSheet({
   // markings entirely until both selections are made — otherwise
   // every date would render as 'missing'.
   const markedDates = useMemo(() => {
-    if (!selectedHouse || !watchLogType || !minDate) return undefined;
+    if (!watchHouse || !watchLogType || !minDate) return undefined;
     const submittedKeys = new Set();
     for (const log of batchLogs || []) {
       if (log.deletedAt) continue;
       if (log.logType !== watchLogType) continue;
       const hid = String(typeof log.house === 'object' ? log.house?._id : log.house);
-      if (hid !== String(selectedHouse)) continue;
+      if (hid !== String(watchHouse)) continue;
       const raw = log.logDate || log.date;
       if (!raw) continue;
       submittedKeys.add(new Date(raw).toISOString().slice(0, 10));
@@ -204,7 +228,7 @@ export default function DailyLogSheet({
       cursor.setDate(cursor.getDate() + 1);
     }
     return map;
-  }, [batchLogs, selectedHouse, watchLogType, minDate, maxDate]);
+  }, [batchLogs, watchHouse, watchLogType, minDate, maxDate]);
 
   const onSubmit = async (formData) => {
     // Refuse new entries on a completed batch — the FAB / pending
@@ -244,7 +268,7 @@ export default function DailyLogSheet({
     try {
       const payload = {
         batch: batchId,
-        house: selectedHouse || null,
+        house: formData.house || null,
         date: formData.date,
         logType: formData.logType,
         deaths: parseNum(formData.deaths),
@@ -308,15 +332,30 @@ export default function DailyLogSheet({
         {/* House goes BEFORE date so the calendar's submitted/missing
             markers reflect the actually-selected house. Otherwise
             opening the picker before picking a house would paint
-            misleading rings. */}
+            misleading rings.
+
+            Rendered as the same `EnumButtonSelect` tile pattern as
+            log type — every entry has to be attributed to a specific
+            house, and tile buttons make the available options
+            scannable at a glance instead of hiding them behind a
+            dropdown. Required when the batch has any houses. */}
         {houseOptions.length > 0 ? (
-          <FormField label={t('batches.house')}>
-            <Select
-              value={selectedHouse}
-              onValueChange={setSelectedHouse}
-              options={houseOptions}
-              placeholder={t('batches.operations.selectHouse')}
-              label={t('batches.house')}
+          <FormField
+            label={t('batches.house')}
+            required
+            error={errors.house?.message}
+          >
+            <Controller
+              control={control}
+              name="house"
+              render={({ field: { value, onChange } }) => (
+                <EnumButtonSelect
+                  value={value}
+                  onChange={onChange}
+                  options={houseOptions}
+                  columns={Math.min(houseOptions.length, 3)}
+                />
+              )}
             />
           </FormField>
         ) : null}
