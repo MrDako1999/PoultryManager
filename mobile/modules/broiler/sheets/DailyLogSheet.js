@@ -461,23 +461,8 @@ export default function DailyLogSheet({
         </FormSection>
       ) : null}
 
-      {/* Notes & photos */}
+      {/* Photos & notes */}
       <FormSection title={t('batches.operations.notesAndPhotos', 'Notes & Photos')}>
-        <Controller
-          control={control}
-          name="notes"
-          render={({ field: { value, onChange } }) => (
-            <SheetInput
-              label={t('batches.operations.notes')}
-              value={value}
-              onChangeText={onChange}
-              placeholder={t('batches.operations.notesPlaceholder')}
-              multiline
-              numberOfLines={3}
-              style={{ height: 100, alignItems: 'flex-start', paddingVertical: 12 }}
-            />
-          )}
-        />
         <View>
           <FormSubheader>{t('batches.operations.photos', 'Photos')}</FormSubheader>
           <View style={{ marginTop: 10 }}>
@@ -494,6 +479,21 @@ export default function DailyLogSheet({
             />
           </View>
         </View>
+        <Controller
+          control={control}
+          name="notes"
+          render={({ field: { value, onChange } }) => (
+            <SheetInput
+              label={t('batches.operations.notes')}
+              value={value}
+              onChangeText={onChange}
+              placeholder={t('batches.operations.notesPlaceholder')}
+              multiline
+              numberOfLines={3}
+              style={{ height: 100, alignItems: 'flex-start', paddingVertical: 12 }}
+            />
+          )}
+        />
       </FormSection>
     </FormSheet>
   );
