@@ -1,10 +1,44 @@
 import axios from 'axios';
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { getToken, clearToken } from './storage';
 
-const API_BASE_URL = __DEV__
-  ? 'http://localhost:5001/api'
-  : 'https://api.poultrymanager.io/api';
+// Resolve the dev API host. `localhost` only works on the iOS simulator —
+// on an Android emulator it points at the emulator itself (host is 10.0.2.2)
+// and on a physical Android/iOS device it points at the phone. We pull the
+// Metro bundler's host from expo-constants so that whichever device loaded
+// the JS bundle hits the same machine for `/api`.
+//
+// Override with EXPO_PUBLIC_API_URL in mobile/.env for tunnels / staging.
+const DEV_API_PORT = 5001;
+
+const getDevHost = () => {
+  // Newer Expo SDKs expose `hostUri` like "192.168.1.5:8081".
+  const hostUri =
+    Constants.expoConfig?.hostUri ||
+    Constants.expoGoConfig?.hostUri ||
+    Constants.manifest2?.extra?.expoClient?.hostUri ||
+    Constants.manifest?.debuggerHost ||
+    '';
+  const host = hostUri.split(':')[0];
+  if (host && host !== 'localhost' && host !== '127.0.0.1') return host;
+  // Sensible fallbacks if Metro didn't report a host (e.g. running a
+  // pre-bundled dev build offline): emulator loopback on Android, host
+  // loopback on iOS.
+  return Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
+};
+
+const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_URL ||
+  (__DEV__
+    ? `http://${getDevHost()}:${DEV_API_PORT}/api`
+    : 'https://api.poultrymanager.io/api');
+
+if (__DEV__) {
+  // eslint-disable-next-line no-console
+  console.log('[api] base URL =', API_BASE_URL);
+}
 
 // 30s timeout: long enough for slow uplinks (rural farm wifi, tethered LTE),
 // short enough that the sync engine doesn't hang `isSyncing=true` forever
