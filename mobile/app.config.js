@@ -26,7 +26,7 @@ module.exports = {
   expo: {
     name: 'PoultryManager',
     slug: 'poultrymanager',
-    version: '1.0.2',
+    version: '1.0.3',
     // Required by expo-updates so Updates.reloadAsync() (used by the
     // language switcher to apply RTL layout changes mid-session) can
     // initialise. We pin to the app's `version` so OTA channels stay
@@ -79,13 +79,13 @@ module.exports = {
       [
         'expo-splash-screen',
         {
-          // splash-light.png / splash-dark.png are 1024×1024 PNGs that
-          // bake in the gear-and-chicken logo + "PoultryManager.io"
-          // wordmark. `imageWidth: 280` gives the wordmark room to
-          // breathe at standard phone widths without dominating the
-          // canvas. Dark variant is a near-white silhouette designed to
-          // sit on the brand dark-green background (#0d3b22 ≈ the top
-          // colour of the hero gradient, hsl(148, 65%, 14%)).
+          // iOS keeps the wordmarked 1024×1024 splash — the native
+          // LaunchScreen storyboard draws it un-clipped. `imageWidth`
+          // gives the wordmark room to breathe at standard phone widths
+          // without dominating the canvas. The dark variant is a
+          // near-white silhouette designed to sit on the brand
+          // dark-green background (#0d3b22 ≈ the top colour of the
+          // hero gradient, hsl(148, 65%, 14%)).
           image: './assets/images/splash-light.png',
           imageWidth: 280,
           resizeMode: 'contain',
@@ -93,6 +93,23 @@ module.exports = {
           dark: {
             image: './assets/images/splash-dark.png',
             backgroundColor: '#0d3b22',
+          },
+          // Android 12+ renders `windowSplashScreenAnimatedIcon` inside
+          // a 288dp canvas and clips anything outside the central
+          // ~192dp circle — which chopped off the "PoultryManager.io"
+          // wordmark in the iOS asset (test users saw just a row of
+          // dots under the logo). The Android splash therefore uses
+          // logo-only PNGs whose artwork sits inside a 60% safe square
+          // so the full gear-and-chicken mark fits the visible circle.
+          android: {
+            image: './assets/images/splash-android-light.png',
+            imageWidth: 220,
+            resizeMode: 'contain',
+            backgroundColor: '#f5f8f5',
+            dark: {
+              image: './assets/images/splash-android-dark.png',
+              backgroundColor: '#0d3b22',
+            },
           },
         },
       ],
