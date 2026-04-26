@@ -18,9 +18,23 @@ const guessMime = (filename) => {
 /**
  * Upload a single media file to /api/media/upload.
  *
- * IMPORTANT: do NOT pass `Content-Type: multipart/form-data` manually. The
- * RN FormData polyfill needs to set the boundary itself. Setting it manually
- * blanks the boundary on iOS and causes silent upload failures.
+ * Header rules (must follow exactly):
+ *   - We DO set `Content-Type: multipart/form-data` (no boundary). RN's
+ *     networking layer replaces it with the proper `multipart/form-data;
+ *     boundary=<auto>` value on both iOS and Android.
+ *   - We do NOT set a manual boundary — that's what breaks iOS, because
+ *     the platform appends its own boundary string and the two get out
+ *     of sync, producing a silently malformed body.
+ *   - Without an explicit Content-Type, axios falls back to its POST
+ *     default of `application/x-www-form-urlencoded`. iOS happens to
+ *     rewrite that to `multipart/form-data` before the request goes
+ *     out, but Android passes it straight to okhttp's
+ *     `MultipartBody.Builder.setType()`, which throws
+ *     `multipart != application/x-www-form-urlencoded` and surfaces in
+ *     the app as a generic `Network Error`.
+ *
+ * `transformRequest: (v) => v` keeps axios from JSON-stringifying the
+ * FormData object — RN's XHR knows how to serialize it natively.
  */
 export async function uploadMedia({ uri, name, mimeType, entityType, entityId, category, mediaType = 'document' }) {
   if (!uri) throw new Error('uploadMedia: uri is required');
@@ -37,6 +51,7 @@ export async function uploadMedia({ uri, name, mimeType, entityType, entityId, c
   try {
     const { data } = await api.post('/media/upload', formData, {
       transformRequest: (v) => v,
+      headers: { 'Content-Type': 'multipart/form-data' },
     });
     preflightOk = true;
     return data;
@@ -66,7 +81,10 @@ export async function uploadPreflight() {
     try {
       const formData = new FormData();
       formData.append('file', { uri: 'data:text/plain;base64,QQ==', name: 'ping.txt', type: 'text/plain' });
-      await api.post('/media/upload', formData, { transformRequest: (v) => v });
+      await api.post('/media/upload', formData, {
+        transformRequest: (v) => v,
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
       preflightOk = true;
       return true;
     } catch (err) {
