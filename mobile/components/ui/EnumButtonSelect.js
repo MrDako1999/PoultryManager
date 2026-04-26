@@ -59,7 +59,16 @@ export default function EnumButtonSelect({
           ? (compactLabelLines > 1 ? styles.tileCompactMultiline : styles.tileCompact)
           : styles.tileTall;
         const iconColor = selected ? accentColor : mutedColor;
-        const labelLines = compact ? compactLabelLines : 2;
+        // Tall (non-compact) tiles render icon-on-top, label-below in a
+        // narrow column. Forcing single-line + auto-shrink keeps every
+        // tile in the row visually balanced even when one translation
+        // is noticeably longer than another (the original wrapping
+        // turned "Daily Log" / "Weight Sample" into stacked two-line
+        // labels next to a single-line "Environment", which looked
+        // ragged). Compact tiles keep the caller's `compactLabelLines`
+        // contract.
+        const labelLines = compact ? compactLabelLines : 1;
+        const shrinkLabel = !compact;
         return (
           <View
             key={optVal}
@@ -97,13 +106,22 @@ export default function EnumButtonSelect({
               <Text
                 style={{
                   flex: compact ? 1 : undefined,
+                  width: compact ? undefined : '100%',
                   minWidth: 0,
-                  fontSize: compact ? 12.5 : 12.5,
+                  // Compact tiles have more horizontal room (icon next
+                  // to label, often laid out in 2+ columns). Tall
+                  // tiles share the row 3-up so we have to drop the
+                  // base size a hair to keep two-word labels like
+                  // "Weight Sample" / "Daily Log" on a single line.
+                  fontSize: compact ? 12.5 : 11.5,
                   fontFamily: selected ? 'Poppins-SemiBold' : 'Poppins-Medium',
                   color: selected ? accentColor : textColor,
                   textAlign: compact ? (isRTL ? 'right' : 'left') : 'center',
                 }}
                 numberOfLines={labelLines}
+                adjustsFontSizeToFit={shrinkLabel}
+                minimumFontScale={shrinkLabel ? 0.8 : undefined}
+                ellipsizeMode="tail"
               >
                 {label}
               </Text>
@@ -140,8 +158,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   tileTall: {
-    minHeight: 76,
-    paddingVertical: 12,
+    minHeight: 68,
+    paddingVertical: 10,
     paddingHorizontal: 8,
     borderWidth: 1.5,
     borderRadius: 14,

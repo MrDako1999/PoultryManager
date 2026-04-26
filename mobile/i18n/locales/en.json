@@ -1299,6 +1299,8 @@
     "confirm": "Confirm",
     "back": "Back",
     "next": "Next",
+    "previous": "Previous",
+    "done": "Done",
     "expandAll": "Expand all",
     "collapseAll": "Collapse all",
     "day": "Day",
