@@ -19,9 +19,8 @@ import BusinessSourcesView from './pages/business-scoped/BusinessSourcesView';
 import AccountingSalesView from './accounting/AccountingSalesView';
 import AccountingExpensesView from './accounting/AccountingExpensesView';
 
-import BroilerKpiRow from './dashboard/BroilerKpiRow';
+import BroilerKpiHero from './dashboard/BroilerKpiHero';
 import BroilerActiveBatches from './dashboard/BroilerActiveBatches';
-import BroilerFinancials from './dashboard/BroilerFinancials';
 
 import WorkerHome from './screens/WorkerHome';
 
@@ -116,10 +115,13 @@ const broilerModule = {
     batchScoped: ['sources', 'expenses', 'feedOrders', 'saleOrders', 'dailyLogs'],
   },
 
+  // Owner dashboard parity with mobile/modules/broiler/index.js: a scope-aware
+  // KPI hero (Flock + Net Profit) and the active-batch progress cards. Both
+  // gated on `batch:read` since the hero's scope toggle and aggregator share
+  // the active batch set with the cards below it.
   dashboardWidgets: [
-    { id: 'broilerKpiRow',        component: BroilerKpiRow,        capability: 'batch:read',     order: 10, fullWidth: true },
-    { id: 'broilerActiveBatches', component: BroilerActiveBatches, capability: 'batch:read',     order: 20, fullWidth: true },
-    { id: 'broilerFinancials',    component: BroilerFinancials,    capability: 'saleOrder:read', order: 30, fullWidth: true },
+    { id: 'broilerKpiHero',       component: BroilerKpiHero,       capability: 'batch:read', order: 10, fullWidth: true },
+    { id: 'broilerActiveBatches', component: BroilerActiveBatches, capability: 'batch:read', order: 20, fullWidth: true },
   ],
 
   accountingTabs: [

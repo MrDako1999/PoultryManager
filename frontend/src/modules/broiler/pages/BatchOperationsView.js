@@ -1,8 +1,10 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useParams, useOutletContext, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Card, CardContent } from '@/components/ui/card';
-import { Home, ChevronsDownUp, ChevronsUpDown, Skull, ShieldCheck, AlertTriangle, Wheat, Droplets } from 'lucide-react';
+import {
+  Home, ChevronsDownUp, ChevronsUpDown, Skull, Heart, TrendingDown,
+  Wheat, Droplets, Activity,
+} from 'lucide-react';
 import CollapsibleSection from '@/components/CollapsibleSection';
 import ExpenseCategoryGroup from '@/modules/broiler/rows/ExpenseCategoryGroup';
 import DailyLogRow from '@/modules/broiler/rows/DailyLogRow';
@@ -11,6 +13,31 @@ import MortalityCharts from '@/modules/broiler/charts/MortalityCharts';
 import ConsumptionCharts from '@/modules/broiler/charts/ConsumptionCharts';
 import useLocalQuery from '@/hooks/useLocalQuery';
 import { formatDateForInput } from '@/lib/format';
+import KpiHeroCard, {
+  mortalityToneClass,
+} from '@/modules/broiler/components/KpiHeroCard';
+
+const fmtInt = (val) => Number(val || 0).toLocaleString('en-US');
+
+const fmtCompactKg = (val) => {
+  const n = Number(val || 0);
+  if (n >= 1000) {
+    return `${(n / 1000).toLocaleString('en-US', {
+      minimumFractionDigits: 1, maximumFractionDigits: 1,
+    })}t`;
+  }
+  return `${fmtInt(n)} kg`;
+};
+
+const fmtCompactL = (val) => {
+  const n = Number(val || 0);
+  if (n >= 1000) {
+    return `${(n / 1000).toLocaleString('en-US', {
+      minimumFractionDigits: 1, maximumFractionDigits: 1,
+    })}kL`;
+  }
+  return `${fmtInt(n)} L`;
+};
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -65,6 +92,16 @@ export default function BatchOperationsView() {
 
   const toggleDateCat = (key) => setDateCatOpen((prev) => ({ ...prev, [key]: !(prev[key] ?? true) }));
 
+  // Cycle days drives the avg-daily-deaths denominator. Mirrors the
+  // mobile BatchPerformanceTab — one elapsed day for batches that
+  // started today (so we never divide by zero) and a floor so we
+  // don't fractional-divide on partial days.
+  const cycleDays = useMemo(() => {
+    if (!batch?.startDate) return 0;
+    const start = new Date(batch.startDate);
+    return Math.max(1, Math.floor((Date.now() - start) / 86400000));
+  }, [batch?.startDate]);
+
   const mortalityStats = useMemo(() => {
     const totalInitial = houses.reduce((s, h) => s + (h.quantity || 0), 0);
     const deathLogs = allLogs.filter(
@@ -95,8 +132,10 @@ export default function BatchOperationsView() {
       });
     }
 
-    return { totalDeaths, mortalityPct, survivalPct, worstHouse, hasData: totalDeaths > 0 };
-  }, [houses, allLogs]);
+    const avgDailyDeaths = cycleDays > 0 ? totalDeaths / cycleDays : 0;
+
+    return { totalDeaths, mortalityPct, survivalPct, worstHouse, avgDailyDeaths, totalInitial, hasData: totalDeaths > 0 };
+  }, [houses, allLogs, cycleDays]);
 
   const consumptionStats = useMemo(() => {
     const dailyLogs_ = allLogs.filter(
@@ -125,51 +164,57 @@ export default function BatchOperationsView() {
     );
   }
 
+  const mortColor = mortalityToneClass(mortalityStats.mortalityPct);
+  const worstColor = mortalityStats.worstHouse
+    ? mortalityToneClass(mortalityStats.worstHouse.rate)
+    : null;
+
   return (
     <>
+      {/* Mobile-parity Mortality KPI card — replaces the four flat
+          Total Deaths / Rate / Survival / Worst House boxes. The
+          headline carries the absolute number toned by severity; the
+          subline restates the rate against placed birds; survival,
+          worst-house (with rate sub-value) and avg-daily-deaths fill
+          the 3-cell stat grid. */}
       {mortalityStats.hasData && (
-        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4 mb-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2 mb-1">
-                <Skull className="h-4 w-4 text-red-500" />
-                <p className="text-xs text-muted-foreground">{t('charts.totalDeaths', 'Total Deaths')}</p>
-              </div>
-              <div className="text-2xl font-bold tabular-nums">{mortalityStats.totalDeaths.toLocaleString('en-US')}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2 mb-1">
-                <AlertTriangle className="h-4 w-4 text-amber-500" />
-                <p className="text-xs text-muted-foreground">{t('charts.mortalityRate', 'Mortality Rate')}</p>
-              </div>
-              <div className="text-2xl font-bold tabular-nums">{mortalityStats.mortalityPct.toFixed(2)}%</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2 mb-1">
-                <ShieldCheck className="h-4 w-4 text-emerald-500" />
-                <p className="text-xs text-muted-foreground">{t('charts.survivalRate', 'Survival Rate')}</p>
-              </div>
-              <div className="text-2xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">{mortalityStats.survivalPct.toFixed(2)}%</div>
-            </CardContent>
-          </Card>
-          {mortalityStats.worstHouse && (
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-2 mb-1">
-                  <Home className="h-4 w-4 text-red-500" />
-                  <p className="text-xs text-muted-foreground">{t('charts.worstHouse', 'Highest Mortality')}</p>
-                </div>
-                <div className="text-2xl font-bold truncate">{mortalityStats.worstHouse.name}</div>
-                <p className="text-xs text-muted-foreground tabular-nums mt-0.5">
-                  {mortalityStats.worstHouse.deaths.toLocaleString('en-US')} {t('charts.deaths', 'deaths')} ({mortalityStats.worstHouse.rate.toFixed(2)}%)
-                </p>
-              </CardContent>
-            </Card>
-          )}
+        <div className="mb-4">
+          <KpiHeroCard
+            title={t('batches.mortalitySummary', 'Mortality')}
+            icon={Skull}
+            headline={fmtInt(mortalityStats.totalDeaths)}
+            headlineColor={mortalityStats.totalDeaths > 0 ? mortColor : undefined}
+            subline={
+              mortalityStats.totalInitial > 0
+                ? `${t('batches.totalDeaths', 'Deaths').toLowerCase()}  \u00b7  ${mortalityStats.mortalityPct.toFixed(2)}%`
+                : t('batches.totalDeaths', 'Deaths').toLowerCase()
+            }
+            sublineColor={mortalityStats.totalInitial > 0 ? mortColor : undefined}
+            stats={[
+              {
+                icon: Heart,
+                label: t('batches.survivalRate', 'Survival'),
+                value: `${mortalityStats.survivalPct.toFixed(2)}%`,
+                valueColor: 'text-success',
+              },
+              {
+                icon: Home,
+                label: t('batches.worstHouse', 'Worst House'),
+                value: mortalityStats.worstHouse?.name || '\u2014',
+                subValue: mortalityStats.worstHouse
+                  ? `${mortalityStats.worstHouse.rate.toFixed(2)}%`
+                  : null,
+                subValueColor: worstColor,
+              },
+              {
+                icon: TrendingDown,
+                label: t('batches.avgDailyDeaths', 'Avg Daily'),
+                value: mortalityStats.avgDailyDeaths >= 10
+                  ? fmtInt(mortalityStats.avgDailyDeaths)
+                  : mortalityStats.avgDailyDeaths.toFixed(1),
+              },
+            ]}
+          />
         </div>
       )}
 
@@ -177,44 +222,41 @@ export default function BatchOperationsView() {
         <MortalityCharts houses={houses} dailyLogs={allLogs} />
       </div>
 
+      {/* Mobile-parity Consumption KPI card — collapses the four
+          Feed / Feed-per-bird / Water / Water-per-bird tiles into one
+          card. Feed is the headline (the bigger of the two numbers in
+          almost every batch), water joins it as a stat with its
+          per-bird ratio as a subValue. Feed/bird sits beside it for
+          the equivalent ratio cross-reference. */}
       {consumptionStats.hasData && (
-        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4 mb-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2 mb-1">
-                <Wheat className="h-4 w-4 text-amber-600" />
-                <p className="text-xs text-muted-foreground">{t('charts.totalFeed', 'Total Feed')}</p>
-              </div>
-              <div className="text-2xl font-bold tabular-nums">{consumptionStats.totalFeed.toLocaleString('en-US')} kg</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2 mb-1">
-                <Wheat className="h-4 w-4 text-amber-600/60" />
-                <p className="text-xs text-muted-foreground">{t('charts.feedPerBird', 'Feed / Bird')}</p>
-              </div>
-              <div className="text-2xl font-bold tabular-nums">{consumptionStats.feedPerBird.toFixed(2)} kg</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2 mb-1">
-                <Droplets className="h-4 w-4 text-blue-500" />
-                <p className="text-xs text-muted-foreground">{t('charts.totalWater', 'Total Water')}</p>
-              </div>
-              <div className="text-2xl font-bold tabular-nums">{consumptionStats.totalWater.toLocaleString('en-US')} L</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2 mb-1">
-                <Droplets className="h-4 w-4 text-blue-500/60" />
-                <p className="text-xs text-muted-foreground">{t('charts.waterPerBird', 'Water / Bird')}</p>
-              </div>
-              <div className="text-2xl font-bold tabular-nums">{consumptionStats.waterPerBird.toFixed(2)} L</div>
-            </CardContent>
-          </Card>
+        <div className="mb-4">
+          <KpiHeroCard
+            title={t('batches.consumptionSummary', 'Consumption')}
+            icon={Activity}
+            headline={fmtCompactKg(consumptionStats.totalFeed)}
+            subline={mortalityStats.totalInitial > 0
+              ? t('batches.feedPerBirdShort', '{{value}} kg/bird', {
+                  value: consumptionStats.feedPerBird.toFixed(2),
+                })
+              : null}
+            stats={[
+              {
+                icon: Wheat,
+                label: t('batches.feedPerBird', 'Feed / Bird'),
+                value: `${consumptionStats.feedPerBird.toFixed(2)} kg`,
+              },
+              {
+                icon: Droplets,
+                label: t('batches.totalWater', 'Water'),
+                value: fmtCompactL(consumptionStats.totalWater),
+              },
+              {
+                icon: Droplets,
+                label: t('batches.waterPerBird', 'Water / Bird'),
+                value: `${consumptionStats.waterPerBird.toFixed(2)} L`,
+              },
+            ]}
+          />
         </div>
       )}
 

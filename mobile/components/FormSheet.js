@@ -3,8 +3,7 @@ import {
 } from 'react';
 import {
   View, Text, Pressable, Modal, ScrollView, Platform,
-  StyleSheet, Animated, PanResponder, Dimensions, Keyboard,
-  InputAccessoryView,
+  StyleSheet, Keyboard, InputAccessoryView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -22,35 +21,30 @@ import FormSheetContext from '@/components/FormSheetContext';
 /**
  * FormSheet — reusable design-language chrome for create / edit sheets.
  *
- * iOS uses the native UIKit `presentationStyle="pageSheet"` Modal so we
- * get rounded top corners, parent peek, and OS-managed swipe-to-dismiss
- * for free.
+ * Each platform gets its native equivalent of a modal form:
  *
- * Android does NOT have a pageSheet presentation — `presentationStyle`
- * is iOS-only and a stock `<Modal>` always fills the screen with no
- * rounded corners or dismissal gesture. So on Android we render our own
- * sheet inside a transparent Modal:
- *   - Backdrop dims the parent (which is still visible through the
- *     transparent modal, mimicking pageSheet's parent peek).
- *   - Sheet slides up from the bottom with rounded top corners and a
- *     top gap so the user can see ~status bar + 24dp of parent.
- *   - Drag-pill area is wired to a PanResponder so dragging it down past
- *     a threshold (or with enough velocity) closes the sheet, matching
- *     iOS.
- *   - Backdrop tap and hardware-back also close.
+ *   iOS — UIKit `presentationStyle="pageSheet"` Modal. Rounded top
+ *   corners, parent peeks behind, OS-managed swipe-to-dismiss.
+ *
+ *   Android — full-screen `Modal` (Material full-screen dialog). Fills
+ *   the screen edge-to-edge, slides up from the bottom, no backdrop
+ *   peek and no swipe-to-dismiss; the header X (and hardware back)
+ *   close it. This matches the platform's own add/edit screens
+ *   (Contacts, Calendar event, Gmail compose, etc.) instead of trying
+ *   to imitate iOS's pageSheet on a platform that has no such concept.
  *
  * Keyboard handling is unified across both platforms via
  * `useKeyboardHeight` + `paddingBottom: keyboardHeight` on the inner
  * wrapper. We do NOT use `KeyboardAvoidingView` because:
- *   - On Android, the translucent modal's window does not honour
- *     `adjustResize`, so KAV's measurements are wrong and focused fields
- *     get hidden by the keyboard (what triggered this rewrite).
+ *   - On Android, doing the padding ourselves is more predictable
+ *     across activity softInputMode quirks and lets the manual
+ *     keyboard toolbar (Prev / Next / Done) sit flush above the
+ *     keyboard.
  *   - On iOS, `KAV behavior="padding"` works, but doing the padding
- *     ourselves keeps both platforms on one code path and lets us also
- *     render a keyboard accessory toolbar (Prev / Next / Done) right
- *     above the keyboard. That toolbar is essential on iOS where
- *     `decimal-pad` / `number-pad` keyboards have no Return key — the
- *     user otherwise has no way to advance between numeric fields.
+ *     ourselves keeps both platforms on one code path. The toolbar is
+ *     essential on iOS where `decimal-pad` / `number-pad` keyboards
+ *     have no Return key — the user otherwise has no way to advance
+ *     between numeric fields.
  *
  * Layout in StyleSheet (§9 NativeWind trap rule). Tokens-only colors;
  * RTL-safe.
@@ -256,31 +250,31 @@ export default function FormSheet({
   const canPrev = showToolbar && navInfo.index > 0;
   const canNext = showToolbar && navInfo.index >= 0 && navInfo.index < navInfo.count - 1;
 
-  // Inner chrome (drag pill + header + body + footer + keyboard toolbar)
-  // is identical on both platforms. We only differ in the wrapping
-  // Modal presentation. The inner wrapper uses `paddingBottom:
+  // Inner chrome (header + body + footer + keyboard toolbar) is shared
+  // across platforms. iOS adds a drag pill (matching the pageSheet
+  // affordance); Android skips it because a full-screen dialog has no
+  // swipe-to-dismiss. The inner wrapper uses `paddingBottom:
   // keyboardHeight` so when the keyboard is up everything (footer +
   // toolbar) lifts above it without `KeyboardAvoidingView`.
-  const renderInner = ({ panHandlers } = {}) => (
+  const renderInner = () => (
     <View
       style={{
         flex: 1,
         backgroundColor: screenBg,
+        paddingTop: Platform.OS === 'android' ? insets.top : 0,
         paddingBottom: keyboardHeight,
       }}
     >
-      {/* Drag pill — on iOS pageSheet handles the gesture itself; on
-          Android we attach panHandlers so dragging this strip dismisses
-          the sheet. We pad the touch target so the user can grab it
-          even though the visible pill is small. */}
-      <View style={styles.dragZone} {...(panHandlers || {})}>
-        <View
-          style={[
-            styles.dragPill,
-            { backgroundColor: dark ? 'hsl(150, 14%, 28%)' : 'hsl(148, 14%, 86%)' },
-          ]}
-        />
-      </View>
+      {Platform.OS === 'ios' ? (
+        <View style={styles.dragZone}>
+          <View
+            style={[
+              styles.dragPill,
+              { backgroundColor: dark ? 'hsl(150, 14%, 28%)' : 'hsl(148, 14%, 86%)' },
+            ]}
+          />
+        </View>
+      ) : null}
 
       {/* Header — icon tile + title/subtitle + close X */}
       <View
@@ -468,111 +462,20 @@ export default function FormSheet({
     );
   }
 
+  // Android: full-screen Modal, the platform's native equivalent of a
+  // modal form (Material full-screen dialog). No transparent backdrop,
+  // no rounded corners, no drag-to-dismiss — the header X and hardware
+  // back close it.
   return (
     <FormSheetContext.Provider value={ctxValue}>
-      <AndroidPageSheet
-        open={open}
-        onClose={onClose}
-        handleClose={handleClose}
-        insets={insets}
-        sheetBg={sheetBg}
-        renderInner={renderInner}
-      />
+      <Modal
+        visible={open}
+        animationType="slide"
+        onRequestClose={onClose}
+      >
+        {renderInner()}
+      </Modal>
     </FormSheetContext.Provider>
-  );
-}
-
-/**
- * Android-only "pageSheet" reimplementation. Lives in the same file so
- * the iOS path stays a one-line Modal and we don't ship the gesture
- * machinery to iOS users where UIKit already does it natively.
- *
- * The sheet is an Animated.View we translate down as the user drags
- * the drag-pill region, snapping to either close-velocity or back to 0.
- */
-function AndroidPageSheet({ open, onClose, handleClose, insets, sheetBg, renderInner }) {
-  const screenHeight = Dimensions.get('window').height;
-  const dragY = useRef(new Animated.Value(0)).current;
-
-  // Threshold and velocity thresholds match the iOS pageSheet feel.
-  // ~25% of screen height OR a fast downward flick triggers dismissal.
-  const DISMISS_DISTANCE = screenHeight * 0.25;
-  const DISMISS_VELOCITY = 0.8;
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 4,
-      onPanResponderMove: (_, g) => {
-        if (g.dy > 0) dragY.setValue(g.dy);
-      },
-      onPanResponderRelease: (_, g) => {
-        if (g.dy > DISMISS_DISTANCE || g.vy > DISMISS_VELOCITY) {
-          Animated.timing(dragY, {
-            toValue: screenHeight,
-            duration: 200,
-            useNativeDriver: true,
-          }).start(() => {
-            dragY.setValue(0);
-            handleClose();
-          });
-        } else {
-          Animated.spring(dragY, {
-            toValue: 0,
-            useNativeDriver: true,
-            bounciness: 4,
-          }).start();
-        }
-      },
-      onPanResponderTerminate: () => {
-        Animated.spring(dragY, {
-          toValue: 0,
-          useNativeDriver: true,
-        }).start();
-      },
-    })
-  ).current;
-
-  // Top gap leaves the parent peeking through, matching iOS pageSheet
-  // (which insets the sheet ~status-bar + ~10pt). We use safe-area top
-  // to keep gesture-nav and notch devices honest, plus a small extra
-  // cushion.
-  const topGap = insets.top + 12;
-
-  return (
-    <Modal
-      visible={open}
-      animationType="slide"
-      transparent
-      statusBarTranslucent
-      onRequestClose={onClose}
-    >
-      <View style={StyleSheet.absoluteFill}>
-        {/* Backdrop — tap closes. The transparency lets the underlying
-            screen show through, the same way iOS pageSheet does. */}
-        <Pressable
-          onPress={handleClose}
-          style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.35)' }]}
-        />
-        <Animated.View
-          style={{
-            position: 'absolute',
-            top: topGap,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: sheetBg,
-            borderTopLeftRadius: 14,
-            borderTopRightRadius: 14,
-            overflow: 'hidden',
-            transform: [{ translateY: dragY }],
-            elevation: 16,
-          }}
-        >
-          {renderInner({ panHandlers: panResponder.panHandlers })}
-        </Animated.View>
-      </View>
-    </Modal>
   );
 }
 

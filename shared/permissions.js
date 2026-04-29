@@ -78,6 +78,49 @@ export const DEFAULT_ROLE_ACTIONS = {
     'media:create',
   ],
 
+  // Slaughterhouse operational roles — minimal cross-cutting defaults.
+  // The bulk of each role's permissions is granted via the per-module
+  // capability matrix in shared/modules/slaughterhouse/capabilities.js,
+  // which is merged in only when the user has the slaughterhouse module
+  // enabled. The defaults here are limited to reads and media that
+  // every operational role needs regardless of module context.
+  gate_clerk: [
+    'media:read',
+    'media:create',
+    'business:read',
+    'contact:read',
+  ],
+
+  receiving_worker: [
+    'media:read',
+    'media:create',
+  ],
+
+  processing_supervisor: [
+    'media:read',
+    'media:create',
+    'business:read',
+    'contact:read',
+    'worker:read',
+  ],
+
+  packing_worker: [
+    'media:read',
+    'media:create',
+  ],
+
+  cold_store_user: [
+    'media:read',
+    'media:create',
+  ],
+
+  dispatch_user: [
+    'media:read',
+    'media:create',
+    'business:read',
+    'contact:read',
+  ],
+
   viewer: [
     'batch:read',
     'source:read',

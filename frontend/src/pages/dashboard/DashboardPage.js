@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Plus, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import PageTitle from '@/components/ui/page-title';
 import useAuthStore from '@/stores/authStore';
 import useCapabilities from '@/hooks/useCapabilities';
 import { MODULES } from '@/modules/registry';
@@ -26,9 +27,15 @@ export default function DashboardPage() {
     return mod?.roleDashboards?.[role] || null;
   }, [activeModule, role]);
 
+  // Scope widgets to the active module so the picker actually swaps the
+  // dashboard. Falls back to visibleModules when no active module is set
+  // (single-module accounts where the switcher never appears).
   const widgets = useMemo(() => {
     const out = [];
-    for (const id of visibleModules) {
+    const moduleIds = activeModule
+      ? [activeModule].filter((id) => visibleModules.includes(id))
+      : visibleModules;
+    for (const id of moduleIds) {
       const mod = MODULES[id];
       for (const widget of mod?.dashboardWidgets || []) {
         if (widget.capability && !can(widget.capability)) continue;
@@ -37,7 +44,7 @@ export default function DashboardPage() {
     }
     out.sort((a, b) => (a.order || 0) - (b.order || 0));
     return out;
-  }, [visibleModules, can]);
+  }, [activeModule, visibleModules, can]);
 
   const today = new Date().toLocaleDateString(undefined, {
     weekday: 'long',
@@ -52,37 +59,35 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-heading font-bold tracking-tight">
-            {t('dashboard.welcome', { name: user?.firstName || '' })}
-          </h1>
-          <p className="text-sm text-muted-foreground">{today}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {can('batch:create') && (
-            <Button
-              size="sm"
-              className="gap-1.5"
-              onClick={() => navigate('/dashboard/batches', { state: { openNew: true } })}
-            >
-              <Plus className="h-3.5 w-3.5" />
-              {t('dashboard.newBatch')}
-            </Button>
-          )}
-          {can('batch:read') && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => navigate('/dashboard/batches')}
-            >
-              <ClipboardList className="h-3.5 w-3.5" />
-              {t('dashboard.viewBatches')}
-            </Button>
-          )}
-        </div>
-      </div>
+      <PageTitle
+        title={t('dashboard.welcome', { name: user?.firstName || '' })}
+        subtitle={today}
+        actions={
+          <>
+            {can('batch:create') && (
+              <Button
+                size="sm"
+                className="gap-1.5"
+                onClick={() => navigate('/dashboard/batches', { state: { openNew: true } })}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                {t('dashboard.newBatch')}
+              </Button>
+            )}
+            {can('batch:read') && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => navigate('/dashboard/batches')}
+              >
+                <ClipboardList className="h-3.5 w-3.5" />
+                {t('dashboard.viewBatches')}
+              </Button>
+            )}
+          </>
+        }
+      />
 
       {widgets.map((widget) => {
         const W = widget.component;

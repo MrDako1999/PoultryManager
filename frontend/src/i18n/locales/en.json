@@ -99,7 +99,17 @@
     "totalExpenses": "Total Expenses",
     "salesOrders": "sale orders",
     "expenseRecords": "expenses",
-    "netProfitLoss": "Net Profit / Loss"
+    "netProfitLoss": "Net Profit / Loss",
+    "scopeActive": "Active",
+    "scopeAllTime": "All-time",
+    "scopeThisMonth": "This Month",
+    "flockSummary": "Flock",
+    "flockHeadlineAvailableSuffix": "AVAILABLE",
+    "flockHeadlineRaisedSuffix": "RAISED",
+    "flockMetricRaised": "Raised",
+    "flockMetricSold": "Sold",
+    "flockMetricCycles": "Cycles",
+    "flockMetricMortality": "Mortality"
   },
   "settings": {
     "title": "Settings",
@@ -206,11 +216,29 @@
     "modulesDesc": "Modules you have access to on your account",
     "roles": {
       "owner": "Owner",
+      "ownerDesc": "Full access to everything in the account.",
       "manager": "Manager",
+      "managerDesc": "Operational management across all modules.",
       "veterinarian": "Veterinarian",
+      "veterinarianDesc": "Health monitoring and clinical records.",
       "accountant": "Accountant",
+      "accountantDesc": "Financial records, sales and expenses.",
       "ground_staff": "Ground Staff",
-      "viewer": "Viewer"
+      "ground_staffDesc": "Daily logs for assigned farms and houses.",
+      "gate_clerk": "Gate Clerk",
+      "gate_clerkDesc": "Registers truck arrivals and assigns queue position.",
+      "receiving_worker": "Receiving Worker",
+      "receiving_workerDesc": "Logs DOA, condemned, B-grade and shortage during unloading.",
+      "processing_supervisor": "Processing Supervisor",
+      "processing_supervisorDesc": "Oversees the line, approves variance and closes jobs.",
+      "packing_worker": "Packing Worker",
+      "packing_workerDesc": "Logs whole-chicken boxes, portion trays and giblet trays.",
+      "cold_store_user": "Cold Store User",
+      "cold_store_userDesc": "Manages cold-store inventory and movements.",
+      "dispatch_user": "Dispatch User",
+      "dispatch_userDesc": "Prepares outbound vehicles and captures handover signatures.",
+      "viewer": "Viewer",
+      "viewerDesc": "Read-only access."
     }
   },
   "contacts": {
@@ -402,6 +430,7 @@
     },
     "houses": "Houses",
     "house": "house",
+    "houseN": "House {{n}}",
     "housesPlural": "houses",
     "addHouse": "Add House",
     "houseName": "House name",

@@ -2,6 +2,7 @@ import { View, TextInput, Pressable } from 'react-native';
 import { Search, X } from 'lucide-react-native';
 import { useState, useCallback, useRef, useEffect } from 'react';
 import useThemeStore from '@/stores/themeStore';
+import { textInputFit } from '@/lib/textInputFit';
 
 export default function SearchInput({ value, onChangeText, placeholder = 'Search...', debounceMs = 300 }) {
   const { resolvedTheme } = useThemeStore();
@@ -30,7 +31,7 @@ export default function SearchInput({ value, onChangeText, placeholder = 'Search
         placeholder={placeholder}
         placeholderTextColor={mutedColor}
         className="flex-1 ml-2 text-sm"
-        style={{ color: textColor, fontFamily: 'Poppins-Regular' }}
+        style={{ color: textColor, fontFamily: 'Poppins-Regular', ...textInputFit }}
         autoCapitalize="none"
         autoCorrect={false}
       />

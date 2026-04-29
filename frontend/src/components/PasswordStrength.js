@@ -11,11 +11,11 @@ const RULES = [
 ];
 
 const STRENGTH_CONFIG = [
-  { min: 0, label: 'auth.pwWeak', color: 'bg-red-500' },
-  { min: 1, label: 'auth.pwWeak', color: 'bg-red-500' },
-  { min: 2, label: 'auth.pwFair', color: 'bg-orange-500' },
-  { min: 3, label: 'auth.pwGood', color: 'bg-yellow-500' },
-  { min: 4, label: 'auth.pwStrong', color: 'bg-green-500' },
+  { min: 0, label: 'auth.pwWeak', color: 'bg-destructive' },
+  { min: 1, label: 'auth.pwWeak', color: 'bg-destructive' },
+  { min: 2, label: 'auth.pwFair', color: 'bg-warning' },
+  { min: 3, label: 'auth.pwGood', color: 'bg-warning' },
+  { min: 4, label: 'auth.pwStrong', color: 'bg-success' },
 ];
 
 export default function PasswordStrength({ password }) {
@@ -45,7 +45,7 @@ export default function PasswordStrength({ password }) {
             />
           ))}
         </div>
-        <span className={cn('text-xs font-medium', score <= 1 && 'text-red-500', score === 2 && 'text-orange-500', score === 3 && 'text-yellow-600', score === 4 && 'text-green-600')}>
+        <span className={cn('text-xs font-medium', score <= 1 && 'text-destructive', score === 2 && 'text-warning', score === 3 && 'text-warning', score === 4 && 'text-success')}>
           {t(config.label)}
         </span>
       </div>
@@ -55,14 +55,14 @@ export default function PasswordStrength({ password }) {
           return (
             <div key={rule.key} className="flex items-center gap-1.5">
               {ok ? (
-                <Check className="h-3 w-3 text-green-600 shrink-0" />
+                <Check className="h-3 w-3 text-success shrink-0" />
               ) : (
                 <X className="h-3 w-3 text-muted-foreground/50 shrink-0" />
               )}
               <span
                 className={cn(
                   'text-xs transition-colors',
-                  ok ? 'text-green-600' : 'text-muted-foreground'
+                  ok ? 'text-success' : 'text-muted-foreground'
                 )}
               >
                 {t(rule.labelKey)}

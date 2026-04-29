@@ -355,10 +355,10 @@ export default function DailyLogSheet({
 
               {/* Duplicate detected — blocking prompt */}
               {upsertMatch && !editingLog && !upsertConfirmed && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-4 dark:border-amber-800 dark:bg-amber-950/30">
+                <div className="rounded-lg border border-warning/30 bg-warning-bg px-4 py-4">
                   <div className="flex items-start gap-2 mb-3">
-                    <Info className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
-                    <p className="text-sm text-amber-800 dark:text-amber-200">
+                    <Info className="h-4 w-4 shrink-0 text-warning mt-0.5" />
+                    <p className="text-sm text-warning">
                       {t('batches.operations.duplicateExists')}
                     </p>
                   </div>

@@ -26,7 +26,7 @@ module.exports = {
   expo: {
     name: 'PoultryManager',
     slug: 'poultrymanager',
-    version: '1.0.3',
+    version: '1.0.5',
     // Required by expo-updates so Updates.reloadAsync() (used by the
     // language switcher to apply RTL layout changes mid-session) can
     // initialise. We pin to the app's `version` so OTA channels stay

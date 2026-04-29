@@ -9,9 +9,11 @@
 // then import + register it here.
 
 import { broilerCapabilities } from './broiler/capabilities.js';
+import { slaughterhouseCapabilities } from './slaughterhouse/capabilities.js';
 
 export const MODULE_CAPABILITIES = {
   broiler: broilerCapabilities,
+  slaughterhouse: slaughterhouseCapabilities,
 };
 
 export function getModuleCapabilities(moduleId) {

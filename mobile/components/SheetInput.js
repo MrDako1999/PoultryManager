@@ -10,6 +10,7 @@ import { useHeroSheetTokens } from './HeroSheetScreen';
 import { useFormSheetContext } from './FormSheetContext';
 import { useIsRTL } from '@/stores/localeStore';
 import { rowDirection, textAlignStart } from '@/lib/rtl';
+import { textInputFit, textInputFitMultiline } from '@/lib/textInputFit';
 
 /**
  * Soft-fill input matching the HeroSheetScreen aesthetic.
@@ -198,6 +199,7 @@ const SheetInput = forwardRef(({
             height: '100%',
             textAlign: textAlignStart(isRTL),
             writingDirection: isRTL ? 'rtl' : 'ltr',
+            ...(multiline ? textInputFitMultiline : textInputFit),
           }}
           {...textInputProps}
         />

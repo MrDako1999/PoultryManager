@@ -5,6 +5,7 @@ import { Sun, Sunrise, Sunset, Moon } from 'lucide-react-native';
 import useAuthStore from '@/stores/authStore';
 import useCapabilities from '@/hooks/useCapabilities';
 import SyncIconButton from '@/components/SyncIconButton';
+import FinancialPrivacyToggle from '@/components/FinancialPrivacyToggle';
 import ModuleSwitcher from '@/shared/components/ModuleSwitcher';
 import HeroSheetScreen, { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import SheetSection from '@/components/SheetSection';
@@ -114,6 +115,7 @@ export default function DashboardScreen() {
   const headerRight = (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
       <ModuleSwitcher compact />
+      <FinancialPrivacyToggle />
       <SyncIconButton />
     </View>
   );

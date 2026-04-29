@@ -142,27 +142,27 @@ export default function BusinessOverview() {
   );
 
   const traderKpis = [
-    { label: t('businesses.detail.totalSales'), value: `${currency} ${fmt(totalSales)}`, icon: ShoppingCart, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-100 dark:bg-emerald-900/30' },
-    { label: t('businesses.detail.totalExpenses'), value: `${currency} ${fmt(totalExpenses)}`, icon: DollarSign, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/30' },
-    { label: t('businesses.detail.totalTransfers'), value: `${currency} ${fmt(totalTransfers)}`, icon: ArrowLeftRight, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/30' },
+    { label: t('businesses.detail.totalSales'), value: `${currency} ${fmt(totalSales)}`, icon: ShoppingCart, color: 'text-success', bg: 'bg-success-bg' },
+    { label: t('businesses.detail.totalExpenses'), value: `${currency} ${fmt(totalExpenses)}`, icon: DollarSign, color: 'text-destructive', bg: 'bg-destructive/15' },
+    { label: t('businesses.detail.totalTransfers'), value: `${currency} ${fmt(totalTransfers)}`, icon: ArrowLeftRight, color: 'text-info', bg: 'bg-info-bg' },
     {
       label: `${t('businesses.detail.balance')}${balance > 0 ? ` · ${t('businesses.detail.theyOweYou')}` : balance < 0 ? ` · ${t('businesses.detail.settled')}` : ''}`,
       value: `${currency} ${fmt(Math.abs(balance))}`,
       icon: Scale,
-      color: balance > 0 ? 'text-red-600 dark:text-red-400' : balance < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground',
-      bg: balance > 0 ? 'bg-red-100 dark:bg-red-900/30' : balance < 0 ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-muted',
+      color: balance > 0 ? 'text-destructive' : balance < 0 ? 'text-success' : 'text-muted-foreground',
+      bg: balance > 0 ? 'bg-destructive/15' : balance < 0 ? 'bg-success-bg' : 'bg-muted',
     },
   ];
 
   const supplierKpis = [
-    { label: t('businesses.detail.totalPurchases'), value: `${currency} ${fmt(totalPurchases)}`, icon: DollarSign, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/30' },
-    { label: t('businesses.detail.totalTransfers'), value: `${currency} ${fmt(totalTransfers)}`, icon: ArrowLeftRight, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/30' },
+    { label: t('businesses.detail.totalPurchases'), value: `${currency} ${fmt(totalPurchases)}`, icon: DollarSign, color: 'text-destructive', bg: 'bg-destructive/15' },
+    { label: t('businesses.detail.totalTransfers'), value: `${currency} ${fmt(totalTransfers)}`, icon: ArrowLeftRight, color: 'text-info', bg: 'bg-info-bg' },
     {
       label: `${t('businesses.detail.balance')}${balance > 0 ? ` · ${t('businesses.detail.youOweThem')}` : balance < 0 ? ` · ${t('businesses.detail.settled')}` : ''}`,
       value: `${currency} ${fmt(Math.abs(balance))}`,
       icon: Scale,
-      color: balance > 0 ? 'text-red-600 dark:text-red-400' : balance < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground',
-      bg: balance > 0 ? 'bg-red-100 dark:bg-red-900/30' : balance < 0 ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-muted',
+      color: balance > 0 ? 'text-destructive' : balance < 0 ? 'text-success' : 'text-muted-foreground',
+      bg: balance > 0 ? 'bg-destructive/15' : balance < 0 ? 'bg-success-bg' : 'bg-muted',
     },
   ];
 

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { getAllEntities, dbEvents, SOFT_DELETE_TABLES } from '@/lib/db';
+import { recordError } from '@/lib/errorBuffer';
 
 export default function useLocalQuery(tableName, filters) {
   const [data, setData] = useState([]);
@@ -30,7 +31,13 @@ export default function useLocalQuery(tableName, filters) {
 
       setData(result);
     } catch (err) {
+      // Without this `recordError` the failure is invisible to the
+      // user and to us — the catch has been silently leaving stale
+      // `data` in place, which is exactly what masked the EMUI
+      // broken-handle bug for so long. Tag the entry with the table
+      // name so the diagnostic can pinpoint which screen tripped.
       console.error(`useLocalQuery(${tableName}) error:`, err);
+      recordError('useLocalQuery', err, undefined, { table: tableName });
     } finally {
       setIsLoading(false);
     }

@@ -18,9 +18,9 @@ import api from '@/lib/api';
 
 const STATUS_CONFIG = {
   NEW: { icon: CircleDashed, color: 'text-muted-foreground', bg: 'bg-muted' },
-  IN_PROGRESS: { icon: Clock, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-100 dark:bg-amber-900/30' },
-  COMPLETE: { icon: CheckCircle2, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-100 dark:bg-emerald-900/30' },
-  DELAYED: { icon: AlertTriangle, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/30' },
+  IN_PROGRESS: { icon: Clock, color: 'text-warning', bg: 'bg-warning-bg' },
+  COMPLETE: { icon: CheckCircle2, color: 'text-success', bg: 'bg-success-bg' },
+  DELAYED: { icon: AlertTriangle, color: 'text-destructive', bg: 'bg-destructive/15' },
   OTHER: { icon: CircleDot, color: 'text-muted-foreground', bg: 'bg-muted' },
 };
 
@@ -189,10 +189,10 @@ export default function FarmOverview() {
       {/* Quick Info KPIs */}
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
         {[
-          { label: t('farms.detail.totalBatches', 'Total Batches'), value: quickStats.totalBatches, icon: Layers, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/30' },
-          { label: t('farms.detail.birdsProcessed', 'Birds Processed'), value: quickStats.totalInitial.toLocaleString('en-US'), icon: Bird, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-100 dark:bg-amber-900/30' },
-          { label: t('farms.detail.overallMortality', 'Mortality Rate'), value: `${quickStats.mortalityRate}%`, icon: Skull, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/30' },
-          { label: t('farms.detail.totalRevenue', 'Total Revenue'), value: `${currency} ${fmt(quickStats.totalRevenue)}`, icon: DollarSign, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-100 dark:bg-emerald-900/30' },
+          { label: t('farms.detail.totalBatches', 'Total Batches'), value: quickStats.totalBatches, icon: Layers, color: 'text-info', bg: 'bg-info-bg' },
+          { label: t('farms.detail.birdsProcessed', 'Birds Processed'), value: quickStats.totalInitial.toLocaleString('en-US'), icon: Bird, color: 'text-warning', bg: 'bg-warning-bg' },
+          { label: t('farms.detail.overallMortality', 'Mortality Rate'), value: `${quickStats.mortalityRate}%`, icon: Skull, color: 'text-destructive', bg: 'bg-destructive/15' },
+          { label: t('farms.detail.totalRevenue', 'Total Revenue'), value: `${currency} ${fmt(quickStats.totalRevenue)}`, icon: DollarSign, color: 'text-success', bg: 'bg-success-bg' },
         ].map((kpi) => (
           <Card key={kpi.label}>
             <CardContent className="pt-4 pb-3">
@@ -381,7 +381,7 @@ export default function FarmOverview() {
                   </div>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="text-sm font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+                  <p className="text-sm font-semibold tabular-nums text-success">
                     {currency} {fmt(b.revenue)}
                   </p>
                 </div>

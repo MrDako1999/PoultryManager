@@ -11,6 +11,7 @@ import SlidingSegmentedControl from '@/components/SlidingSegmentedControl';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import useCapabilities from '@/hooks/useCapabilities';
 import useSettings from '@/hooks/useSettings';
+import useFinancialPrivacyStore, { MASKED_VALUE } from '@/stores/financialPrivacyStore';
 import BatchKpiCard, { profitToneColor } from '@/modules/broiler/components/BatchKpiCard';
 import useBroilerDashboardStats from './useBroilerDashboardStats';
 
@@ -117,11 +118,12 @@ const CHIP_TINTS = {
 export default function BroilerKpiHero() {
   const { t } = useTranslation();
   const tokens = useHeroSheetTokens();
-  const { dark } = tokens;
+  const { dark, mutedColor } = tokens;
   const accounting = useSettings('accounting');
   const currency = accounting?.currency || 'AED';
   const { can } = useCapabilities();
   const canOpenAccounting = can('expense:read') || can('saleOrder:read');
+  const financialsHidden = useFinancialPrivacyStore((s) => s.hidden);
 
   const [scope, setScope] = useState('active');
   const { flockStats, financials, isLoading } = useBroilerDashboardStats(scope);
@@ -151,9 +153,16 @@ export default function BroilerKpiHero() {
   const flockHeadlineIsLive = scope === 'active';
   // Mortality stat value — chip-tint table (green / amber / red by rate).
   const mortalityFg = CHIP_TINTS[mortalityTone(flockStats.mortalityPct)][dark ? 'dark' : 'light'].fg;
-  const profitColor = profitToneColor(financials.netProfit, tokens);
-  const perBirdColor = profitToneColor(financials.profitPerBird, tokens);
+  // Privacy mode: paint money tone-neutral (no green/red leak of profit
+  // sign) and replace digit formatters with the dotted placeholder so a
+  // shoulder-surfer can't reconstruct the number from a coloured digit
+  // string.
+  const profitColor = financialsHidden ? mutedColor : profitToneColor(financials.netProfit, tokens);
+  const perBirdColor = financialsHidden ? mutedColor : profitToneColor(financials.profitPerBird, tokens);
   const finFmt = scope === 'active' ? fmtMoney : fmtCompactCurrency;
+  const maskMoney = (formatter) => (val) => (financialsHidden ? MASKED_VALUE : formatter(val));
+  const fmtMoneyMaybeMasked = maskMoney(fmtMoney);
+  const finFmtMaybeMasked = maskMoney(finFmt);
 
   return (
     <View>
@@ -230,16 +239,21 @@ export default function BroilerKpiHero() {
         }
       />
 
-      {/* Same Net Profit KPI card as Batch Overview / Farm Overview */}
+      {/* Same Net Profit KPI card as Batch Overview / Farm Overview.
+          When the privacy toggle is on (`financialsHidden`), every
+          money-bearing slot collapses to `MASKED_VALUE` and the margin
+          subline is suppressed entirely — leaving only the card chrome,
+          icons, and labels intact so the layout still reads as the
+          finance section. */}
       <BatchKpiCard
         title={t('batches.netProfit', 'Net Profit')}
         icon={DollarSign}
         headlineSuffix={currency}
         headlineSuffixSubscript
-        headline={fmtMoney(financials.netProfit)}
+        headline={fmtMoneyMaybeMasked(financials.netProfit)}
         headlineColor={profitColor}
         subline={
-          scope !== 'allTime' && financials.marginPct != null
+          !financialsHidden && scope !== 'allTime' && financials.marginPct != null
             ? t('batches.margin', 'Margin {{pct}}%', { pct: financials.marginPct.toFixed(1) })
             : null
         }
@@ -248,17 +262,19 @@ export default function BroilerKpiHero() {
           {
             icon: TrendingUp,
             label: t('batches.totalRevenue', 'Revenue'),
-            value: finFmt(financials.totalRevenue),
+            value: finFmtMaybeMasked(financials.totalRevenue),
           },
           {
             icon: Receipt,
             label: t('batches.expenses', 'Expenses'),
-            value: finFmt(financials.totalExpenses),
+            value: finFmtMaybeMasked(financials.totalExpenses),
           },
           {
             icon: Bird,
             label: t('batches.profitPerBird', 'PNL / Bird'),
-            value: financials.profitPerBird != null ? fmtMoney(financials.profitPerBird) : '—',
+            value: financialsHidden
+              ? MASKED_VALUE
+              : (financials.profitPerBird != null ? fmtMoney(financials.profitPerBird) : '—'),
             valueColor: perBirdColor,
           },
         ]}

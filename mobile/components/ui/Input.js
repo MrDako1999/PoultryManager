@@ -1,8 +1,9 @@
 import { forwardRef } from 'react';
 import { TextInput } from 'react-native';
 import { cn } from '@/lib/utils';
+import { textInputFit } from '@/lib/textInputFit';
 
-const Input = forwardRef(({ className, ...props }, ref) => {
+const Input = forwardRef(({ className, style, ...props }, ref) => {
   return (
     <TextInput
       ref={ref}
@@ -13,6 +14,7 @@ const Input = forwardRef(({ className, ...props }, ref) => {
         className
       )}
       placeholderTextColor="hsl(150, 10%, 45%)"
+      style={[textInputFit, style]}
       {...props}
     />
   );

@@ -643,7 +643,7 @@ export default function SaleOrderSheet({ open, onOpenChange, batchId, editingSal
           </div>
 
           {transportDeductionVal > 0 && (
-            <div className="flex justify-between items-center text-sm font-semibold text-red-600 dark:text-red-400 border-t pt-2">
+            <div className="flex justify-between items-center text-sm font-semibold text-destructive border-t pt-2">
               <span>{t('batches.saleForm.transportDeduction')}</span>
               <span>-{currency} {fmt(transportDeductionVal)}</span>
             </div>
@@ -696,7 +696,7 @@ export default function SaleOrderSheet({ open, onOpenChange, batchId, editingSal
       </Button>
 
       {(transportDeductionVal + discountsTotalVal) > 0 && (
-        <div className="flex justify-between items-center text-sm font-semibold text-red-600 dark:text-red-400 border-t pt-2">
+        <div className="flex justify-between items-center text-sm font-semibold text-destructive border-t pt-2">
           <span>{t('batches.saleForm.totalDiscounts')}</span>
           <span>-{currency} {fmt(transportDeductionVal + discountsTotalVal)}</span>
         </div>

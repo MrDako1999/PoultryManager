@@ -2,6 +2,7 @@ import { View, TextInput, Text } from 'react-native';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
 import { rowDirection, textAlignStart } from '@/lib/rtl';
+import { textInputFit } from '@/lib/textInputFit';
 
 const COUNTRY_CODE = '+971';
 
@@ -65,6 +66,7 @@ export default function PhoneInput({ value, onChange }) {
           height: '100%',
           textAlign: textAlignStart(isRTL),
           writingDirection: 'ltr',
+          ...textInputFit,
         }}
       />
     </View>

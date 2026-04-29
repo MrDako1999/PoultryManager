@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ClipboardList, Warehouse } from 'lucide-react-native';
 import SheetInput from '@/components/SheetInput';
+import FeedAmountInput from '@/components/FeedAmountInput';
 import EnumButtonSelect from '@/components/ui/EnumButtonSelect';
 import DatePicker from '@/components/ui/DatePicker';
 import MultiFileUpload from '@/components/MultiFileUpload';
@@ -400,12 +401,11 @@ export default function DailyLogSheet({
             control={control}
             name="feedKg"
             render={({ field: { value, onChange } }) => (
-              <SheetInput
-                label={t('batches.operations.feedKg')}
+              <FeedAmountInput
+                label={t('batches.operations.feedConsumed', 'Feed Consumed')}
                 value={value}
-                onChangeText={onChange}
-                keyboardType="decimal-pad"
-                placeholder="0"
+                onChange={onChange}
+                error={errors.feedKg?.message}
               />
             )}
           />

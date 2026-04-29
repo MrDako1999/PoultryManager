@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, Pressable, ActivityIndicator } from 'react-native';
 import { Search, MapPin, X } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
+import { textInputFit } from '@/lib/textInputFit';
 
 const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
@@ -120,7 +121,7 @@ export default function PlacesSearchInput({ placeholder, onSelect, autoFocus = f
           placeholderTextColor={MUTED}
           autoFocus={autoFocus}
           className="flex-1 text-sm text-foreground"
-          style={{ paddingVertical: 0 }}
+          style={[{ paddingVertical: 0 }, textInputFit]}
         />
         {loading && <ActivityIndicator size="small" color={MUTED} />}
         {query.length > 0 && !loading && (

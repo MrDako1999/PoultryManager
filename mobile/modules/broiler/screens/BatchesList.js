@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useCallback } from 'react';
 import {
   View, Text, ScrollView, RefreshControl, Pressable, StyleSheet, Platform,
-  LayoutAnimation, UIManager,
+  LayoutAnimation, UIManager, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -29,7 +29,10 @@ import QuickAddFAB from '@/components/QuickAddFAB';
 import { SkeletonRow } from '@/components/skeletons';
 import { useToast } from '@/components/ui/Toast';
 import { useIsRTL } from '@/stores/localeStore';
-import { deltaSync } from '@/lib/syncEngine';
+import { deltaSync, fullSync, fullResync } from '@/lib/syncEngine';
+import { resetDb } from '@/lib/db';
+import { clearErrorBuffer } from '@/lib/errorBuffer';
+import { runBatchesDiagnostic } from '@/lib/dbDiagnostic';
 import BatchSheet from '@/modules/broiler/sheets/BatchSheet';
 import BatchAvatar from '@/modules/broiler/components/BatchAvatar';
 import { getStatusConfig } from '@/modules/broiler/lib/batchStatusConfig';
@@ -243,6 +246,85 @@ export default function BatchesScreen() {
     setRefreshing(false);
   };
 
+  // Hidden long-press on the header title runs a SQL-level diagnostic
+  // and shows the result in an Alert. Used to debug discrepancies
+  // between dashboard widgets (which compute live-bird counts from the
+  // same `batches` table) and this screen claiming "No batches yet".
+  // No UI affordance for normal users — it's invisible until invoked.
+  //
+  // Recovery actions in the Alert:
+  //   - Reset local DB:    closeAsync + deleteDatabaseAsync + fullSync.
+  //                        Use when the diagnostic shows native-handle
+  //                        errors (the EMUI broken-handle failure mode)
+  //                        or the batches table is missing entirely.
+  //                        Also wipes the error buffer since the
+  //                        previous failures don't apply post-reset.
+  //   - Force full re-sync: clearTable() each entity + fullSync.
+  //                        Use when the DB itself is healthy but data
+  //                        is stale / out of step with the server.
+  //   - Clear error log:   wipe the MMKV ring buffer (iOS-visible
+  //                        button only — Android Alert caps at 3
+  //                        buttons; on Android use Reset to clear).
+  //   - Close:             dismiss.
+  const onTitleLongPress = useCallback(async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+    let report;
+    try {
+      report = await runBatchesDiagnostic();
+    } catch (err) {
+      report = `runBatchesDiagnostic failed: ${err?.message || err}`;
+    }
+    Alert.alert(
+      'Batches diagnostic',
+      report,
+      [
+        {
+          text: 'Reset local DB',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await resetDb();
+              clearErrorBuffer();
+              await fullSync({ reportProgress: true });
+              toast({ title: t('common.synced', 'Synced') });
+            } catch (e) {
+              console.error('[diagnostic] resetDb + fullSync failed:', e);
+              toast({
+                title: t('common.syncFailed', 'Sync failed'),
+                variant: 'destructive',
+              });
+            }
+          },
+        },
+        {
+          text: 'Force full re-sync',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await fullResync();
+              toast({ title: t('common.synced', 'Synced') });
+            } catch (e) {
+              console.error('[diagnostic] fullResync failed:', e);
+              toast({
+                title: t('common.syncFailed', 'Sync failed'),
+                variant: 'destructive',
+              });
+            }
+          },
+        },
+        {
+          text: 'Clear error log',
+          onPress: () => {
+            clearErrorBuffer();
+            toast({ title: 'Error log cleared' });
+          },
+        },
+        { text: 'Close', style: 'cancel' },
+      ],
+      { cancelable: true }
+    );
+  }, [t, toast]);
+
   const openCreate = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setBatchSheet({ open: true, data: null });
@@ -292,6 +374,7 @@ export default function BatchesScreen() {
         gradient={heroGradient}
         topInset={insets.top}
         isRTL={isRTL}
+        onTitleLongPress={onTitleLongPress}
       />
 
       <ScrollView
@@ -469,7 +552,7 @@ export default function BatchesScreen() {
   );
 }
 
-function BrandHeader({ title, subtitle, gradient, topInset, isRTL }) {
+function BrandHeader({ title, subtitle, gradient, topInset, isRTL, onTitleLongPress }) {
   return (
     <LinearGradient
       colors={gradient}
@@ -490,20 +573,32 @@ function BrandHeader({ title, subtitle, gradient, topInset, isRTL }) {
         }}
       >
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Text
-            style={{
-              fontSize: 24,
-              fontFamily: 'Poppins-Bold',
-              color: '#ffffff',
-              letterSpacing: -0.4,
-              lineHeight: 30,
-              textAlign: textAlignStart(isRTL),
-              writingDirection: isRTL ? 'rtl' : 'ltr',
-            }}
-            numberOfLines={1}
+          {/* The wrapping Pressable owns the hidden long-press
+              diagnostic — invisible to regular users (no ripple, no
+              hit-state styling), only the QA / dev who knows about the
+              gesture will trigger it. `delayLongPress: 800` matches the
+              RN default; we keep it explicit so the gesture feels
+              deliberate rather than accidental on a normal tap. */}
+          <Pressable
+            onLongPress={onTitleLongPress}
+            delayLongPress={800}
+            android_ripple={null}
           >
-            {title}
-          </Text>
+            <Text
+              style={{
+                fontSize: 24,
+                fontFamily: 'Poppins-Bold',
+                color: '#ffffff',
+                letterSpacing: -0.4,
+                lineHeight: 30,
+                textAlign: textAlignStart(isRTL),
+                writingDirection: isRTL ? 'rtl' : 'ltr',
+              }}
+              numberOfLines={1}
+            >
+              {title}
+            </Text>
+          </Pressable>
           {subtitle ? (
             <Text
               style={{

@@ -1,6 +1,7 @@
 import { TextInput } from 'react-native';
 import { cn } from '@/lib/utils';
 import useThemeStore from '@/stores/themeStore';
+import { textInputFitMultiline } from '@/lib/textInputFit';
 
 export default function Textarea({ className, ...props }) {
   const { resolvedTheme } = useThemeStore();
@@ -14,7 +15,7 @@ export default function Textarea({ className, ...props }) {
         'min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm',
         className
       )}
-      style={{ color: textColor, fontFamily: 'Poppins-Regular' }}
+      style={{ color: textColor, fontFamily: 'Poppins-Regular', ...textInputFitMultiline }}
       placeholderTextColor="hsl(150, 10%, 45%)"
       {...props}
     />

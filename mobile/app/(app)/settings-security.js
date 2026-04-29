@@ -8,6 +8,7 @@ import { useToast } from '@/components/ui/Toast';
 import api from '@/lib/api';
 import HeroSheetScreen, { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import SheetSection from '@/components/SheetSection';
+import { textInputFit } from '@/lib/textInputFit';
 
 function PasswordField({ value, onChangeText, placeholder }) {
   const { inputBg, inputBorderIdle, inputBorderFocus, textColor, mutedColor, iconColor } = useHeroSheetTokens();
@@ -45,6 +46,7 @@ function PasswordField({ value, onChangeText, placeholder }) {
           fontSize: 15,
           color: textColor,
           height: '100%',
+          ...textInputFit,
         }}
       />
       <Pressable onPress={() => setVisible((v) => !v)} hitSlop={10} style={{ padding: 4 }}>

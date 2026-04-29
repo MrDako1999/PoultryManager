@@ -72,7 +72,18 @@ export default function AppLayout() {
         <Stack.Screen name="feed-order/[id]" />
         <Stack.Screen name="feed-item/[id]" />
         <Stack.Screen name="sale/[id]" />
-        <Stack.Screen name="daily-log/[id]" />
+        {/* The daily-log detail screen owns its own horizontal swipe
+            (prev/next entry navigator). The native full-screen back
+            gesture would compete with that — a casual horizontal drag
+            in the middle of the screen would race between "go back to
+            the list" and "next entry" and frequently win the wrong
+            one. Disable the full-screen variant here; the edge-swipe
+            (~20pt from the leading edge) stays alive so users can
+            still gesture back when they actually mean to. */}
+        <Stack.Screen
+          name="daily-log/[id]"
+          options={{ fullScreenGestureEnabled: false }}
+        />
         <Stack.Screen name="farm/[id]" />
         <Stack.Screen name="business/[id]" />
         <Stack.Screen name="contact/[id]" />

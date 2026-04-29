@@ -2,6 +2,7 @@ import { View, Text, Pressable, TextInput } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Plus, Trash2, Home } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
+import { textInputFit } from '@/lib/textInputFit';
 
 const MUTED = 'hsl(150, 10%, 45%)';
 
@@ -72,7 +73,7 @@ export default function HouseConfigurator({ value = [], onChange }) {
               placeholder={t('farms.houseName', 'House name')}
               placeholderTextColor={MUTED}
               className="flex-1 text-sm text-foreground"
-              style={{ paddingVertical: 0 }}
+              style={[{ paddingVertical: 0 }, textInputFit]}
               numberOfLines={1}
             />
             <TextInput
@@ -82,7 +83,7 @@ export default function HouseConfigurator({ value = [], onChange }) {
               placeholder={t('farms.houseCapacity', 'Capacity')}
               placeholderTextColor={MUTED}
               className="w-24 text-sm text-foreground tabular-nums text-right"
-              style={{ paddingVertical: 0 }}
+              style={[{ paddingVertical: 0 }, textInputFit]}
               numberOfLines={1}
             />
             <Pressable

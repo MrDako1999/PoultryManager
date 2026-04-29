@@ -23,15 +23,29 @@ export default function Sidebar({
 }) {
   const { t } = useTranslation();
   const { resolvedTheme } = useThemeStore();
-  const { visibleModules, can } = useCapabilities();
+  const { visibleModules, activeModule, can } = useCapabilities();
   const isDark = resolvedTheme === 'dark';
   const bannerSrc = isDark ? '/media/logo/PM_banner_white.png' : '/media/logo/PM_Banner.png';
   const iconSrc = isDark ? '/media/logo/pm_logo_notext_square_white_max.png' : '/media/logo/PM logo_notext_square_max.png';
   const sidebarWidth = isExpanded ? SIDEBAR_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
 
+  // Scope module-contributed sidebarGroups to the active module so the
+  // sidebar swaps between modules cleanly. Cross-module groups (Directory,
+  // Accounting) still see the full visibleModules list inside buildSidebar
+  // because they aggregate across modules.
+  const scopedModules = useMemo(() => {
+    if (activeModule && visibleModules.includes(activeModule)) return [activeModule];
+    return visibleModules;
+  }, [activeModule, visibleModules]);
+
   const { navItems, navGroups } = useMemo(
-    () => buildSidebar({ visibleModules, modules: MODULES, can }),
-    [visibleModules, can],
+    () => buildSidebar({
+      visibleModules: scopedModules,
+      allModules: visibleModules,
+      modules: MODULES,
+      can,
+    }),
+    [scopedModules, visibleModules, can],
   );
 
   return (

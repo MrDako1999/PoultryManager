@@ -47,7 +47,7 @@ export const MODULE_CATALOG = {
     descKey: 'modules.slaughterhouseDesc',
     icon: 'Factory',
     color: { light: '#dc2626', dark: '#f87171' },
-    available: false,
+    available: true,
   },
   marketing: {
     id: 'marketing',

@@ -2,8 +2,9 @@ import { forwardRef, useState } from 'react';
 import { View, TextInput, Pressable } from 'react-native';
 import { Eye, EyeOff } from 'lucide-react-native';
 import { cn } from '@/lib/utils';
+import { textInputFit } from '@/lib/textInputFit';
 
-const PasswordInput = forwardRef(({ className, ...props }, ref) => {
+const PasswordInput = forwardRef(({ className, style, ...props }, ref) => {
   const [visible, setVisible] = useState(false);
 
   return (
@@ -16,6 +17,7 @@ const PasswordInput = forwardRef(({ className, ...props }, ref) => {
           className
         )}
         placeholderTextColor="hsl(150, 10%, 45%)"
+        style={[textInputFit, style]}
         {...props}
       />
       <Pressable

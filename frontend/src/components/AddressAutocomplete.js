@@ -313,9 +313,9 @@ export default function AddressAutocomplete({ value, onChange, disabled }) {
       <AddressFields addr={addr} onChange={handleFieldChange} disabled={disabled} t={t} />
 
       {!hasAddress && (
-        <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/30 px-3 py-2.5">
-          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-500" />
-          <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
+        <div className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning-bg px-3 py-2.5">
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-warning" />
+          <p className="text-xs text-warning leading-relaxed">
             {t('businesses.addressVatWarning')}
           </p>
         </div>

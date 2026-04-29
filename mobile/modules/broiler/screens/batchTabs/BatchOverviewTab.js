@@ -14,6 +14,8 @@ import { rowDirection, textAlignStart } from '@/lib/rtl';
 import BatchKpiCard, {
   profitToneColor, mortalityToneColor,
 } from '@/modules/broiler/components/BatchKpiCard';
+import FeedInventoryCard from '@/modules/broiler/components/FeedInventoryCard';
+import { computeFeedInventory } from '@/modules/broiler/lib/feedInventory';
 
 const NUMERIC_LOCALE = 'en-US';
 
@@ -45,8 +47,6 @@ const fmtCompactL = (val) => {
   return `${fmtInt(n)} L`;
 };
 
-const FEED_TYPE_ORDER = { STARTER: 0, GROWER: 1, FINISHER: 2, OTHER: 3 };
-const FEED_TYPES_DISPLAYED = ['STARTER', 'GROWER', 'FINISHER'];
 const TOP_EXPENSE_CATEGORIES = 5;
 
 export default function BatchOverviewTab({ batch, batchId, onJumpTab }) {
@@ -95,6 +95,17 @@ export default function BatchOverviewTab({ batch, batchId, onJumpTab }) {
     };
   }, [dailyLogs]);
 
+  // Total feed ORDERED across the batch — paired with consumed in
+  // the Feed stat below so the "16.6t" reads as "16.6t of 25.0t"
+  // (consumed of ordered) at a glance. Same compute the
+  // FeedInventoryCard runs internally, called here only for the
+  // single number; the shared helper keeps the math definition in
+  // one place.
+  const totalFeedOrderedKg = useMemo(
+    () => computeFeedInventory({ feedOrders, dailyLogs }).orderedKg,
+    [feedOrders, dailyLogs]
+  );
+
   const currentBirds = Math.max(0, totalInitial - totalDeaths);
   const mortalityPct = totalInitial > 0 ? (totalDeaths / totalInitial) * 100 : 0;
   const survivalPct = totalInitial > 0 ? (currentBirds / totalInitial) * 100 : 0;
@@ -125,38 +136,6 @@ export default function BatchOverviewTab({ batch, batchId, onJumpTab }) {
   const marginPct = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : null;
   const profitPerBird = currentBirds > 0 ? netProfit / currentBirds : null;
 
-  const feedByType = useMemo(() => {
-    const groups = {};
-    feedOrders.forEach((order) => {
-      (order.items || []).forEach((item) => {
-        const type = item.feedType || 'OTHER';
-        const bags = item.bags || 0;
-        const itemKg = bags * (item.quantitySize || 50);
-        if (!groups[type]) groups[type] = { totalKg: 0, totalBags: 0 };
-        groups[type].totalKg += itemKg;
-        groups[type].totalBags += bags;
-      });
-    });
-    return groups;
-  }, [feedOrders]);
-
-  const totalFeedKg = useMemo(
-    () => Object.values(feedByType).reduce((s, g) => s + g.totalKg, 0),
-    [feedByType]
-  );
-
-  const totalFeedBags = useMemo(
-    () => Object.values(feedByType).reduce((s, g) => s + g.totalBags, 0),
-    [feedByType]
-  );
-
-  const otherFeed = useMemo(() => Object.entries(feedByType)
-    .filter(([type]) => !FEED_TYPES_DISPLAYED.includes(type))
-    .reduce(
-      (acc, [, g]) => ({ totalKg: acc.totalKg + g.totalKg, totalBags: acc.totalBags + g.totalBags }),
-      { totalKg: 0, totalBags: 0 }
-    ),
-  [feedByType]);
 
   const expenseBreakdown = useMemo(() => {
     const groups = {};
@@ -254,16 +233,45 @@ export default function BatchOverviewTab({ batch, batchId, onJumpTab }) {
               label: t('dashboard.mortalityRate', 'Mortality'),
               value: `${mortalityPct.toFixed(2)}%`,
               valueColor: mortColor,
+              // Absolute death count under the rate — answers
+              // "1.59% of how many?" without forcing the user to
+              // sum the per-house rows. Hidden at zero so a fresh
+              // batch's footer doesn't read "0 deaths".
+              subValue: totalDeaths > 0
+                ? t('batches.deathsCount', '{{count}} deaths', {
+                    count: fmtInt(totalDeaths),
+                  })
+                : null,
             },
             {
               icon: Wheat,
               label: t('batches.totalFeed', 'Feed'),
               value: fmtCompactKg(totalFeedConsumedKg),
+              // Pair consumed with ordered using the same
+              // "of {{X}}" pattern the headline already uses
+              // ("of 33,000 placed"). Hidden when nothing has
+              // been ordered yet — the stat keeps its single-line
+              // shape rather than reading "of 0t".
+              subValue: totalFeedOrderedKg > 0
+                ? t('batches.feedOfOrdered', 'of {{total}}', {
+                    total: fmtCompactKg(totalFeedOrderedKg),
+                  })
+                : null,
             },
             {
               icon: Droplets,
               label: t('batches.totalWater', 'Water'),
               value: fmtCompactL(totalWaterL),
+              // Cumulative L/bird against currently-alive birds —
+              // matches the FeedInventoryCard's per-bird convention
+              // so the two cards agree on what "/ bird" means.
+              // Hidden when no birds are alive (which doubles as a
+              // guard against fresh / completed batches).
+              subValue: currentBirds > 0 && totalWaterL > 0
+                ? t('batches.waterPerBirdShort', '{{value}} L/bird', {
+                    value: (totalWaterL / currentBirds).toFixed(2),
+                  })
+                : null,
             },
           ]}
         >
@@ -365,93 +373,12 @@ export default function BatchOverviewTab({ batch, batchId, onJumpTab }) {
           ) : null}
         </BatchKpiCard>
 
-        <BatchKpiCard
-          title={t('batches.feedMix', 'Feed')}
-          icon={Wheat}
+        <FeedInventoryCard
+          feedOrders={feedOrders}
+          dailyLogs={dailyLogs}
+          houses={houses}
           onPress={() => onJumpTab?.('feedOrders')}
-          headline={`${fmtInt(totalFeedKg)}`}
-          subline={totalFeedBags > 0
-            ? `kg  ·  ${fmtInt(totalFeedBags)} ${t('batches.bags', 'bags')}`
-            : 'kg'}
-        >
-          {totalFeedKg === 0 ? (
-            <Text
-              style={{
-                fontSize: 13,
-                fontFamily: 'Poppins-Regular',
-                color: mutedColor,
-                textAlign: 'center',
-                paddingVertical: 12,
-              }}
-            >
-              {t('batches.operations.noEntries', 'No entries yet')}
-            </Text>
-          ) : (
-            <View style={{ gap: 10, marginTop: 4 }}>
-              {[...FEED_TYPES_DISPLAYED, ...(otherFeed.totalKg > 0 ? ['OTHER'] : [])]
-                .sort((a, b) => (FEED_TYPE_ORDER[a] ?? 99) - (FEED_TYPE_ORDER[b] ?? 99))
-                .map((type) => {
-                  const kg = type === 'OTHER' ? otherFeed.totalKg : (feedByType[type]?.totalKg || 0);
-                  const bags = type === 'OTHER' ? otherFeed.totalBags : (feedByType[type]?.totalBags || 0);
-                  const widthPct = totalFeedKg > 0 ? (kg / totalFeedKg) * 100 : 0;
-                  return (
-                    <View key={type}>
-                      <View
-                        style={[
-                          styles.barLabelRow,
-                          { flexDirection: rowDirection(isRTL) },
-                        ]}
-                      >
-                        <Text
-                          style={{
-                            flex: 1,
-                            fontSize: 12,
-                            fontFamily: 'Poppins-Medium',
-                            color: textColor,
-                            textAlign: textAlignStart(isRTL),
-                          }}
-                        >
-                          {t(`feed.feedTypes.${type}`, type)}
-                        </Text>
-                        <Text
-                          style={{
-                            fontSize: 12,
-                            fontFamily: 'Poppins-Regular',
-                            color: mutedColor,
-                          }}
-                        >
-                          {fmtInt(kg)}
-                          <Text style={{ fontSize: 11 }}> kg</Text>
-                          {bags > 0 ? (
-                            <Text style={{ fontSize: 11, color: mutedColor }}>
-                              {`  (${fmtInt(bags)})`}
-                            </Text>
-                          ) : null}
-                        </Text>
-                      </View>
-                      <View
-                        style={[
-                          styles.barTrack,
-                          {
-                            backgroundColor: dark
-                              ? 'rgba(255,255,255,0.06)'
-                              : 'rgba(0,0,0,0.05)',
-                          },
-                        ]}
-                      >
-                        <View
-                          style={[
-                            styles.barFill,
-                            { backgroundColor: accentColor, width: `${widthPct}%` },
-                          ]}
-                        />
-                      </View>
-                    </View>
-                  );
-                })}
-            </View>
-          )}
-        </BatchKpiCard>
+        />
 
         <BatchKpiCard
           title={t('batches.expenseBreakdown', 'Expenses by category')}

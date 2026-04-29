@@ -9,7 +9,13 @@ import {
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
 import useSettings from '@/hooks/useSettings';
+import FeedProgressBar from '@/components/FeedProgressBar';
 import BatchKpiCard from '@/modules/broiler/components/BatchKpiCard';
+import {
+  aggregateOrderedByType,
+  allocateConsumedByType,
+  computeFeedInventory,
+} from '@/modules/broiler/lib/feedInventory';
 import { rowDirection, textAlignStart } from '@/lib/rtl';
 
 const NUMERIC_LOCALE = 'en-US';
@@ -42,20 +48,39 @@ const itemCostWithVat = (item, vatRate) => {
 /**
  * FeedMixHeroCard — KPI card for Feed Orders.
  *
- * Wraps `BatchKpiCard` (the canonical KPI primitive used by the dashboard
- * and Batch Detail tabs) so the eyebrow, headline + subscript suffix,
- * stat row, and surface treatment all match the rest of the app. The
- * per-feed-type bar chart lives in the `children` slot.
+ * Wraps `BatchKpiCard` so it sits in the same surface chrome as every
+ * other KPI tile in the app. Two-layer scope: the **stats** (orders
+ * count, total cost, cost/kg) reflect the user's current filters
+ * (date range, company, search, feed type), while the **per-type
+ * bars** show batch-wide consumption progress — the same
+ * `FeedProgressBar` primitive the Batch Overview / Performance Feed
+ * card uses, so the visual grammar stays unified across every
+ * feed-related surface in the app.
+ *
+ * The bars stay anchored to full-batch ordered + consumed totals so a
+ * date filter (or company filter) doesn't make the consumption fill
+ * look like it's running away from a shrunken envelope. When the
+ * user filters by feed type, only the matching phase rows render but
+ * each row's consumed/ordered numbers still come from the full batch.
+ *
+ * @param {object} props
+ * @param {Array} props.feedOrders - filtered orders, used for stats.
+ * @param {Array} [props.allFeedOrders] - unfiltered orders, used for the bars.
+ *   Falls back to `feedOrders` when omitted (e.g. legacy callers).
+ * @param {Array} [props.dailyLogs] - batch's daily logs; powers the consumption fill.
+ * @param {string[]} [props.feedTypeFilter=[]]
  */
 export default function FeedMixHeroCard({
   feedOrders = [],
+  allFeedOrders,
+  dailyLogs,
   feedTypeFilter = [],
 }) {
   const { t } = useTranslation();
   const isRTL = useIsRTL();
   const tokens = useHeroSheetTokens();
   const {
-    accentColor, dark, mutedColor, textColor,
+    mutedColor, textColor,
   } = tokens;
   const accounting = useSettings('accounting');
   const vatRate = accounting?.vatRate ?? 5;
@@ -116,7 +141,25 @@ export default function FeedMixHeroCard({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   ), [displayedTypes, feedByType, otherFeed]);
 
-  const totalKgInScope = displayedTotals.totalKg;
+  // Bars: anchored to the unfiltered batch view so consumption never
+  // runs away from a shrunken filtered envelope. Fall back to the
+  // filtered list when the unfiltered one isn't supplied so legacy
+  // callers (and any consumer that doesn't have a batch context)
+  // still get a sensible bar.
+  const orderedByTypeFull = useMemo(
+    () => aggregateOrderedByType(allFeedOrders ?? feedOrders),
+    [allFeedOrders, feedOrders]
+  );
+  const consumedKg = useMemo(
+    () => (dailyLogs
+      ? computeFeedInventory({ feedOrders: allFeedOrders ?? feedOrders, dailyLogs }).consumedKg
+      : 0),
+    [allFeedOrders, feedOrders, dailyLogs]
+  );
+  const consumedByType = useMemo(
+    () => allocateConsumedByType({ orderedByType: orderedByTypeFull, consumedKg }),
+    [orderedByTypeFull, consumedKg]
+  );
 
   const displayedOrderCount = useMemo(() => {
     if (feedTypeFilter.length === 0) return feedOrders.length;
@@ -136,68 +179,58 @@ export default function FeedMixHeroCard({
 
   const hasFeed = displayedTotals.totalKg > 0;
 
-  // Per-feed-type bars rendered inside BatchKpiCard's `children` slot.
-  // Empty state mirrors the rest of the app's "no entries yet" copy and
-  // sits in the same card chrome so the surface stays consistent.
+  // Per-feed-type bars rendered inside BatchKpiCard's `children`
+  // slot. Each row uses the shared FeedProgressBar so the visual is
+  // identical to the Batch Overview / Performance Feed card.
   const bars = hasFeed ? (
-    <View style={{ gap: 10 }}>
+    <View style={{ gap: 6, marginTop: 2 }}>
       {displayedTypes.map((type) => {
-        const stats = getTypeStats(type);
-        const kg = stats.totalKg;
-        const bags = stats.totalBags;
-        const widthPct = totalKgInScope > 0 ? (kg / totalKgInScope) * 100 : 0;
+        // Bar geometry uses full-batch ordered + consumed allocation
+        // (`orderedByTypeFull` / `consumedByType`) so the user sees
+        // accurate phase progress regardless of which filters they've
+        // applied above. The right-side label still shows the
+        // FILTERED ordered amount so the row's numbers tie back to
+        // the cost/orders stats up top.
+        const orderedFiltered = getTypeStats(type).totalKg;
+        const orderedFull = orderedByTypeFull[type]?.totalKg || 0;
+        const consumed = consumedByType[type] || 0;
         return (
-          <View key={type}>
-            <View
-              style={[
-                styles.barLabelRow,
-                { flexDirection: rowDirection(isRTL) },
-              ]}
+          <View
+            key={type}
+            style={[
+              styles.phaseRow,
+              { flexDirection: rowDirection(isRTL) },
+            ]}
+          >
+            <Text
+              style={{
+                width: 64,
+                fontSize: 11,
+                fontFamily: 'Poppins-SemiBold',
+                color: textColor,
+                letterSpacing: 0.4,
+                textTransform: 'uppercase',
+                textAlign: textAlignStart(isRTL),
+              }}
+              numberOfLines={1}
             >
-              <Text
-                style={{
-                  flex: 1,
-                  fontSize: 12,
-                  fontFamily: 'Poppins-Medium',
-                  color: textColor,
-                  textAlign: textAlignStart(isRTL),
-                }}
-              >
-                {t(`feed.feedTypes.${type}`, type)}
-              </Text>
-              <Text
-                style={{
-                  fontSize: 12,
-                  fontFamily: 'Poppins-Regular',
-                  color: mutedColor,
-                }}
-              >
-                {fmtInt(kg)}
-                <Text style={{ fontSize: 11 }}> kg</Text>
-                {bags > 0 ? (
-                  <Text style={{ fontSize: 11 }}>
-                    {`  (${fmtInt(bags)})`}
-                  </Text>
-                ) : null}
-              </Text>
+              {t(`feed.feedTypes.${type}`, type)}
+            </Text>
+            <View style={styles.barWrap}>
+              <FeedProgressBar consumedKg={consumed} orderedKg={orderedFull} />
             </View>
-            <View
-              style={[
-                styles.barTrack,
-                {
-                  backgroundColor: dark
-                    ? 'rgba(255,255,255,0.06)'
-                    : 'rgba(0,0,0,0.05)',
-                },
-              ]}
+            <Text
+              style={{
+                minWidth: 90,
+                fontSize: 10,
+                fontFamily: 'Poppins-Medium',
+                color: mutedColor,
+                textAlign: 'right',
+              }}
+              numberOfLines={1}
             >
-              <View
-                style={[
-                  styles.barFill,
-                  { backgroundColor: accentColor, width: `${widthPct}%` },
-                ]}
-              />
-            </View>
+              {`${fmtInt(consumed)}/${fmtInt(orderedFiltered)} kg`}
+            </Text>
           </View>
         );
       })}
@@ -246,17 +279,12 @@ export default function FeedMixHeroCard({
 }
 
 const styles = StyleSheet.create({
-  barLabelRow: {
+  phaseRow: {
     alignItems: 'center',
-    marginBottom: 6,
+    gap: 8,
   },
-  barTrack: {
-    height: 5,
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  barFill: {
-    height: '100%',
-    borderRadius: 3,
+  barWrap: {
+    flex: 1,
+    minWidth: 0,
   },
 });

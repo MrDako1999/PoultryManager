@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Home, ClipboardList, ChevronRight } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import PageTitle from '@/components/ui/page-title';
 import useAuthStore from '@/stores/authStore';
 import useLocalQuery from '@/hooks/useLocalQuery';
 
@@ -83,14 +84,10 @@ export default function WorkerHome() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-heading font-bold tracking-tight">
-          {t('dashboard.welcome', { name: user?.firstName || '' })}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {t('worker.assignedHousesSubtitle', 'Your assigned houses')}
-        </p>
-      </div>
+      <PageTitle
+        title={t('dashboard.welcome', { name: user?.firstName || '' })}
+        subtitle={t('worker.assignedHousesSubtitle', 'Your assigned houses')}
+      />
 
       {myHouses.length === 0 ? (
         <Card>

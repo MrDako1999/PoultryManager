@@ -25,7 +25,46 @@
     --border: 148 14% 87%;
     --input: 148 14% 87%;
     --ring: 148 60% 20%;
-    --radius: 0.5rem;
+    /*
+     * --radius bumped from 0.5rem to 0.625rem so rounded-md / rounded-lg
+     * come up half a step. Matches the mobile language's softer corners
+     * (mobile/docs/DESIGN_LANGUAGE.md §4 Border radii) without making
+     * desktop UI feel toy-like — buttons (rounded-2xl) land at 16pt, inputs
+     * (rounded-xl) at 12pt, cards (rounded-2xl) at 16pt.
+     */
+    --radius: 0.625rem;
+
+    /*
+     * Input atoms — translated from mobile/docs/DESIGN_LANGUAGE.md §2.
+     * The mobile pattern uses a soft-fill + 1.5pt focus border instead of
+     * the shadcn-default transparent fill + ring offset. We carry the
+     * tokens over so re-skinned web inputs read identical to the mobile
+     * SheetInput (sans the icon-prefix slot, which is opt-in).
+     */
+    --input-bg: 148 18% 96%;
+    --input-border-idle: 148 14% 88%;
+    --input-border-focus: 148 60% 30%;
+
+    /*
+     * --accent-strong is the brand-green active/focus colour used by
+     * inputs, checkboxes, and link affordances. Kept distinct from
+     * --primary (the CTA fill) so a focused input on top of a primary
+     * card doesn't visually fight the CTA underneath it.
+     */
+    --accent-strong: 148 60% 28%;
+
+    /*
+     * Status semantic tokens — replace the amber/emerald/red-100 literals
+     * scattered across the dashboard. Each pair is a 92% L tint background
+     * + a saturated foreground; brand-aligned so success lands on the
+     * green hue, not stock emerald.
+     */
+    --success-bg: 148 35% 92%;
+    --success-fg: 148 60% 22%;
+    --warning-bg: 38 92% 92%;
+    --warning-fg: 30 70% 35%;
+    --info-bg: 210 60% 94%;
+    --info-fg: 215 60% 35%;
 
     /*
      * Marketing / design-language tokens — translated from
@@ -44,6 +83,22 @@
     --section-border: 148 14% 88%;
     --elevated-card-bg: 148 22% 95%;
     --elevated-card-border: 148 16% 84%;
+    /* One step warmer than --elevated-card-bg, used for hover/pressed
+       state on tappable elevated cards (BatchCard, dashboard active
+       batches). Mobile parity: §2 token table. */
+    --elevated-card-pressed: 148 22% 89%;
+
+    /*
+     * FeedProgressBar palette — three accent shades on the same hue
+     * (148°) used by the 3-zone feed inventory bar. Lifted out as
+     * variables so the component can switch automatically with the
+     * theme without branching in JS. Tuned for *contrast*: the track
+     * is nearly the card background so empty-vs-fill reads cleanly,
+     * and the medium fill is a meaningfully darker step so the
+     * consumed → ordered boundary stays unambiguous on the bar.
+     */
+    --feed-bar-track: hsl(148, 30%, 95%);
+    --feed-bar-ordered: hsl(148, 38%, 68%);
   }
 
   .dark {
@@ -81,6 +136,32 @@
     --section-border: 150 12% 28%;
     --elevated-card-bg: 150 14% 22%;
     --elevated-card-border: 150 12% 30%;
+    --elevated-card-pressed: 150 16% 28%;
+
+    /* Input atoms — dark variant. Idle border is a hairline 24% L step;
+       focus border jumps to a brighter accent stop so the focus state
+       reads against the dark sheet without a glow. */
+    --input-bg: 150 16% 18%;
+    --input-border-idle: 150 14% 24%;
+    --input-border-focus: 148 55% 50%;
+
+    --accent-strong: 148 55% 55%;
+
+    /* Dark status tokens use a translucent fg-tint as the bg so the
+       pill reads on top of the dark card surface without introducing a
+       new opaque layer. */
+    --success-bg: 148 55% 55% / 0.16;
+    --success-fg: 148 55% 65%;
+    --warning-bg: 38 90% 60% / 0.18;
+    --warning-fg: 38 90% 70%;
+    --info-bg: 210 60% 60% / 0.18;
+    --info-fg: 210 60% 75%;
+
+    /* Feed bar palette — dark variant. Track is a low-alpha green
+       wash on the dark card; ordered fill bumps to a brighter
+       translucent value so the boundary reads against both. */
+    --feed-bar-track: rgba(148, 210, 165, 0.12);
+    --feed-bar-ordered: rgba(148, 210, 165, 0.58);
   }
 }
 

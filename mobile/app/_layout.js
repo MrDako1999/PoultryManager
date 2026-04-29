@@ -10,6 +10,8 @@ import { useColorScheme } from 'nativewind';
 import { ToastProvider } from '@/components/ui/Toast';
 import useThemeStore from '@/stores/themeStore';
 import useLocaleStore from '@/stores/localeStore';
+import useFeedDisplayStore from '@/stores/feedDisplayStore';
+import useFinancialPrivacyStore from '@/stores/financialPrivacyStore';
 import useNetwork from '@/hooks/useNetwork';
 import FullResyncOverlay from '@/components/FullResyncOverlay';
 import LanguageChangeOverlay from '@/components/LanguageChangeOverlay';
@@ -36,12 +38,16 @@ export default function RootLayout() {
 
   const { initTheme } = useThemeStore();
   const initLocale = useLocaleStore((s) => s.initLocale);
+  const initFeedDisplay = useFeedDisplayStore((s) => s.initFeedDisplay);
+  const initFinancialPrivacy = useFinancialPrivacyStore((s) => s.initFinancialPrivacy);
 
   useNetwork();
 
   useEffect(() => {
     initTheme();
     initLocale();
+    initFeedDisplay();
+    initFinancialPrivacy();
   }, []);
 
   useEffect(() => {

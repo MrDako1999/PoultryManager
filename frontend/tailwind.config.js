@@ -44,6 +44,28 @@ export default {
         elevatedCard: {
           DEFAULT: 'hsl(var(--elevated-card-bg))',
           border: 'hsl(var(--elevated-card-border))',
+          pressed: 'hsl(var(--elevated-card-pressed))',
+        },
+
+        // Atom-level visual tokens ported from mobile/docs/DESIGN_LANGUAGE.md
+        // §2 (input chrome) and the status-pill recipe (§8.d). Every shadcn
+        // primitive that needs the soft-fill input look or the brand-aligned
+        // success/warning/info tones consumes these.
+        inputBg: 'hsl(var(--input-bg))',
+        inputBorderIdle: 'hsl(var(--input-border-idle))',
+        inputBorderFocus: 'hsl(var(--input-border-focus))',
+        accentStrong: 'hsl(var(--accent-strong))',
+        success: {
+          DEFAULT: 'hsl(var(--success-fg))',
+          bg: 'hsl(var(--success-bg))',
+        },
+        warning: {
+          DEFAULT: 'hsl(var(--warning-fg))',
+          bg: 'hsl(var(--warning-bg))',
+        },
+        info: {
+          DEFAULT: 'hsl(var(--info-fg))',
+          bg: 'hsl(var(--info-bg))',
         },
       },
       borderRadius: {

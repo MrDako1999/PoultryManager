@@ -10,6 +10,7 @@ import * as Haptics from 'expo-haptics';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import { useIsRTL } from '@/stores/localeStore';
 import { rowDirection, textAlignStart } from '@/lib/rtl';
+import { textInputFit } from '@/lib/textInputFit';
 
 const DISMISS_THRESHOLD = 80;
 
@@ -552,6 +553,7 @@ const BottomPickerSheet = forwardRef(function BottomPickerSheet({
                     height: '100%',
                     textAlign: textAlignStart(isRTL),
                     writingDirection: isRTL ? 'rtl' : 'ltr',
+                    ...textInputFit,
                   }}
                 />
                 {search.length > 0 ? (

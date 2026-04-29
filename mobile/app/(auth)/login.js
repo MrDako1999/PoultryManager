@@ -22,6 +22,7 @@ import { useIsRTL } from '@/stores/localeStore';
 import HeroSheetScreen, { useHeroSheetTokens } from '@/components/HeroSheetScreen';
 import AuthHeroToolbar from '@/components/AuthHeroToolbar';
 import { rowDirection } from '@/lib/rtl';
+import { textInputFit } from '@/lib/textInputFit';
 
 const loginSchema = z.object({
   email: z.string().email('auth.emailInvalid').min(1, 'auth.emailRequired'),
@@ -159,6 +160,7 @@ export default function LoginScreen() {
                   height: '100%',
                   textAlign,
                   writingDirection: isRTL ? 'rtl' : 'ltr',
+                  ...textInputFit,
                 }}
               />
             </InputBox>
@@ -236,6 +238,7 @@ export default function LoginScreen() {
                   height: '100%',
                   textAlign,
                   writingDirection: isRTL ? 'rtl' : 'ltr',
+                  ...textInputFit,
                 }}
               />
               <Pressable

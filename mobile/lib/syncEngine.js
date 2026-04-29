@@ -17,6 +17,7 @@ import {
 } from './db';
 import api from './api';
 import { uploadPendingBlob } from './mediaQueue';
+import { recordError } from './errorBuffer';
 import useSyncStore from '@/stores/syncStore';
 import {
   REF_FIELDS,
@@ -304,6 +305,7 @@ export async function fullSync({ reportProgress = false } = {}) {
   } catch (err) {
     console.error('Full sync failed:', err);
     store.addSyncError({ type: 'fullSync', message: err.message, at: new Date().toISOString() });
+    recordError('syncEngine', err, undefined, { op: 'fullSync' });
     throw err;
   } finally {
     store.setSyncing(false);
@@ -325,6 +327,7 @@ export async function fullResync() {
     await fullSync({ reportProgress: true });
   } catch (err) {
     console.error('Full resync failed:', err);
+    recordError('syncEngine', err, undefined, { op: 'fullResync' });
   } finally {
     store.setFullResyncing(false);
     store.clearSyncProgress();
@@ -429,6 +432,10 @@ export async function deltaSync() {
       transient,
       message: err.message,
       at: new Date().toISOString(),
+    });
+    recordError('syncEngine', err, undefined, {
+      op: 'deltaSync',
+      transient: String(transient),
     });
     // Don't touch isOnline here. Mirroring the desktop, the OS link-layer
     // signal (NetInfo `state.isConnected`, surfaced via `useNetwork`) is
@@ -559,6 +566,11 @@ export async function processQueue() {
             `[${entry.entityType}/${entry.action}]:`,
           err.message
         );
+        recordError('mutationQueue', err, undefined, {
+          entityType: entry.entityType,
+          action: entry.action,
+          transient: String(transient),
+        });
 
         if (transient) {
           // Leave status='pending'. The next periodic sync (60s) or the
@@ -830,3 +842,32 @@ export function stopPeriodicSync() {
     intervalId = null;
   }
 }
+
+// `db.js` emits a `reconnect` event after evicting a dead native
+// handle on AppState resume (the EMUI failure mode where the JSI
+// binding gets torn down while the JS-side reference stays live).
+// When that happens the user's screens are stuck on stale state
+// (`useLocalQuery` got [] from the broken handle and silently
+// retained it). Trigger a deltaSync + processQueue once the new
+// handle is open so the UI catches up automatically instead of
+// waiting for the 60s tick or a manual pull-to-refresh.
+//
+// Debounced via `_reconnectTimer` so a burst of reconnect emits
+// (multiple AppState 'active' transitions in quick succession on
+// some devices) collapse to one sync run.
+let _reconnectTimer = null;
+const RECONNECT_DEBOUNCE_MS = 500;
+dbEvents.on('reconnect', () => {
+  if (_reconnectTimer) return;
+  _reconnectTimer = setTimeout(async () => {
+    _reconnectTimer = null;
+    const store = useSyncStore.getState();
+    if (!store.isOnline || store.isSyncing) return;
+    try {
+      await deltaSync();
+      await processQueue();
+    } catch (err) {
+      console.warn('[syncEngine] reconnect-driven sync failed:', err?.message);
+    }
+  }, RECONNECT_DEBOUNCE_MS);
+});

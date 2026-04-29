@@ -15,6 +15,19 @@ export const REF_FIELDS = {
   customer: 'businesses',
   existingBusinessId: 'businesses',
   existingContactId: 'contacts',
+
+  // Slaughterhouse module references — temp-id resolution paths used by
+  // the sync engine when the backend lands. Without these, an offline-
+  // created job + offline-created trucks would arrive at the server with
+  // mismatched parent refs once the queue starts draining.
+  job: 'processingJobs',
+  truckEntry: 'truckEntries',
+  supplier: 'businesses',
+  driver: 'contacts',
+  storageLocation: 'storageLocations',
+  stockUnit: 'stockUnits',
+  handover: 'handovers',
+  priceList: 'priceLists',
 };
 
 export const ARRAY_REF_FIELDS = {

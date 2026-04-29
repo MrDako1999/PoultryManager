@@ -1,9 +1,11 @@
 import { MODULE_IDS } from '@poultrymanager/shared';
 import { addModuleResources } from '@/i18n';
 import broiler from './broiler/index.js';
+import slaughterhouse from './slaughterhouse/index.js';
 
 export const MODULES = {
   [broiler.id]: broiler,
+  [slaughterhouse.id]: slaughterhouse,
 };
 
 export const MODULE_ORDER = MODULE_IDS.filter((id) => !!MODULES[id]);

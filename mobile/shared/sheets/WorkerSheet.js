@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useTranslation } from 'react-i18next';
-import { Users, Warehouse, Check } from 'lucide-react-native';
-import * as Haptics from 'expo-haptics';
+import { Users } from 'lucide-react-native';
 import useOfflineMutation from '@/hooks/useOfflineMutation';
 import useLocalQuery from '@/hooks/useLocalQuery';
 import useSettings from '@/hooks/useSettings';
@@ -15,11 +14,11 @@ import EnumButtonSelect from '@/components/ui/EnumButtonSelect';
 import DatePicker from '@/components/ui/DatePicker';
 import FormSheet from '@/components/FormSheet';
 import { FormSection, FormField } from '@/components/FormSheetParts';
-import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
+import FarmAssignmentList from '@/components/FarmAssignmentList';
 import { useIsRTL } from '@/stores/localeStore';
 import { useToast } from '@/components/ui/Toast';
 import api from '@/lib/api';
-import { rowDirection, textAlignStart } from '@/lib/rtl';
+import { rowDirection } from '@/lib/rtl';
 
 const WORKER_ROLES = ['manager', 'supervisor', 'labourer', 'driver', 'other'];
 
@@ -53,7 +52,6 @@ export default function WorkerSheet({
 }) {
   const { t } = useTranslation();
   const isRTL = useIsRTL();
-  const tokens = useHeroSheetTokens();
   const { toast } = useToast();
   const accounting = useSettings('accounting');
   const currency = accounting?.currency || 'AED';
@@ -104,13 +102,6 @@ export default function WorkerSheet({
     })),
     [t]
   );
-
-  const toggleFarm = (farmId) => {
-    Haptics.selectionAsync().catch(() => {});
-    setAssignedFarmIds((prev) =>
-      prev.includes(farmId) ? prev.filter((id) => id !== farmId) : [...prev, farmId]
-    );
-  };
 
   const onSubmit = async (data) => {
     setSaving(true);
@@ -373,129 +364,15 @@ export default function WorkerSheet({
             'Pick the farms this worker is responsible for. They will only see data for those farms.'
           )}
           padded={false}
-          style={{ padding: 12, gap: 12 }}
+          style={{ padding: 14, gap: 10 }}
         >
-          <View
-            style={{
-              borderRadius: 12,
-              borderWidth: 1,
-              borderColor: tokens.borderColor,
-              overflow: 'hidden',
-              backgroundColor: tokens.dark ? 'rgba(255,255,255,0.03)' : 'hsl(148, 22%, 96%)',
-            }}
-          >
-            {farms.map((farm, idx) => {
-              const isLast = idx === farms.length - 1;
-              const checked = assignedFarmIds.map(String).includes(String(farm._id));
-              return (
-                <FarmRow
-                  key={farm._id}
-                  farm={farm}
-                  checked={checked}
-                  isLast={isLast}
-                  onToggle={() => toggleFarm(farm._id)}
-                  tokens={tokens}
-                  isRTL={isRTL}
-                />
-              );
-            })}
-          </View>
+          <FarmAssignmentList
+            farms={farms}
+            value={assignedFarmIds}
+            onChange={setAssignedFarmIds}
+          />
         </FormSection>
       ) : null}
     </FormSheet>
   );
 }
-
-function FarmRow({ farm, checked, isLast, onToggle, tokens, isRTL }) {
-  const { textColor, accentColor, mutedColor, dark, borderColor } = tokens;
-  return (
-    <Pressable
-      onPress={onToggle}
-      android_ripple={{
-        color: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-        borderless: false,
-      }}
-      style={({ pressed }) => [
-        rowStyles.row,
-        {
-          flexDirection: rowDirection(isRTL),
-          borderBottomWidth: isLast ? 0 : StyleSheet.hairlineWidth,
-          borderBottomColor: borderColor,
-          backgroundColor: pressed
-            ? (dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)')
-            : 'transparent',
-        },
-      ]}
-    >
-      <View
-        style={[
-          rowStyles.checkbox,
-          {
-            backgroundColor: checked ? accentColor : 'transparent',
-            borderColor: checked ? accentColor : (dark ? 'hsl(150, 14%, 32%)' : 'hsl(148, 14%, 78%)'),
-          },
-        ]}
-      >
-        {checked ? <Check size={12} color="#ffffff" strokeWidth={3} /> : null}
-      </View>
-      <View style={[rowStyles.iconTile, {
-        backgroundColor: checked
-          ? (dark ? 'rgba(148,210,165,0.18)' : 'hsl(148, 35%, 92%)')
-          : (dark ? 'rgba(255,255,255,0.05)' : 'hsl(148, 18%, 95%)'),
-      }]}>
-        <Warehouse size={14} color={checked ? accentColor : mutedColor} strokeWidth={2.2} />
-      </View>
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text
-          style={{
-            fontSize: 14,
-            fontFamily: checked ? 'Poppins-SemiBold' : 'Poppins-Medium',
-            color: textColor,
-            textAlign: textAlignStart(isRTL),
-          }}
-          numberOfLines={1}
-        >
-          {farm.farmName}
-        </Text>
-        {farm.nickname ? (
-          <Text
-            style={{
-              fontSize: 11,
-              fontFamily: 'Poppins-Regular',
-              color: mutedColor,
-              textAlign: textAlignStart(isRTL),
-              marginTop: 2,
-            }}
-            numberOfLines={1}
-          >
-            {farm.nickname}
-          </Text>
-        ) : null}
-      </View>
-    </Pressable>
-  );
-}
-
-const rowStyles = StyleSheet.create({
-  row: {
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 6,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconTile: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});

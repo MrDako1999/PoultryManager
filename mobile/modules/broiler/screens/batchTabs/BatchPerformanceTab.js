@@ -24,6 +24,7 @@ import { rowDirection, textAlignStart } from '@/lib/rtl';
 import BatchKpiCard, {
   mortalityToneColor,
 } from '@/modules/broiler/components/BatchKpiCard';
+import FeedInventoryCard from '@/modules/broiler/components/FeedInventoryCard';
 
 const NUMERIC_LOCALE = 'en-US';
 
@@ -32,26 +33,6 @@ const fmt = (val, digits = 0) =>
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   });
-
-const fmtCompactKg = (val) => {
-  const n = Number(val || 0);
-  if (n >= 1000) {
-    return `${(n / 1000).toLocaleString(NUMERIC_LOCALE, {
-      minimumFractionDigits: 1, maximumFractionDigits: 1,
-    })}t`;
-  }
-  return `${fmt(n)} kg`;
-};
-
-const fmtCompactL = (val) => {
-  const n = Number(val || 0);
-  if (n >= 1000) {
-    return `${(n / 1000).toLocaleString(NUMERIC_LOCALE, {
-      minimumFractionDigits: 1, maximumFractionDigits: 1,
-    })}kL`;
-  }
-  return `${fmt(n)} L`;
-};
 
 export default function BatchPerformanceTab({ batch, batchId }) {
   const { t } = useTranslation();
@@ -67,6 +48,11 @@ export default function BatchPerformanceTab({ batch, batchId }) {
   const [consMetric, setConsMetric] = useState('feed');
   const [consView, setConsView] = useState('cumulative');
   const [dailyLogs, dailyLogsLoading] = useLocalQuery('dailyLogs', { batch: batchId });
+  // FeedInventoryCard needs ordered feed to compute remaining inventory.
+  // We don't gate the loading state on this — the card has its own
+  // empty/untracked treatment, and blocking the entire performance
+  // tab on an unrelated query would be a regression.
+  const [feedOrders] = useLocalQuery('feedOrders', { batch: batchId });
   const houses = batch?.houses || [];
   const startDate = batch?.startDate;
 
@@ -157,29 +143,6 @@ export default function BatchPerformanceTab({ batch, batchId }) {
       hasData: totalDeaths > 0,
     };
   }, [housesData, sortedHousesByMortality, totalInitial, cycleDays]);
-
-  const consumptionStats = useMemo(() => {
-    const dayCounts = new Set();
-    let totalFeed = 0;
-    let totalWater = 0;
-    (dailyLogs || []).forEach((log) => {
-      if (log.deletedAt || log.logType !== 'DAILY') return;
-      totalFeed += log.feedKg || 0;
-      totalWater += log.waterLiters || 0;
-      const dateKey = log.logDate || log.date;
-      if (dateKey && (log.feedKg || log.waterLiters)) {
-        dayCounts.add(new Date(dateKey).toISOString().slice(0, 10));
-      }
-    });
-    return {
-      totalFeed,
-      totalWater,
-      feedPerBird: totalInitial > 0 ? totalFeed / totalInitial : 0,
-      waterPerBird: totalInitial > 0 ? totalWater / totalInitial : 0,
-      daysLogged: dayCounts.size,
-      hasData: totalFeed > 0 || totalWater > 0,
-    };
-  }, [dailyLogs, totalInitial]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -285,28 +248,16 @@ export default function BatchPerformanceTab({ batch, batchId }) {
           />
         </ChartCard>
 
-        <BatchKpiCard
-          title={t('batches.consumptionSummary', 'Consumption')}
-          icon={Wheat}
-          headline={fmtCompactKg(consumptionStats.totalFeed)}
-          subline={`${fmtCompactL(consumptionStats.totalWater)}  ·  ${t('batches.totalWater', 'Water').toLowerCase()}`}
-          stats={[
-            {
-              icon: Wheat,
-              label: t('batches.feedPerBird', 'Feed / Bird'),
-              value: `${consumptionStats.feedPerBird.toFixed(2)} kg`,
-            },
-            {
-              icon: Droplets,
-              label: t('batches.waterPerBird', 'Water / Bird'),
-              value: `${consumptionStats.waterPerBird.toFixed(2)} L`,
-            },
-            {
-              icon: ClipboardList,
-              label: t('batches.daysLogged', 'Days Logged'),
-              value: fmt(consumptionStats.daysLogged),
-            },
-          ]}
+        {/* Unified Feed card — folds the old "Consumption" KPI and
+            the standalone Feed Inventory card into a single tile so
+            the Performance tab tells one feed story (consumed,
+            remaining, runway, FCR) instead of forcing the user to
+            cross-reference two cards. Same component used on the
+            Batch Overview tab. */}
+        <FeedInventoryCard
+          feedOrders={feedOrders}
+          dailyLogs={dailyLogs}
+          houses={houses}
         />
 
         <ChartCard

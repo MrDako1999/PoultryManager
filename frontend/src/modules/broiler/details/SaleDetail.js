@@ -177,7 +177,7 @@ export default function SaleDetail({ saleId, onEdit, onViewExpense, onClose }) {
                 <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', !countsOpen && '-rotate-90')} />
                   {cn_.chickensSent.toLocaleString('en-US')} {t('batches.saleForm.chickensSent').toLowerCase()}
-                  {losses > 0 && <span className="text-red-500 dark:text-red-400">(-{losses})</span>}
+                  {losses > 0 && <span className="text-destructive">(-{losses})</span>}
                 </span>
                 <span className="text-sm font-semibold text-primary">{wholeChickenCount.toLocaleString('en-US')} {t('batches.saleDetail.gradeA')}</span>
               </button>

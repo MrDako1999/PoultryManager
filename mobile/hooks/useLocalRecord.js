@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getEntityById, dbEvents } from '@/lib/db';
+import { recordError } from '@/lib/errorBuffer';
 
 export default function useLocalRecord(tableName, id) {
   const [record, setRecord] = useState(null);
@@ -12,6 +13,7 @@ export default function useLocalRecord(tableName, id) {
       setRecord(result);
     } catch (err) {
       console.error(`useLocalRecord(${tableName}, ${id}) error:`, err);
+      recordError('useLocalRecord', err, undefined, { table: tableName, id });
     } finally {
       setIsLoading(false);
     }

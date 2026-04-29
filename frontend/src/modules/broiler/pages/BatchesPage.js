@@ -35,13 +35,8 @@ import {
   ArrowUpRight,
   Warehouse,
   Home,
-  ChevronRight,
-  CheckCircle2,
-  Clock,
-  AlertTriangle,
-  CircleDashed,
-  CircleDot,
 } from 'lucide-react';
+import BatchCard from '@/modules/broiler/components/BatchCard';
 import SearchableSelect from '@/components/SearchableSelect';
 import CollapsibleSection from '@/components/CollapsibleSection';
 import QuickAddFarmDialog from '@/shared/sheets/QuickAddFarmDialog';
@@ -53,14 +48,6 @@ import useCapabilities from '@/hooks/useCapabilities';
 import { formatDateForInput } from '@/lib/format';
 
 const BATCH_STATUSES = ['NEW', 'IN_PROGRESS', 'COMPLETE', 'DELAYED', 'OTHER'];
-
-const STATUS_CONFIG = {
-  NEW: { icon: CircleDashed, color: 'text-muted-foreground', bg: 'bg-muted' },
-  IN_PROGRESS: { icon: Clock, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-100 dark:bg-amber-900/30' },
-  COMPLETE: { icon: CheckCircle2, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-100 dark:bg-emerald-900/30' },
-  DELAYED: { icon: AlertTriangle, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/30' },
-  OTHER: { icon: CircleDot, color: 'text-muted-foreground', bg: 'bg-muted' },
-};
 
 const batchSchema = z.object({
   farm: z.string().min(1, 'Farm is required'),
@@ -105,24 +92,28 @@ export default function BatchesPage() {
   const allBatches = useLocalQuery('batches');
   const farms = useLocalQuery('farms');
   const allHouses = useLocalQuery('houses');
-  const allSaleOrders = useLocalQuery('saleOrders');
+  const allDailyLogs = useLocalQuery('dailyLogs');
   const isLoading = false;
+
+  // Pre-aggregate deaths per batch ONCE so each <BatchCard> below doesn't
+  // re-walk dailyLogs (O(N*M) → O(N)). The card uses this to show the
+  // mortality-tinted `(-deaths) · pct%` line on every row, mirroring the
+  // dashboard active-batches summary.
+  const deathsByBatchId = useMemo(() => {
+    const acc = {};
+    allDailyLogs.forEach((log) => {
+      if (log.deletedAt || log.logType !== 'DAILY' || !log.deaths) return;
+      const batchId = typeof log.batch === 'object' ? log.batch?._id : log.batch;
+      if (!batchId) return;
+      acc[batchId] = (acc[batchId] || 0) + log.deaths;
+    });
+    return acc;
+  }, [allDailyLogs]);
 
   const farmsById = useMemo(
     () => Object.fromEntries(farms.map((f) => [f._id, f])),
     [farms]
   );
-
-  const lastSaleDateByBatch = useMemo(() => {
-    const map = {};
-    allSaleOrders.forEach((sale) => {
-      const batchId = sale.batch?._id || sale.batch;
-      if (!batchId || !sale.saleDate) return;
-      const d = new Date(sale.saleDate);
-      if (!map[batchId] || d > map[batchId]) map[batchId] = d;
-    });
-    return map;
-  }, [allSaleOrders]);
 
   const resolveFarm = (batch) => {
     if (batch.farm && typeof batch.farm === 'object') return batch.farm;
@@ -437,50 +428,17 @@ export default function BatchesPage() {
                     </span>
                   }
                 >
-                  {group.batches.map((batch) => {
-                    const farm = resolveFarm(batch);
-                    const displayName = batch.batchName || (farm
-                      ? `${farm.nickname || farm.farmName.substring(0, 8).toUpperCase()}-${batch.startDate ? formatBatchDate(batch.startDate) : '?'}`
-                      : t('batches.addBatch'));
-                    const avatarLetter = (farm?.nickname || farm?.farmName || '?')[0].toUpperCase();
-                    const batchNum = batch.sequenceNumber ?? '';
-                    const status = STATUS_CONFIG[batch.status] || STATUS_CONFIG.OTHER;
-                    const StatusIcon = status.icon;
-                    return (
-                      <div
+                  <div className="flex flex-col gap-2 p-2">
+                    {group.batches.map((batch) => (
+                      <BatchCard
                         key={batch._id}
-                        className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent/50 cursor-pointer group"
+                        batch={batch}
+                        deaths={deathsByBatchId[batch._id] || 0}
+                        variant="compact"
                         onClick={() => navigate(`/dashboard/batches/${batch._id}`)}
-                      >
-                        <div className="relative shrink-0">
-                          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-                            <span className="text-xs font-bold text-primary leading-none">{avatarLetter}{batchNum}</span>
-                          </div>
-                          <div className={`absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full ${status.bg} ring-2 ring-card`}>
-                            <StatusIcon className={`h-2.5 w-2.5 ${status.color}`} />
-                          </div>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">{displayName}</p>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                            {batch.startDate && (() => {
-                              const start = new Date(batch.startDate);
-                              const end = batch.status === 'COMPLETE'
-                                ? (lastSaleDateByBatch[batch._id] || start)
-                                : new Date();
-                              const days = Math.max(0, Math.floor((end - start) / 86400000));
-                              return (
-                                <span className="tabular-nums">
-                                  {batch.status === 'COMPLETE' ? `${days} days` : `Day ${days}`}
-                                </span>
-                              );
-                            })()}
-                          </div>
-                        </div>
-                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </div>
-                    );
-                  })}
+                      />
+                    ))}
+                  </div>
                 </CollapsibleSection>
               ))}
             </div>

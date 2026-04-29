@@ -133,7 +133,7 @@ function Row({ label, value, currency, bold, negative, highlight }) {
       className={cn(
         'flex items-center justify-between text-sm py-0.5',
         bold && 'font-semibold',
-        negative && 'text-red-600 dark:text-red-400',
+        negative && 'text-destructive',
         highlight && 'text-primary',
       )}
     >

@@ -24,7 +24,7 @@ export function Row({ label, value, bold, negative, highlight }) {
     <div className={cn(
       ROW_CLS,
       bold && 'font-semibold',
-      negative && 'text-red-600 dark:text-red-400',
+      negative && 'text-destructive',
       highlight && 'text-primary',
     )}>
       <span className={LABEL_CLS}>{label}</span>

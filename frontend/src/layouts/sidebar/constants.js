@@ -27,13 +27,18 @@ export const STORAGE_KEY = 'sidebar-collapsed';
  *
  * Composition order:
  *   1. Dashboard (always-on)
- *   2. Per-module sidebar groups (from `module.sidebarGroups`)
+ *   2. Per-module sidebar groups (from `module.sidebarGroups`) — scoped
+ *      to `visibleModules`, which the Sidebar narrows to just the active
+ *      module so the picker swaps the module-contributed nav cleanly.
  *   3. Directory group (always-on, children gated by per-entity capability)
- *   4. Accounting group (present when any module has at least one readable
- *      accounting tab — children still gated individually)
+ *   4. Accounting group (present when any module in `allModules` has at
+ *      least one readable accounting tab — children still gated
+ *      individually). Uses `allModules` so the accounting tab stays
+ *      visible across module switches.
  *   5. (Settings is rendered separately from these lists)
  */
-export function buildSidebar({ visibleModules = [], modules = {}, can }) {
+export function buildSidebar({ visibleModules = [], allModules = null, modules = {}, can }) {
+  const accountingScope = Array.isArray(allModules) ? allModules : visibleModules;
   const gate = typeof can === 'function' ? can : () => true;
 
   const navItems = [
@@ -75,7 +80,7 @@ export function buildSidebar({ visibleModules = [], modules = {}, can }) {
   }
 
   // Accounting — only if at least one module contributes a readable accounting tab.
-  const hasAccountingAccess = visibleModules.some((moduleId) => {
+  const hasAccountingAccess = accountingScope.some((moduleId) => {
     const tabs = modules[moduleId]?.accountingTabs || [];
     return tabs.some((t) => !t.capability || gate(t.capability));
   });

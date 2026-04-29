@@ -16,6 +16,13 @@ export default function BatchFeedOrdersTab({ batchId }) {
 
   const [feedOrders, loading] = useLocalQuery('feedOrders', { batch: batchId });
   const [allBusinesses] = useLocalQuery('businesses');
+  // Daily logs power the consumption fill on the FeedMixHeroCard's
+  // per-type bars — so the same "consumed vs ordered" relationship
+  // farmers see on the Batch Overview Feed card is also visible
+  // here. We deliberately do NOT gate `loading` on this query: the
+  // card has its own empty/missing-data fallbacks, and feed-order
+  // browsing shouldn't wait on log sync.
+  const [dailyLogs] = useLocalQuery('dailyLogs', { batch: batchId });
 
   const [search, setSearch] = useState('');
   const [dateRange, setDateRange] = useState(undefined);
@@ -139,6 +146,8 @@ export default function BatchFeedOrdersTab({ batchId }) {
           <View style={styles.heroWrap}>
             <FeedMixHeroCard
               feedOrders={filtered}
+              allFeedOrders={feedOrders}
+              dailyLogs={dailyLogs}
               feedTypeFilter={feedTypeFilter}
             />
           </View>

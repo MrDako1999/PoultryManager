@@ -117,11 +117,11 @@ export default function SyncIndicator() {
     statusLabel = `${failedCount} failed`;
   } else if (pendingCount > 0) {
     StatusIcon = RefreshCw;
-    iconClass = 'text-amber-500';
+    iconClass = 'text-warning';
     statusLabel = `${pendingCount} pending`;
   } else {
     StatusIcon = Check;
-    iconClass = 'text-emerald-500';
+    iconClass = 'text-success';
     statusLabel = 'Synced';
   }
 
@@ -137,7 +137,7 @@ export default function SyncIndicator() {
               <span
                 className={cn(
                   'absolute -top-0.5 -right-0.5 flex items-center justify-center h-4 min-w-4 rounded-full text-[10px] font-bold text-white px-1 pointer-events-none',
-                  failedCount > 0 ? 'bg-destructive' : 'bg-amber-500',
+                  failedCount > 0 ? 'bg-destructive' : 'bg-warning',
                 )}
               >
                 {badgeCount}

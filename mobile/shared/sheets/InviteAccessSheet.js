@@ -1,8 +1,7 @@
 import { useMemo, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Check, ChevronDown, ChevronRight, Warehouse } from 'lucide-react-native';
-import * as Haptics from 'expo-haptics';
+import { ChevronDown, ChevronRight } from 'lucide-react-native';
 import {
   ACCOUNT_ROLES as ALL_ROLES,
   MODULE_CAPABILITIES,
@@ -11,10 +10,11 @@ import {
 } from '@poultrymanager/shared';
 import EnumButtonSelect from '@/components/ui/EnumButtonSelect';
 import { useHeroSheetTokens } from '@/components/HeroSheetScreen';
-import { FormSection, FormField } from '@/components/FormSheetParts';
+import { FormSection } from '@/components/FormSheetParts';
+import FarmAssignmentList from '@/components/FarmAssignmentList';
 import useLocalQuery from '@/hooks/useLocalQuery';
 import { useIsRTL } from '@/stores/localeStore';
-import { rowDirection, textAlignStart } from '@/lib/rtl';
+import { textAlignStart } from '@/lib/rtl';
 
 const ASSIGNABLE_ROLES = ALL_ROLES.filter((r) => r !== 'owner');
 
@@ -54,7 +54,7 @@ export default function InviteAccessSheet({
   const { t } = useTranslation();
   const isRTL = useIsRTL();
   const tokens = useHeroSheetTokens();
-  const { mutedColor, textColor, accentColor, borderColor, dark } = tokens;
+  const { mutedColor } = tokens;
 
   const [farms] = useLocalQuery('farms');
 
@@ -78,17 +78,6 @@ export default function InviteAccessSheet({
     }
     return false;
   }, [accountRole, userModules]);
-
-  const selectedFarms = new Set((farmAssignments || []).map(String));
-
-  const toggleFarm = (farmId) => {
-    Haptics.selectionAsync().catch(() => {});
-    const id = String(farmId);
-    const next = new Set(selectedFarms);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    onFarmAssignments(Array.from(next));
-  };
 
   return (
     <View style={{ gap: 16 }}>
@@ -120,71 +109,13 @@ export default function InviteAccessSheet({
             'This role only sees data for farms you assign here.'
           )}
           padded={false}
-          style={{ padding: 12, gap: 12 }}
+          style={{ padding: 14, gap: 10 }}
         >
-          {farms.length === 0 ? (
-            <View
-              style={{
-                padding: 16,
-                borderRadius: 12,
-                borderWidth: 1,
-                borderColor,
-                alignItems: 'center',
-              }}
-            >
-              <Warehouse size={20} color={mutedColor} />
-              <Text
-                style={{
-                  fontSize: 13,
-                  fontFamily: 'Poppins-SemiBold',
-                  color: textColor,
-                  marginTop: 8,
-                }}
-              >
-                {t('settings.scopeNoFarmsTitle', 'No farms yet')}
-              </Text>
-              <Text
-                style={{
-                  fontSize: 11,
-                  fontFamily: 'Poppins-Regular',
-                  color: mutedColor,
-                  marginTop: 4,
-                  textAlign: 'center',
-                }}
-              >
-                {t(
-                  'settings.scopeNoFarmsDesc',
-                  'Create farms first; you can assign them once they exist.'
-                )}
-              </Text>
-            </View>
-          ) : (
-            <View
-              style={{
-                borderRadius: 12,
-                borderWidth: 1,
-                borderColor,
-                overflow: 'hidden',
-                backgroundColor: dark ? 'rgba(255,255,255,0.03)' : 'hsl(148, 22%, 96%)',
-              }}
-            >
-              {farms.map((farm, idx) => {
-                const isLast = idx === farms.length - 1;
-                const checked = selectedFarms.has(String(farm._id));
-                return (
-                  <FarmRow
-                    key={farm._id}
-                    farm={farm}
-                    checked={checked}
-                    isLast={isLast}
-                    onToggle={() => toggleFarm(farm._id)}
-                    tokens={tokens}
-                    isRTL={isRTL}
-                  />
-                );
-              })}
-            </View>
-          )}
+          <FarmAssignmentList
+            farms={farms}
+            value={farmAssignments}
+            onChange={onFarmAssignments}
+          />
         </FormSection>
       ) : (
         <FormSection
@@ -216,81 +147,6 @@ export default function InviteAccessSheet({
         tokens={tokens}
       />
     </View>
-  );
-}
-
-function FarmRow({ farm, checked, isLast, onToggle, tokens, isRTL }) {
-  const { textColor, accentColor, mutedColor, dark, borderColor } = tokens;
-  return (
-    <Pressable
-      onPress={onToggle}
-      android_ripple={{
-        color: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-        borderless: false,
-      }}
-      style={({ pressed }) => [
-        farmRowStyles.row,
-        {
-          flexDirection: rowDirection(isRTL),
-          borderBottomWidth: isLast ? 0 : StyleSheet.hairlineWidth,
-          borderBottomColor: borderColor,
-          backgroundColor: pressed
-            ? (dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)')
-            : 'transparent',
-        },
-      ]}
-    >
-      <View
-        style={[
-          farmRowStyles.checkbox,
-          {
-            backgroundColor: checked ? accentColor : 'transparent',
-            borderColor: checked ? accentColor : (dark ? 'hsl(150, 14%, 32%)' : 'hsl(148, 14%, 78%)'),
-          },
-        ]}
-      >
-        {checked ? <Check size={12} color="#ffffff" strokeWidth={3} /> : null}
-      </View>
-      <View
-        style={[
-          farmRowStyles.iconTile,
-          {
-            backgroundColor: checked
-              ? (dark ? 'rgba(148,210,165,0.18)' : 'hsl(148, 35%, 92%)')
-              : (dark ? 'rgba(255,255,255,0.05)' : 'hsl(148, 18%, 95%)'),
-          },
-        ]}
-      >
-        <Warehouse size={14} color={checked ? accentColor : mutedColor} strokeWidth={2.2} />
-      </View>
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text
-          style={{
-            fontSize: 14,
-            fontFamily: checked ? 'Poppins-SemiBold' : 'Poppins-Medium',
-            color: textColor,
-            textAlign: textAlignStart(isRTL),
-          }}
-          numberOfLines={1}
-        >
-          {farm.farmName}
-        </Text>
-        {farm.nickname ? (
-          <Text
-            style={{
-              fontSize: 11,
-              fontFamily: 'Poppins-Regular',
-              color: mutedColor,
-              textAlign: textAlignStart(isRTL),
-              marginTop: 2,
-            }}
-            numberOfLines={1}
-          >
-            {farm.nickname}
-          </Text>
-        ) : null}
-      </View>
-    </Pressable>
   );
 }
 
@@ -489,26 +345,3 @@ function PermPill({ label, on, locked = false, destructive = false, onPress, tok
   );
 }
 
-const farmRowStyles = StyleSheet.create({
-  row: {
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 6,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconTile: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});

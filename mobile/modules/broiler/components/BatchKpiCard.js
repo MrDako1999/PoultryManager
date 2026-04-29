@@ -42,6 +42,15 @@ export default function BatchKpiCard({
   children,
   stats,
   onPress,
+  // Optional ReactNode rendered in the chevron's position (top
+  // right of the headline row). When provided, the navigation
+  // chevron is suppressed even if the card is tappable — the
+  // consumer has explicitly claimed the slot for an inline
+  // affordance (e.g. the kg/bags toggle on the Feed card). The
+  // card-level `onPress` still fires when the user taps elsewhere
+  // on the card; the inner Pressable in `headlineRight` consumes
+  // its own touches via RN's responder system.
+  headlineRight,
 }) {
   const isRTL = useIsRTL();
   const tokens = useHeroSheetTokens();
@@ -58,8 +67,8 @@ export default function BatchKpiCard({
   // same horizontal indentation.
   const Inner = (
     <>
-      {/* Headline + chevron row */}
-      {(headline != null || headlinePrefix || headlineSuffix || tappable) ? (
+      {/* Headline + chevron / inline-action row */}
+      {(headline != null || headlinePrefix || headlineSuffix || tappable || headlineRight) ? (
         <View
           style={[
             styles.headlineRow,
@@ -135,7 +144,20 @@ export default function BatchKpiCard({
               ) : null}
             </View>
           </View>
-          {tappable ? (
+          {headlineRight ? (
+            // Pressable wrapper consumes touches in the 12px gap
+            // between the headline cluster and the inline action so
+            // the card-level `onPress` doesn't fire when the user
+            // is aiming at the toggle and lands a hair to the side.
+            // RN's responder system gives this no-op handler the
+            // touch before it bubbles to the outer card.
+            <Pressable
+              onPress={() => {}}
+              style={{ paddingStart: 12 }}
+            >
+              {headlineRight}
+            </Pressable>
+          ) : tappable ? (
             <ChevronGlyph
               size={18}
               color={mutedColor}
@@ -366,6 +388,32 @@ export function mortalityToneColor(pct, tokens) {
   if (pct >= 5) return tokens.errorColor;
   if (pct >= 2) return tokens.dark ? '#fbbf24' : '#d97706';
   return tokens.accentColor;
+}
+
+// Maps a feed-inventory status (see computeFeedInventory) to the tone
+// the KPI card should render the headline / subline / banner in.
+//
+//   ok        — comfortable runway, paint with accent (positive).
+//   low       — 3–7 days runway, amber so it's noticed but not alarming.
+//   critical  — under 3 days runway, red.
+//   over      — consumed already exceeds tracked orders, also red — the
+//               inventory math is under-water and the farmer needs to
+//               either log more orders or accept the reorder cue.
+//   untracked — no orders entered yet; muted because there's nothing
+//               to project against.
+export function feedStockToneColor(status, tokens) {
+  switch (status) {
+    case 'critical':
+    case 'over':
+      return tokens.errorColor;
+    case 'low':
+      return tokens.dark ? '#fbbf24' : '#d97706';
+    case 'untracked':
+      return tokens.mutedColor;
+    case 'ok':
+    default:
+      return tokens.accentColor;
+  }
 }
 
 const styles = StyleSheet.create({
